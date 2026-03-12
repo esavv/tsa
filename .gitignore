@@ -23,6 +23,7 @@ build/
 
 # Project
 *.db
+logs/
 *.sqlite3
 *.sqlite
 *.log

@@ -1,0 +1,2 @@
+# TSA wait times scraper – stdlib only (urllib, sqlite3, json).
+# No dependencies required for local MVP. Optional later: requests, flask, etc.
