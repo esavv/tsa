@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Terminal {{ terminal }} ({{ airport }}) – TSA Wait Times{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block body %}
+  <p class="back"><a href="/">← Back to all terminals</a></p>
+  <h1>{{ airport }} – Terminal {{ terminal }}</h1>
+  <p class="muted">Wait times over the last 24 hours</p>
+  <div class="chart-container">
+    <canvas id="chart"></canvas>
+  </div>
+  <div id="loading" class="muted">Loading history…</div>
+  <script>
+    const airport = "{{ airport }}";
+    const terminal = "{{ terminal }}";
+    fetch('/api/history?airport=' + encodeURIComponent(airport) + '&terminal=' + encodeURIComponent(terminal))
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        const labels = [];
+        const generalMinutes = [];
+        const precheckMinutes = [];
+        const combined = [];
+        const byTime = {};
+        for (const p of data.general || []) {
+          byTime[p.t] = { t: p.t, general: p.minutes, precheck: null };
+        }
+        for (const p of data.precheck || []) {
+          if (!byTime[p.t]) byTime[p.t] = { t: p.t, general: null, precheck: null };
+          byTime[p.t].precheck = p.minutes;
+        }
+        const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
+        for (const p of sorted) {
+          labels.push(new Date(p.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          generalMinutes.push(p.general != null ? p.general : null);
+          precheckMinutes.push(p.precheck != null ? p.precheck : null);
+        }
+        const ctx = document.getElementById('chart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'General', data: generalMinutes, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.2 },
+              { label: 'TSA PreCheck', data: precheckMinutes, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.1)', fill: true, tension: 0.2 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
+              x: { title: { display: true, text: 'Time' } }
+            }
+          }
+        });
+      })
+      .catch(e => {
+        document.getElementById('loading').textContent = 'Error: ' + e.message;
+      });
+  </script>
+{% endblock %}

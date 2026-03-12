@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}TSA Wait Times – JFK & LGA{% endblock %}
+{% block body %}
+  <h1>TSA security wait times</h1>
+  <p class="muted">Latest snapshot · <a href="/">Refresh</a></p>
+  <div id="loading">Loading…</div>
+  <div id="content" style="display: none;">
+    <p class="muted" id="scraped-at"></p>
+    <div class="airport-section" id="airports"></div>
+  </div>
+  <script>
+    fetch('/api/latest')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        if (data.scraped_at_utc) {
+          const d = new Date(data.scraped_at_utc);
+          document.getElementById('scraped-at').textContent = 'Last updated: ' + d.toLocaleString();
+        }
+        const names = { LGA: 'LaGuardia (LGA)', JFK: 'JFK' };
+        const container = document.getElementById('airports');
+        for (const [code, terminals] of Object.entries(data.airports || {})) {
+          const section = document.createElement('div');
+          section.className = 'airport-section';
+          section.innerHTML = '<h2>' + (names[code] || code) + '</h2>';
+          const table = document.createElement('table');
+          table.innerHTML = '<thead><tr><th>Terminal</th><th>General</th><th>PreCheck</th></tr></thead><tbody></tbody>';
+          const tbody = table.querySelector('tbody');
+          for (const row of terminals) {
+            const tr = document.createElement('tr');
+            const general = row.general != null ? row.general + ' min' : '–';
+            const precheck = row.precheck != null ? row.precheck + ' min' : '–';
+            tr.innerHTML =
+              '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + '">Terminal ' + row.terminal + '</a></td>' +
+              '<td>' + general + '</td><td>' + precheck + '</td>';
+            tbody.appendChild(tr);
+          }
+          section.appendChild(table);
+          container.appendChild(section);
+        }
+      })
+      .catch(e => {
+        document.getElementById('loading').textContent = 'Error: ' + e.message;
+      });
+  </script>
+{% endblock %}
