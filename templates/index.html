@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}TSA Wait Times – JFK & LGA{% endblock %}
+{% block title %}TSA Wait Times – JFK, LGA & EWR{% endblock %}
 {% block body %}
   <h1>TSA security wait times</h1>
   <p class="muted">Latest snapshot · <a href="/">Refresh</a></p>
@@ -18,9 +18,12 @@
           const d = new Date(data.scraped_at_utc);
           document.getElementById('scraped-at').textContent = 'Last updated: ' + d.toLocaleString();
         }
-        const names = { LGA: 'LaGuardia (LGA)', JFK: 'JFK' };
+        const names = { LGA: 'LaGuardia (LGA)', JFK: 'JFK', EWR: 'Newark (EWR)' };
+        const order = ['JFK', 'LGA', 'EWR'];
         const container = document.getElementById('airports');
-        for (const [code, terminals] of Object.entries(data.airports || {})) {
+        for (const code of order) {
+          const terminals = (data.airports || {})[code];
+          if (!terminals) continue;
           const section = document.createElement('div');
           section.className = 'airport-section';
           section.innerHTML = '<h2>' + (names[code] || code) + '</h2>';

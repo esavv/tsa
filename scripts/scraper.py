@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch LGA and JFK security wait times from API and insert into SQLite."""
+"""Fetch LGA, JFK, and EWR security wait times from API and insert into SQLite."""
 import os
 import sqlite3
 import urllib.request
@@ -10,6 +10,7 @@ API_BASE = "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWai
 AIRPORTS = {
     "LGA": "https://www.laguardiaairport.com/",
     "JFK": "https://www.jfkairport.com/",
+    "EWR": "https://www.newarkairport.com/",
 }
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
