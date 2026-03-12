@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+.env.local
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Project
+*.db
+*.sqlite3
+*.sqlite
+*.log
+.DS_Store
+
+# Optional: screenshot / OCR artifacts if we add them to disk
+# screenshots/
+# ocr_cache/
