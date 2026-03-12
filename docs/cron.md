@@ -20,7 +20,7 @@ Run the scraper every 15 minutes so you build a local history of TSA wait times.
 
 ## Crontab
 
-Use the full path to `python3` and the repo so cron runs correctly:
+Use the repo’s **venv** so cron uses the same Python as your local runs (and avoids version/type-hint issues). Run from repo root:
 
 ```bash
 crontab -e
@@ -30,7 +30,7 @@ Add:
 
 ```
 # TSA wait times: every 15 minutes
-*/15 * * * * cd /path/to/tsa && /usr/bin/env python3 scripts/run_scrape.py >> /path/to/tsa/logs/cron.log 2>&1
+*/15 * * * * cd /path/to/tsa && ./venv/bin/python scripts/run_scrape.py >> /path/to/tsa/logs/cron.log 2>&1
 ```
 
 Replace `/path/to/tsa` with your repo path (e.g. `$HOME/Projects/tsa`). Create `logs` if you use it:
@@ -42,7 +42,7 @@ mkdir -p /path/to/tsa/logs
 Optional: set `TSA_DB_PATH` in crontab if you want the DB elsewhere:
 
 ```
-*/15 * * * * cd /path/to/tsa && TSA_DB_PATH=/path/to/tsa/tsa.db /usr/bin/env python3 scripts/run_scrape.py >> ...
+*/15 * * * * cd /path/to/tsa && TSA_DB_PATH=/path/to/tsa/tsa.db ./venv/bin/python scripts/run_scrape.py >> ...
 ```
 
 ## Querying the data
