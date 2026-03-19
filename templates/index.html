@@ -1,5 +1,34 @@
 {% extends "base.html" %}
 {% block title %}TSA Wait Times – JFK, LGA & EWR{% endblock %}
+{% block head %}
+  <style>
+    .airport-section table {
+      width: auto;
+      min-width: 620px;
+    }
+    .metric-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      width: 100%;
+    }
+    .metric-value {
+      white-space: nowrap;
+    }
+    .spark-slot {
+      width: 140px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .sparkline {
+      width: 72px;
+      height: 26px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+  </style>
+{% endblock %}
 {% block body %}
   <h1>TSA security wait times</h1>
   <p class="muted">Latest snapshot · <a href="/">Refresh</a></p>
@@ -9,6 +38,39 @@
     <div class="airport-section" id="airports"></div>
   </div>
   <script>
+    function drawSparkline(canvas, points, color) {
+      if (!canvas || !points || points.length < 2) return;
+      const w = 72;
+      const h = 26;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+
+      const values = points.map(p => p.minutes).filter(v => v != null);
+      if (values.length < 2) return;
+      const minV = Math.min(...values);
+      const maxV = Math.max(...values);
+      const range = maxV - minV;
+      const pad = 2;
+      const isFlat = range === 0;
+
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        const x = pad + (i * (w - pad * 2)) / (points.length - 1);
+        const y = isFlat
+          ? h / 2
+          : h - pad - ((p.minutes - minV) / range) * (h - pad * 2);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
     fetch('/api/latest')
       .then(r => r.json())
       .then(data => {
@@ -41,10 +103,18 @@
             const tr = document.createElement('tr');
             const general = row.general != null ? row.general + ' min' : '–';
             const precheck = row.precheck != null ? row.precheck + ' min' : '–';
+            const gCanvasId = 'spark-g-' + code + '-' + row.terminal;
+            const pCanvasId = 'spark-p-' + code + '-' + row.terminal;
             tr.innerHTML =
               '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + '">Terminal ' + row.terminal + '</a></td>' +
-              '<td>' + general + '</td><td>' + precheck + '</td>';
+              '<td><span class="metric-wrap"><span class="metric-value">' + general + '</span><span class="spark-slot"><canvas class="sparkline" id="' + gCanvasId + '"></canvas></span></span></td>' +
+              '<td><span class="metric-wrap"><span class="metric-value">' + precheck + '</span><span class="spark-slot"><canvas class="sparkline" id="' + pCanvasId + '"></canvas></span></span></td>';
             tbody.appendChild(tr);
+
+            // Draw tiny 6-hour trend lines.
+            const rowCanvases = tr.querySelectorAll('canvas.sparkline');
+            drawSparkline(rowCanvases[0], row.spark_general || [], '#2563eb');
+            drawSparkline(rowCanvases[1], row.spark_precheck || [], '#16a34a');
           }
           section.appendChild(table);
           container.appendChild(section);

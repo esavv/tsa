@@ -27,7 +27,7 @@ def terminal_detail(airport: str, terminal: str):
 
 @app.route("/api/latest")
 def api_latest():
-    """Latest scrape: one timestamp, all airports/terminals with general + precheck."""
+    """Latest scrape + 6h sparkline series per airport/terminal/queue."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -49,22 +49,55 @@ def api_latest():
         (scraped_at_utc,),
     )
     rows = cur.fetchall()
-    conn.close()
-
     airports = {}
     for airport, terminal, queue_type, wait_minutes in rows:
         if airport not in airports:
             airports[airport] = {}
         if terminal not in airports[airport]:
-            airports[airport][terminal] = {"general": None, "precheck": None}
+            airports[airport][terminal] = {
+                "general": None,
+                "precheck": None,
+                "spark_general": [],
+                "spark_precheck": [],
+            }
         key = "general" if queue_type == "general" else "precheck"
         airports[airport][terminal][key] = wait_minutes
+
+    # Add 6-hour sparkline history per terminal/queue.
+    since_6h = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    cur.execute(
+        """
+        SELECT airport, terminal, queue_type, scraped_at_utc, wait_minutes
+        FROM wait_times
+        WHERE scraped_at_utc >= ?
+        ORDER BY scraped_at_utc
+        """,
+        (since_6h,),
+    )
+    history_rows = cur.fetchall()
+    conn.close()
+
+    for airport, terminal, queue_type, scraped_at_utc, wait_minutes in history_rows:
+        if airport not in airports or terminal not in airports[airport]:
+            continue
+        series_key = "spark_general" if queue_type == "general" else "spark_precheck"
+        airports[airport][terminal][series_key].append(
+            {"t": scraped_at_utc, "minutes": wait_minutes}
+        )
 
     # Convert to list of { terminal, general, precheck } per airport
     result = {}
     for airport, terms in airports.items():
         result[airport] = [
-            {"terminal": t, "general": d["general"], "precheck": d["precheck"]}
+            {
+                "terminal": t,
+                "general": d["general"],
+                "precheck": d["precheck"],
+                "spark_general": d["spark_general"],
+                "spark_precheck": d["spark_precheck"],
+            }
             for t, d in sorted(terms.items())
         ]
 
