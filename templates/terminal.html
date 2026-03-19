@@ -67,6 +67,7 @@
   <p class="back"><a href="/">← Back to all terminals</a></p>
   <h1>{{ airport }} – Terminal {{ terminal }}</h1>
   <p class="muted" id="range-subtitle">Security line wait times, last 24 hours</p>
+  <p class="muted" id="last-updated">Last updated: —</p>
   <div class="range-group" id="range-group">
     <button class="range-btn" data-hours="6">6H</button>
     <button class="range-btn" data-hours="12">12H</button>
@@ -84,9 +85,11 @@
     const terminal = "{{ terminal }}";
     const chartCanvas = document.getElementById('chart');
     let chart = null;
+    let currentHours = 24;
     const rangeSubtitle = document.getElementById('range-subtitle');
     const loadingEl = document.getElementById('loading');
     const calloutEl = document.getElementById('chart-callout');
+    const lastUpdatedEl = document.getElementById('last-updated');
     const rangeLabels = { 6: '6 hours', 12: '12 hours', 24: '24 hours', 72: '3 days', 168: '7 days' };
 
     function hideCallout() {
@@ -110,7 +113,31 @@
       rangeSubtitle.textContent = 'Security line wait times, last ' + rangeLabels[hours];
     }
 
+    function shouldShowTick(dateObj, hours) {
+      const minute = dateObj.getMinutes();
+      const hour = dateObj.getHours();
+      if (hours === 6) return minute === 0 || minute === 30;
+      if (hours === 12 || hours === 24) return minute === 0;
+      if (hours === 72) return minute === 0 && (hour % 6 === 0);
+      if (hours === 168) return minute === 0 && (hour % 12 === 0);
+      return false;
+    }
+
+    function formatTick(dateObj, hours) {
+      const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      if (hours === 6 || hours === 12 || hours === 24) {
+        // Keep 6/12/24h compact; show date only at midnight as day marker.
+        if (dateObj.getHours() === 0 && dateObj.getMinutes() === 0) {
+          return datePart + ' ' + timePart;
+        }
+        return timePart;
+      }
+      return datePart + ' ' + timePart;
+    }
+
     function renderChart(hours) {
+      currentHours = Number(hours);
       loadingEl.style.display = 'block';
       loadingEl.textContent = 'Loading history...';
       hideCallout();
@@ -125,8 +152,21 @@
         .then(data => {
           if (data.error) throw new Error(data.error);
           loadingEl.style.display = 'none';
+          if (data.latest_scraped_at_utc) {
+            const d = new Date(data.latest_scraped_at_utc);
+            lastUpdatedEl.textContent = 'Last updated: ' + d.toLocaleString([], {
+              year: 'numeric',
+              month: 'numeric',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit'
+            });
+          } else {
+            lastUpdatedEl.textContent = 'Last updated: —';
+          }
 
           const labels = [];
+          const rawTimes = [];
           const generalMinutes = [];
           const precheckMinutes = [];
           const byTime = {};
@@ -142,6 +182,7 @@
           const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
           for (const p of sorted) {
             labels.push(new Date(p.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+            rawTimes.push(p.t);
             generalMinutes.push(p.general != null ? p.general : null);
             precheckMinutes.push(p.precheck != null ? p.precheck : null);
           }
@@ -158,6 +199,7 @@
                   label: 'General',
                   data: generalMinutes,
                   borderColor: '#2563eb',
+                  borderWidth: 2,
                   backgroundColor: 'rgba(37,99,235,0.1)',
                   pointRadius: 0,
                   pointHoverRadius: 5,
@@ -168,6 +210,7 @@
                   label: 'TSA PreCheck',
                   data: precheckMinutes,
                   borderColor: '#16a34a',
+                  borderWidth: 2,
                   backgroundColor: 'rgba(22,163,74,0.1)',
                   pointRadius: 0,
                   pointHoverRadius: 5,
@@ -181,7 +224,17 @@
               maintainAspectRatio: false,
               interaction: { mode: 'index', intersect: false },
               plugins: {
-                legend: { display: true, position: 'bottom' },
+                legend: {
+                  display: true,
+                  position: 'bottom',
+                  align: 'end',
+                  labels: {
+                    usePointStyle: true,
+                    pointStyle: 'line',
+                    boxWidth: 40,
+                    boxHeight: 8
+                  }
+                },
                 tooltip: { enabled: false }
               },
               onHover: (event, _elements, chartRef) => {
@@ -199,7 +252,21 @@
               },
               scales: {
                 y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
-                x: { title: { display: true, text: 'Time' } }
+                x: {
+                  grid: { display: false, drawBorder: false },
+                  ticks: {
+                    autoSkip: false,
+                    minRotation: 45,
+                    maxRotation: 45,
+                    callback: function(_value, index) {
+                      const iso = rawTimes[index];
+                      if (!iso) return '';
+                      const dt = new Date(iso);
+                      if (!shouldShowTick(dt, currentHours)) return '';
+                      return formatTick(dt, currentHours);
+                    }
+                  }
+                }
               }
             }
           });
