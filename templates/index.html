@@ -2,41 +2,71 @@
 {% block title %}TSA Wait Times – JFK, LGA & EWR{% endblock %}
 {% block head %}
   <style>
-    .airport-section table {
-      width: auto;
-      min-width: 620px;
+    /* One shrink-wrapped column: title + tables share the same left edge;
+       the whole column is centered in the body (max-width 900px). */
+    main.home-layout {
+      width: 100%;
+    }
+    .home-cluster {
+      width: fit-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #airports {
+      display: flex;
+      flex-direction: column;
+    }
+    #airports > .airport-section {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    #airports > .airport-section table {
+      width: max-content;
+      max-width: 100%;
+    }
+    #airports > .airport-section th:nth-child(2),
+    #airports > .airport-section th:nth-child(3),
+    #airports > .airport-section td:nth-child(2),
+    #airports > .airport-section td:nth-child(3) {
+      white-space: nowrap;
+      padding-right: 0.45rem;
     }
     .metric-wrap {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 0.55rem;
-      width: 100%;
+      width: fit-content;
     }
     .metric-value {
       white-space: nowrap;
     }
     .spark-slot {
-      width: 140px;
-      display: flex;
-      justify-content: center;
+      display: inline-flex;
+      width: auto;
       align-items: center;
+      flex: 0 0 auto;
     }
     .sparkline {
       width: 72px;
       height: 26px;
-      display: inline-block;
-      vertical-align: middle;
+      display: block;
     }
   </style>
 {% endblock %}
 {% block body %}
-  <h1>TSA security wait times</h1>
-  <p class="muted">Latest snapshot · <a href="/">Refresh</a></p>
-  <div id="loading">Loading…</div>
-  <div id="content" style="display: none;">
-    <p class="muted" id="scraped-at"></p>
-    <div class="airport-section" id="airports"></div>
-  </div>
+  <main class="home-layout">
+    <div class="home-cluster">
+      <h1>TSA security wait times</h1>
+      <p class="muted">Latest snapshot · <a href="/">Refresh</a></p>
+      <div id="loading">Loading…</div>
+      <div id="content" style="display: none;">
+        <p class="muted" id="scraped-at"></p>
+        <div class="airport-section" id="airports"></div>
+      </div>
+    </div>
+  </main>
   <script>
     function drawSparkline(canvas, points, color) {
       if (!canvas || !points || points.length < 2) return;
