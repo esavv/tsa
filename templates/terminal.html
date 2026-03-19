@@ -2,62 +2,198 @@
 {% block title %}Terminal {{ terminal }} ({{ airport }}) – TSA Wait Times{% endblock %}
 {% block head %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .terminal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .range-group {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .range-btn {
+      border: 1px solid #d0d7e2;
+      border-radius: 999px;
+      background: #fff;
+      color: #334155;
+      font-size: 0.8rem;
+      padding: 0.25rem 0.6rem;
+      cursor: pointer;
+    }
+    .range-btn.active {
+      background: #1f2937;
+      color: #fff;
+      border-color: #1f2937;
+    }
+    .readout {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 1rem;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .readout .time {
+      font-weight: 600;
+    }
+  </style>
 {% endblock %}
 {% block body %}
   <p class="back"><a href="/">← Back to all terminals</a></p>
-  <h1>{{ airport }} – Terminal {{ terminal }}</h1>
-  <p class="muted">Wait times over the last 24 hours</p>
+  <div class="terminal-top">
+    <h1>{{ airport }} – Terminal {{ terminal }}</h1>
+    <div class="range-group" id="range-group">
+      <button class="range-btn" data-hours="6">6H</button>
+      <button class="range-btn" data-hours="12">12H</button>
+      <button class="range-btn active" data-hours="24">24H</button>
+      <button class="range-btn" data-hours="72">3D</button>
+      <button class="range-btn" data-hours="168">7D</button>
+    </div>
+  </div>
+  <p class="muted" id="range-subtitle">Wait times over the last 24 hours</p>
+  <div class="readout muted" id="readout">
+    <span class="time" id="readout-time">Move cursor over chart</span>
+    <span id="readout-general">General: —</span>
+    <span id="readout-precheck">TSA PreCheck: —</span>
+  </div>
   <div class="chart-container">
     <canvas id="chart"></canvas>
   </div>
-  <div id="loading" class="muted">Loading history…</div>
+  <div id="loading" class="muted">Loading history...</div>
   <script>
     const airport = "{{ airport }}";
     const terminal = "{{ terminal }}";
-    fetch('/api/history?airport=' + encodeURIComponent(airport) + '&terminal=' + encodeURIComponent(terminal))
-      .then(r => r.json())
-      .then(data => {
-        document.getElementById('loading').style.display = 'none';
-        const labels = [];
-        const generalMinutes = [];
-        const precheckMinutes = [];
-        const combined = [];
-        const byTime = {};
-        for (const p of data.general || []) {
-          byTime[p.t] = { t: p.t, general: p.minutes, precheck: null };
-        }
-        for (const p of data.precheck || []) {
-          if (!byTime[p.t]) byTime[p.t] = { t: p.t, general: null, precheck: null };
-          byTime[p.t].precheck = p.minutes;
-        }
-        const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
-        for (const p of sorted) {
-          labels.push(new Date(p.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-          generalMinutes.push(p.general != null ? p.general : null);
-          precheckMinutes.push(p.precheck != null ? p.precheck : null);
-        }
-        const ctx = document.getElementById('chart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              { label: 'General', data: generalMinutes, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.2 },
-              { label: 'TSA PreCheck', data: precheckMinutes, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.1)', fill: true, tension: 0.2 }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
-              x: { title: { display: true, text: 'Time' } }
-            }
-          }
-        });
-      })
-      .catch(e => {
-        document.getElementById('loading').textContent = 'Error: ' + e.message;
+    let chart = null;
+    const rangeSubtitle = document.getElementById('range-subtitle');
+    const loadingEl = document.getElementById('loading');
+    const readoutTime = document.getElementById('readout-time');
+    const readoutGeneral = document.getElementById('readout-general');
+    const readoutPrecheck = document.getElementById('readout-precheck');
+    const rangeLabels = { 6: '6 hours', 12: '12 hours', 24: '24 hours', 72: '3 days', 168: '7 days' };
+
+    function setReadout(label, general, precheck) {
+      readoutTime.textContent = label || 'Move cursor over chart';
+      readoutGeneral.textContent = 'General: ' + (general != null ? general + ' min' : '-');
+      readoutPrecheck.textContent = 'TSA PreCheck: ' + (precheck != null ? precheck + ' min' : '-');
+    }
+
+    function updateRangeButtons(hours) {
+      document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.hours === String(hours));
       });
+      rangeSubtitle.textContent = 'Wait times over the last ' + rangeLabels[hours];
+    }
+
+    function renderChart(hours) {
+      loadingEl.style.display = 'block';
+      loadingEl.textContent = 'Loading history...';
+      setReadout('', null, null);
+      updateRangeButtons(hours);
+
+      const url = '/api/history?airport=' + encodeURIComponent(airport)
+        + '&terminal=' + encodeURIComponent(terminal)
+        + '&hours=' + encodeURIComponent(hours);
+
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          loadingEl.style.display = 'none';
+
+          const labels = [];
+          const generalMinutes = [];
+          const precheckMinutes = [];
+          const byTime = {};
+
+          for (const p of data.general || []) {
+            byTime[p.t] = { t: p.t, general: p.minutes, precheck: null };
+          }
+          for (const p of data.precheck || []) {
+            if (!byTime[p.t]) byTime[p.t] = { t: p.t, general: null, precheck: null };
+            byTime[p.t].precheck = p.minutes;
+          }
+
+          const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
+          for (const p of sorted) {
+            labels.push(new Date(p.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+            generalMinutes.push(p.general != null ? p.general : null);
+            precheckMinutes.push(p.precheck != null ? p.precheck : null);
+          }
+
+          if (chart) chart.destroy();
+
+          const ctx = document.getElementById('chart').getContext('2d');
+          chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: 'General',
+                  data: generalMinutes,
+                  borderColor: '#2563eb',
+                  backgroundColor: 'rgba(37,99,235,0.1)',
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  fill: true,
+                  tension: 0.2
+                },
+                {
+                  label: 'TSA PreCheck',
+                  data: precheckMinutes,
+                  borderColor: '#16a34a',
+                  backgroundColor: 'rgba(22,163,74,0.1)',
+                  pointRadius: 0,
+                  pointHoverRadius: 5,
+                  fill: true,
+                  tension: 0.2
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: { mode: 'index', intersect: false }
+              },
+              onHover: (event, _elements, chartRef) => {
+                const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
+                if (!points.length) return;
+                const idx = points[0].index;
+                const label = chartRef.data.labels[idx];
+                const g = chartRef.data.datasets[0].data[idx];
+                const p = chartRef.data.datasets[1].data[idx];
+                setReadout(label, g, p);
+              },
+              scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
+                x: { title: { display: true, text: 'Time' } }
+              }
+            }
+          });
+
+          if (labels.length) {
+            const last = labels.length - 1;
+            setReadout(labels[last], generalMinutes[last], precheckMinutes[last]);
+          } else {
+            setReadout('No data in selected range', null, null);
+          }
+        })
+        .catch(e => {
+          loadingEl.style.display = 'block';
+          loadingEl.textContent = 'Error: ' + e.message;
+        });
+    }
+
+    document.querySelectorAll('.range-btn').forEach(btn => {
+      btn.addEventListener('click', () => renderChart(btn.dataset.hours));
+    });
+
+    renderChart(24);
   </script>
 {% endblock %}
