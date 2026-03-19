@@ -12,6 +12,17 @@
       max-width: 100%;
       margin-left: auto;
       margin-right: auto;
+      /* --- Home table spacing (toggle these) ---
+         Base table cell padding is in base.html: 0.4rem top/bottom, 0.75rem left/right. */
+      --home-terminal-pad-extra-x: 1rem; /* added to RIGHT of Terminal column only (after the link text) */
+      --home-spark-gap-before: 1rem;     /* space between "N min" text and the spark strip */
+      --home-spark-pad-before: 1rem;     /* padding inside spark cell, LEFT of the canvas */
+      --home-spark-pad-after: 2rem;      /* padding inside spark cell, RIGHT of the canvas */
+    }
+    #airports > .airport-section th:first-child,
+    #airports > .airport-section td:first-child {
+      padding-left: 0.75rem; /* base horizontal; no extra before terminal name */
+      padding-right: calc(0.75rem + var(--home-terminal-pad-extra-x));
     }
     #airports {
       display: flex;
@@ -36,7 +47,7 @@
     .metric-wrap {
       display: inline-flex;
       align-items: center;
-      gap: 0.55rem;
+      gap: var(--home-spark-gap-before);
       width: fit-content;
     }
     .metric-value {
@@ -47,6 +58,8 @@
       width: auto;
       align-items: center;
       flex: 0 0 auto;
+      padding-left: var(--home-spark-pad-before);
+      padding-right: var(--home-spark-pad-after);
     }
     .sparkline {
       width: 72px;
