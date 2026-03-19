@@ -10,11 +10,12 @@
     .home-cluster {
       width: fit-content;
       max-width: 100%;
+      min-width: 0; /* lets nested max-width % / overflow resolve on small screens */
       margin-left: auto;
       margin-right: auto;
       /* --- Home table spacing (toggle these) ---
          Base table cell padding is in base.html: 0.4rem top/bottom, 0.75rem left/right. */
-      --home-terminal-pad-extra-x: 7rem; /* added to RIGHT of Terminal column only (after the link text) */
+      --home-terminal-pad-extra-x: 3rem; /* added to RIGHT of Terminal column only (after the link text) */
       --home-spark-gap-before: 1rem;     /* space between "N min" text and the spark strip */
       --home-spark-pad-before: 0.5rem;     /* padding inside spark cell, LEFT of the canvas */
       --home-spark-pad-after: 1rem;      /* padding inside spark cell, RIGHT of the canvas */
@@ -23,6 +24,7 @@
     #airports > .airport-section td:first-child {
       padding-left: 0.75rem; /* base horizontal; no extra before terminal name */
       padding-right: calc(0.75rem + var(--home-terminal-pad-extra-x));
+      white-space: nowrap; /* keep “Terminal 1” on one line with padding after the link */
     }
     #airports {
       display: flex;
@@ -33,9 +35,14 @@
       flex-direction: column;
       align-items: flex-start;
     }
+    .home-table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
+    }
     #airports > .airport-section table {
       width: max-content;
-      max-width: 100%;
+      max-width: none; /* don’t squeeze columns; narrow viewports scroll instead */
     }
     #airports > .airport-section th:nth-child(2),
     #airports > .airport-section th:nth-child(3),
@@ -159,7 +166,10 @@
             drawSparkline(rowCanvases[0], row.spark_general || [], '#2563eb');
             drawSparkline(rowCanvases[1], row.spark_precheck || [], '#16a34a');
           }
-          section.appendChild(table);
+          const scrollWrap = document.createElement('div');
+          scrollWrap.className = 'home-table-scroll';
+          scrollWrap.appendChild(table);
+          section.appendChild(scrollWrap);
           container.appendChild(section);
         }
       })
