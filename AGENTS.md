@@ -1,5 +1,8 @@
 ## project context
- - TODO
+- This is a lightweight TSA wait-time tracker for Port Authority airports (currently JFK, LGA, EWR).
+- Data is collected from a public wait-times API every 15 minutes via cron (`scripts/run_scrape.py`) and stored in a local SQLite DB (`tsa.db`).
+- The Flask app (`app.py`) serves a home page with latest wait times plus mini trend sparklines, and terminal detail pages with interactive historical charts (range toggles, hover readouts).
+- Local dev typically runs with a Python venv; production currently runs on EC2 with nginx + certbot (HTTPS) in front of Flask.
 
  ## deployment history
   - a v1 of the app was deployed to an ec2 instance on March 12, 2026
