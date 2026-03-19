@@ -3,17 +3,12 @@
 {% block head %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    .terminal-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-    }
     .range-group {
       display: flex;
       gap: 0.35rem;
       flex-wrap: wrap;
       justify-content: flex-end;
+      margin-bottom: 0.5rem;
     }
     .range-btn {
       border: 1px solid #d0d7e2;
@@ -29,68 +24,96 @@
       color: #fff;
       border-color: #1f2937;
     }
-    .readout {
-      margin-top: 0.5rem;
-      display: flex;
-      gap: 1rem;
-      align-items: baseline;
-      flex-wrap: wrap;
+    .chart-container { position: relative; }
+    .chart-callout {
+      position: absolute;
+      top: 8px;
+      left: 0;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.88);
+      color: #0f172a;
+      border-radius: 10px;
+      padding: 0.45rem 0.7rem;
+      font-size: 0.8rem;
+      line-height: 1.3;
+      pointer-events: none;
+      white-space: nowrap;
+      display: none;
+      z-index: 10;
+      border: 1px solid #dbe2ea;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
-    .readout .time {
+    .chart-callout .line1 {
       font-weight: 600;
+      margin-bottom: 0.1rem;
+    }
+    .chart-callout .line2 {
+      color: #334155;
+      font-size: 0.78rem;
+    }
+    .chart-container {
+      height: 390px;
+    }
+    @media (min-width: 1200px) {
+      .chart-container {
+        height: 460px;
+      }
     }
   </style>
 {% endblock %}
 {% block body %}
   <p class="back"><a href="/">← Back to all terminals</a></p>
-  <div class="terminal-top">
-    <h1>{{ airport }} – Terminal {{ terminal }}</h1>
-    <div class="range-group" id="range-group">
-      <button class="range-btn" data-hours="6">6H</button>
-      <button class="range-btn" data-hours="12">12H</button>
-      <button class="range-btn active" data-hours="24">24H</button>
-      <button class="range-btn" data-hours="72">3D</button>
-      <button class="range-btn" data-hours="168">7D</button>
-    </div>
-  </div>
-  <p class="muted" id="range-subtitle">Wait times over the last 24 hours</p>
-  <div class="readout muted" id="readout">
-    <span class="time" id="readout-time">Move cursor over chart</span>
-    <span id="readout-general">General: —</span>
-    <span id="readout-precheck">TSA PreCheck: —</span>
+  <h1>{{ airport }} – Terminal {{ terminal }}</h1>
+  <p class="muted" id="range-subtitle">Security line wait times, last 24 hours</p>
+  <div class="range-group" id="range-group">
+    <button class="range-btn" data-hours="6">6H</button>
+    <button class="range-btn" data-hours="12">12H</button>
+    <button class="range-btn active" data-hours="24">24H</button>
+    <button class="range-btn" data-hours="72">3D</button>
+    <button class="range-btn" data-hours="168">7D</button>
   </div>
   <div class="chart-container">
+    <div id="chart-callout" class="chart-callout"></div>
     <canvas id="chart"></canvas>
   </div>
   <div id="loading" class="muted">Loading history...</div>
   <script>
     const airport = "{{ airport }}";
     const terminal = "{{ terminal }}";
+    const chartCanvas = document.getElementById('chart');
     let chart = null;
     const rangeSubtitle = document.getElementById('range-subtitle');
     const loadingEl = document.getElementById('loading');
-    const readoutTime = document.getElementById('readout-time');
-    const readoutGeneral = document.getElementById('readout-general');
-    const readoutPrecheck = document.getElementById('readout-precheck');
+    const calloutEl = document.getElementById('chart-callout');
     const rangeLabels = { 6: '6 hours', 12: '12 hours', 24: '24 hours', 72: '3 days', 168: '7 days' };
 
-    function setReadout(label, general, precheck) {
-      readoutTime.textContent = label || 'Move cursor over chart';
-      readoutGeneral.textContent = 'General: ' + (general != null ? general + ' min' : '-');
-      readoutPrecheck.textContent = 'TSA PreCheck: ' + (precheck != null ? precheck + ' min' : '-');
+    function hideCallout() {
+      calloutEl.style.display = 'none';
+    }
+
+    function showCallout(x, label, general, precheck) {
+      const gText = (general != null ? general + ' min' : '-');
+      const pText = (precheck != null ? precheck + ' min' : '-');
+      calloutEl.innerHTML =
+        '<div class="line1">' + label + '</div>' +
+        '<div class="line2">General: ' + gText + ' · PreCheck: ' + pText + '</div>';
+      calloutEl.style.left = x + 'px';
+      calloutEl.style.display = 'block';
     }
 
     function updateRangeButtons(hours) {
       document.querySelectorAll('.range-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.hours === String(hours));
       });
-      rangeSubtitle.textContent = 'Wait times over the last ' + rangeLabels[hours];
+      rangeSubtitle.textContent = 'Security line wait times, last ' + rangeLabels[hours];
     }
 
     function renderChart(hours) {
       loadingEl.style.display = 'block';
       loadingEl.textContent = 'Loading history...';
-      setReadout('', null, null);
+      hideCallout();
       updateRangeButtons(hours);
 
       const url = '/api/history?airport=' + encodeURIComponent(airport)
@@ -125,7 +148,7 @@
 
           if (chart) chart.destroy();
 
-          const ctx = document.getElementById('chart').getContext('2d');
+          const ctx = chartCanvas.getContext('2d');
           chart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -159,16 +182,20 @@
               interaction: { mode: 'index', intersect: false },
               plugins: {
                 legend: { display: true, position: 'bottom' },
-                tooltip: { mode: 'index', intersect: false }
+                tooltip: { enabled: false }
               },
               onHover: (event, _elements, chartRef) => {
                 const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
-                if (!points.length) return;
+                if (!points.length) {
+                  hideCallout();
+                  return;
+                }
                 const idx = points[0].index;
                 const label = chartRef.data.labels[idx];
                 const g = chartRef.data.datasets[0].data[idx];
                 const p = chartRef.data.datasets[1].data[idx];
-                setReadout(label, g, p);
+                const x = points[0].element.x;
+                showCallout(x, label, g, p);
               },
               scales: {
                 y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
@@ -179,20 +206,23 @@
 
           if (labels.length) {
             const last = labels.length - 1;
-            setReadout(labels[last], generalMinutes[last], precheckMinutes[last]);
+            const x = chart.scales.x.getPixelForValue(last);
+            showCallout(x, labels[last], generalMinutes[last], precheckMinutes[last]);
           } else {
-            setReadout('No data in selected range', null, null);
+            hideCallout();
           }
         })
         .catch(e => {
           loadingEl.style.display = 'block';
           loadingEl.textContent = 'Error: ' + e.message;
+          hideCallout();
         });
     }
 
     document.querySelectorAll('.range-btn').forEach(btn => {
       btn.addEventListener('click', () => renderChart(btn.dataset.hours));
     });
+    chartCanvas.addEventListener('mouseleave', hideCallout);
 
     renderChart(24);
   </script>
