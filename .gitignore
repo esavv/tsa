@@ -23,6 +23,7 @@ build/
 
 # Project
 *.db
+*.db.*
 *.pem
 logs/
 *.sqlite3
