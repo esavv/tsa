@@ -91,6 +91,19 @@ def api_history():
     cur = conn.cursor()
     cur.execute(
         """
+        SELECT scraped_at_utc
+        FROM wait_times
+        WHERE airport = ? AND terminal = ?
+        ORDER BY scraped_at_utc DESC
+        LIMIT 1
+        """,
+        (airport, terminal),
+    )
+    latest_row = cur.fetchone()
+    latest_scraped_at_utc = latest_row[0] if latest_row else None
+
+    cur.execute(
+        """
         SELECT scraped_at_utc, queue_type, wait_minutes
         FROM wait_times
         WHERE airport = ? AND terminal = ? AND scraped_at_utc >= ?
@@ -110,7 +123,11 @@ def api_history():
         else:
             precheck.append(point)
 
-    return jsonify(general=general, precheck=precheck)
+    return jsonify(
+        general=general,
+        precheck=precheck,
+        latest_scraped_at_utc=latest_scraped_at_utc,
+    )
 
 
 if __name__ == "__main__":

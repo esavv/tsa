@@ -16,7 +16,14 @@
         document.getElementById('content').style.display = 'block';
         if (data.scraped_at_utc) {
           const d = new Date(data.scraped_at_utc);
-          document.getElementById('scraped-at').textContent = 'Last updated: ' + d.toLocaleString();
+          document.getElementById('scraped-at').textContent =
+            'Last updated: ' + d.toLocaleString([], {
+              year: 'numeric',
+              month: 'numeric',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit'
+            });
         }
         const names = { LGA: 'LaGuardia (LGA)', JFK: 'JFK', EWR: 'Newark (EWR)' };
         const order = ['JFK', 'LGA', 'EWR'];
