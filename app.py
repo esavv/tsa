@@ -73,13 +73,18 @@ def api_latest():
 
 @app.route("/api/history")
 def api_history():
-    """Last 24h of wait times for one airport + terminal. Query params: airport, terminal."""
+    """History for one airport + terminal. Query params: airport, terminal, hours."""
     airport = request.args.get("airport")
     terminal = request.args.get("terminal")
     if not airport or not terminal:
         return jsonify(error="airport and terminal required"), 400
 
-    since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
+    hours = request.args.get("hours", "24")
+    allowed_hours = {"6", "12", "24", "72", "168"}
+    if hours not in allowed_hours:
+        return jsonify(error="hours must be one of 6, 12, 24, 72, 168"), 400
+
+    since = (datetime.now(timezone.utc) - timedelta(hours=int(hours))).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
     conn = get_db()
