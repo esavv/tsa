@@ -278,6 +278,14 @@
     function shouldShowTick(dateObj, hours) {
       const minute = dateObj.getMinutes();
       const hour = dateObj.getHours();
+      if (touchChartUi()) {
+        if (hours === 6) return minute === 0;
+        if (hours === 12) return minute === 0 && hour % 2 === 0;
+        if (hours === 24) return minute === 0 && hour % 3 === 0;
+        if (hours === 72) return minute === 0 && (hour === 0 || hour === 12);
+        if (hours === 168) return minute === 0 && hour === 0;
+        return false;
+      }
       if (hours === 6) return minute === 0 || minute === 30;
       if (hours === 12 || hours === 24) return minute === 0;
       if (hours === 72) return minute === 0 && (hour % 6 === 0);
@@ -287,6 +295,10 @@
 
     function formatTick(dateObj, hours) {
       const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      if (hours === 72 || hours === 168) {
+        const timeShort = dateObj.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+        return datePart + ' ' + timeShort;
+      }
       const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       if (hours === 6 || hours === 12 || hours === 24) {
         // Keep 6/12/24h compact; show date only at midnight as day marker.
@@ -397,7 +409,10 @@
             chartRef.update('none');
           },
           scales: {
-            y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
+            y: {
+              beginAtZero: true,
+              title: { display: !touchChartUi(), text: 'Minutes' }
+            },
             x: {
               grid: { display: false, drawBorder: false },
               ticks: {
