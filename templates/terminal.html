@@ -140,10 +140,9 @@
       }
     });
 
-    const mobileCrosshairPlugin = {
-      id: 'mobileCrosshair',
+    const readoutCrosshairPlugin = {
+      id: 'readoutCrosshair',
       afterDatasetsDraw(chartRef) {
-        if (!touchChartUi()) return;
         const idx = chartRef.$readoutIndex;
         if (idx == null || idx < 0) return;
         const meta0 = chartRef.getDatasetMeta(0);
@@ -178,7 +177,7 @@
         ctx.restore();
       }
     };
-    Chart.register(mobileCrosshairPlugin);
+    Chart.register(readoutCrosshairPlugin);
 
     function hideCallout() {
       calloutEl.style.display = 'none';
@@ -240,6 +239,7 @@
         const el = meta0.data[idx];
         const x = el ? el.x : chartRef.scales.x.getPixelForTick(idx);
         showCallout(x, label, g, p);
+        chartRef.update('none');
       }
     }
 
@@ -382,7 +382,9 @@
             if (touchChartUi()) return;
             const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
             if (!points.length) {
+              chartRef.$readoutIndex = null;
               hideCallout();
+              chartRef.update('none');
               return;
             }
             const idx = points[0].index;
@@ -390,7 +392,9 @@
             const g = chartRef.data.datasets[0].data[idx];
             const p = chartRef.data.datasets[1].data[idx];
             const x = points[0].element.x;
+            chartRef.$readoutIndex = idx;
             showCallout(x, label, g, p);
+            chartRef.update('none');
           },
           scales: {
             y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
@@ -425,6 +429,7 @@
           const el = meta0.data[last];
           const x = el ? el.x : chart.scales.x.getPixelForTick(last);
           showCallout(x, labels[last], generalMinutes[last], precheckMinutes[last]);
+          chart.update('none');
         }
       } else {
         hideCallout();
@@ -484,7 +489,13 @@
     document.querySelectorAll('.range-btn').forEach(btn => {
       btn.addEventListener('click', () => renderChart(btn.dataset.hours));
     });
-    chartCanvas.addEventListener('mouseleave', hideCallout);
+    chartCanvas.addEventListener('mouseleave', () => {
+      hideCallout();
+      if (chart) {
+        chart.$readoutIndex = null;
+        chart.update('none');
+      }
+    });
 
     renderChart(24);
   </script>
