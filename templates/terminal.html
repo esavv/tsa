@@ -24,6 +24,27 @@
       color: #fff;
       border-color: #1f2937;
     }
+    .chart-shell { margin: 1rem 0; }
+    .chart-reading-fixed {
+      display: none;
+      text-align: left;
+      margin-bottom: 0.5rem;
+      min-height: 2.8rem;
+    }
+    .chart-shell.touch-chart-ui .chart-reading-fixed {
+      display: block;
+    }
+    .chart-reading-fixed .line1 {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 0.95rem;
+      margin-bottom: 0.15rem;
+    }
+    .chart-reading-fixed .line2 {
+      color: #334155;
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
     .chart-container { position: relative; }
     .chart-callout {
       position: absolute;
@@ -44,6 +65,9 @@
       box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
+    }
+    .chart-shell.touch-chart-ui .chart-callout {
+      display: none !important;
     }
     .chart-callout .line1 {
       font-weight: 600;
@@ -75,35 +99,173 @@
     <button class="range-btn" data-hours="72">3D</button>
     <button class="range-btn" data-hours="168">7D</button>
   </div>
-  <div class="chart-container">
-    <div id="chart-callout" class="chart-callout"></div>
-    <canvas id="chart"></canvas>
+  <div id="chart-shell" class="chart-shell">
+    <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
+    <div class="chart-container">
+      <div id="chart-callout" class="chart-callout"></div>
+      <canvas id="chart"></canvas>
+    </div>
   </div>
   <div id="loading" class="muted">Loading history...</div>
   <script>
     const airport = "{{ airport }}";
     const terminal = "{{ terminal }}";
     const chartCanvas = document.getElementById('chart');
+    const chartShell = document.getElementById('chart-shell');
+    const readingFixedEl = document.getElementById('chart-reading-fixed');
     let chart = null;
+    let chartTouchAbort = null;
     let currentHours = 24;
+    let lastHistoryPayload = null;
+    let lastHistoryRequestHours = null;
     const rangeSubtitle = document.getElementById('range-subtitle');
     const loadingEl = document.getElementById('loading');
     const calloutEl = document.getElementById('chart-callout');
     const lastUpdatedEl = document.getElementById('last-updated');
     const rangeLabels = { 6: '6 hours', 12: '12 hours', 24: '24 hours', 72: '3 days', 168: '7 days' };
 
+    /** True when the device is touch-primary (no fine hover); desktop mouse UX stays default. */
+    const mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
+    function touchChartUi() {
+      return mqTouch.matches;
+    }
+    function syncTouchChartShell() {
+      chartShell.classList.toggle('touch-chart-ui', touchChartUi());
+    }
+    syncTouchChartShell();
+    mqTouch.addEventListener('change', () => {
+      syncTouchChartShell();
+      if (lastHistoryPayload != null && lastHistoryRequestHours != null) {
+        buildChartFromHistory(lastHistoryPayload, lastHistoryRequestHours);
+      }
+    });
+
+    const mobileCrosshairPlugin = {
+      id: 'mobileCrosshair',
+      afterDatasetsDraw(chartRef) {
+        if (!touchChartUi()) return;
+        const idx = chartRef.$readoutIndex;
+        if (idx == null || idx < 0) return;
+        const meta0 = chartRef.getDatasetMeta(0);
+        const meta1 = chartRef.getDatasetMeta(1);
+        const p0 = meta0.data[idx];
+        const p1 = meta1.data[idx];
+        const ok0 = p0 && !p0.skip;
+        const ok1 = p1 && !p1.skip;
+        const x = ok0 ? p0.x : (ok1 ? p1.x : null);
+        if (x == null) return;
+        const { ctx, chartArea } = chartRef;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        function dot(px, py, fill) {
+          ctx.fillStyle = fill;
+          ctx.beginPath();
+          ctx.arc(px, py, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        if (ok0) dot(p0.x, p0.y, '#2563eb');
+        if (ok1) dot(p1.x, p1.y, '#16a34a');
+        ctx.restore();
+      }
+    };
+    Chart.register(mobileCrosshairPlugin);
+
     function hideCallout() {
       calloutEl.style.display = 'none';
     }
 
-    function showCallout(x, label, general, precheck) {
+    function readoutHtml(label, general, precheck) {
       const gText = (general != null ? general + ' min' : '-');
       const pText = (precheck != null ? precheck + ' min' : '-');
-      calloutEl.innerHTML =
+      return (
         '<div class="line1">' + label + '</div>' +
-        '<div class="line2">General: ' + gText + ' · PreCheck: ' + pText + '</div>';
+        '<div class="line2">General: ' + gText + ' · PreCheck: ' + pText + '</div>'
+      );
+    }
+
+    function showCallout(x, label, general, precheck) {
+      calloutEl.innerHTML = readoutHtml(label, general, precheck);
       calloutEl.style.left = x + 'px';
       calloutEl.style.display = 'block';
+    }
+
+    function setFixedReadout(label, general, precheck) {
+      readingFixedEl.innerHTML = readoutHtml(label, general, precheck);
+    }
+
+    function clearFixedReadout() {
+      readingFixedEl.innerHTML = '';
+    }
+
+    function xToClosestIndex(chartRef, pixelX) {
+      const meta = chartRef.getDatasetMeta(0);
+      const pts = meta.data;
+      if (!pts.length) return null;
+      let best = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        const pt = pts[i];
+        if (!pt || pt.skip) continue;
+        const d = Math.abs(pixelX - pt.x);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    function applyReadoutAtIndex(chartRef, idx) {
+      if (idx == null || idx < 0) return;
+      const label = chartRef.data.labels[idx];
+      const g = chartRef.data.datasets[0].data[idx];
+      const p = chartRef.data.datasets[1].data[idx];
+      chartRef.$readoutIndex = idx;
+      if (touchChartUi()) {
+        hideCallout();
+        setFixedReadout(label, g, p);
+        chartRef.update('none');
+      } else {
+        const meta0 = chartRef.getDatasetMeta(0);
+        const el = meta0.data[idx];
+        const x = el ? el.x : chartRef.scales.x.getPixelForTick(idx);
+        showCallout(x, label, g, p);
+      }
+    }
+
+    function detachChartTouchHandlers() {
+      if (chartTouchAbort) {
+        chartTouchAbort.abort();
+        chartTouchAbort = null;
+      }
+    }
+
+    function attachChartTouchScrub(chartRef) {
+      detachChartTouchHandlers();
+      if (!touchChartUi()) return;
+      const canvas = chartRef.canvas;
+      const ac = new AbortController();
+      chartTouchAbort = ac;
+      const onTouch = (e) => {
+        if (!e.touches || !e.touches.length) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = e.touches[0].clientX - rect.left;
+        const idx = xToClosestIndex(chartRef, x);
+        if (idx != null) applyReadoutAtIndex(chartRef, idx);
+      };
+      canvas.addEventListener('touchstart', onTouch, { passive: false, signal: ac.signal });
+      canvas.addEventListener('touchmove', onTouch, { passive: false, signal: ac.signal });
     }
 
     function updateRangeButtons(hours) {
@@ -136,11 +298,146 @@
       return datePart + ' ' + timePart;
     }
 
+    function buildChartFromHistory(data, hours) {
+      currentHours = Number(hours);
+      hideCallout();
+      clearFixedReadout();
+      if (chart) {
+        detachChartTouchHandlers();
+        chart.destroy();
+        chart = null;
+      }
+
+      const labels = [];
+      const rawTimes = [];
+      const generalMinutes = [];
+      const precheckMinutes = [];
+      const byTime = {};
+
+      for (const p of data.general || []) {
+        byTime[p.t] = { t: p.t, general: p.minutes, precheck: null };
+      }
+      for (const p of data.precheck || []) {
+        if (!byTime[p.t]) byTime[p.t] = { t: p.t, general: null, precheck: null };
+        byTime[p.t].precheck = p.minutes;
+      }
+
+      const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
+      for (const p of sorted) {
+        labels.push(new Date(p.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+        rawTimes.push(p.t);
+        generalMinutes.push(p.general != null ? p.general : null);
+        precheckMinutes.push(p.precheck != null ? p.precheck : null);
+      }
+
+      const ctx = chartCanvas.getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'General',
+              data: generalMinutes,
+              borderColor: '#2563eb',
+              borderWidth: 2,
+              backgroundColor: 'rgba(37,99,235,0.1)',
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              fill: true,
+              tension: 0.2
+            },
+            {
+              label: 'TSA PreCheck',
+              data: precheckMinutes,
+              borderColor: '#16a34a',
+              borderWidth: 2,
+              backgroundColor: 'rgba(22,163,74,0.1)',
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              fill: true,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              align: 'end',
+              labels: {
+                usePointStyle: true,
+                pointStyle: 'line',
+                boxWidth: 40,
+                boxHeight: 8
+              }
+            },
+            tooltip: { enabled: false }
+          },
+          onHover: (event, _elements, chartRef) => {
+            if (touchChartUi()) return;
+            const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
+            if (!points.length) {
+              hideCallout();
+              return;
+            }
+            const idx = points[0].index;
+            const label = chartRef.data.labels[idx];
+            const g = chartRef.data.datasets[0].data[idx];
+            const p = chartRef.data.datasets[1].data[idx];
+            const x = points[0].element.x;
+            showCallout(x, label, g, p);
+          },
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
+            x: {
+              grid: { display: false, drawBorder: false },
+              ticks: {
+                autoSkip: false,
+                minRotation: 45,
+                maxRotation: 45,
+                callback: function(_value, index) {
+                  const iso = rawTimes[index];
+                  if (!iso) return '';
+                  const dt = new Date(iso);
+                  if (!shouldShowTick(dt, currentHours)) return '';
+                  return formatTick(dt, currentHours);
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (labels.length) {
+        const last = labels.length - 1;
+        chart.$readoutIndex = last;
+        if (touchChartUi()) {
+          setFixedReadout(labels[last], generalMinutes[last], precheckMinutes[last]);
+          chart.update('none');
+          attachChartTouchScrub(chart);
+        } else {
+          const meta0 = chart.getDatasetMeta(0);
+          const el = meta0.data[last];
+          const x = el ? el.x : chart.scales.x.getPixelForTick(last);
+          showCallout(x, labels[last], generalMinutes[last], precheckMinutes[last]);
+        }
+      } else {
+        hideCallout();
+        clearFixedReadout();
+      }
+    }
+
     function renderChart(hours) {
       currentHours = Number(hours);
       loadingEl.style.display = 'block';
       loadingEl.textContent = 'Loading history...';
       hideCallout();
+      clearFixedReadout();
       updateRangeButtons(hours);
 
       const url = '/api/history?airport=' + encodeURIComponent(airport)
@@ -165,124 +462,22 @@
             lastUpdatedEl.textContent = 'Last updated: —';
           }
 
-          const labels = [];
-          const rawTimes = [];
-          const generalMinutes = [];
-          const precheckMinutes = [];
-          const byTime = {};
-
-          for (const p of data.general || []) {
-            byTime[p.t] = { t: p.t, general: p.minutes, precheck: null };
-          }
-          for (const p of data.precheck || []) {
-            if (!byTime[p.t]) byTime[p.t] = { t: p.t, general: null, precheck: null };
-            byTime[p.t].precheck = p.minutes;
-          }
-
-          const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
-          for (const p of sorted) {
-            labels.push(new Date(p.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
-            rawTimes.push(p.t);
-            generalMinutes.push(p.general != null ? p.general : null);
-            precheckMinutes.push(p.precheck != null ? p.precheck : null);
-          }
-
-          if (chart) chart.destroy();
-
-          const ctx = chartCanvas.getContext('2d');
-          chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels,
-              datasets: [
-                {
-                  label: 'General',
-                  data: generalMinutes,
-                  borderColor: '#2563eb',
-                  borderWidth: 2,
-                  backgroundColor: 'rgba(37,99,235,0.1)',
-                  pointRadius: 0,
-                  pointHoverRadius: 5,
-                  fill: true,
-                  tension: 0.2
-                },
-                {
-                  label: 'TSA PreCheck',
-                  data: precheckMinutes,
-                  borderColor: '#16a34a',
-                  borderWidth: 2,
-                  backgroundColor: 'rgba(22,163,74,0.1)',
-                  pointRadius: 0,
-                  pointHoverRadius: 5,
-                  fill: true,
-                  tension: 0.2
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              interaction: { mode: 'index', intersect: false },
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'bottom',
-                  align: 'end',
-                  labels: {
-                    usePointStyle: true,
-                    pointStyle: 'line',
-                    boxWidth: 40,
-                    boxHeight: 8
-                  }
-                },
-                tooltip: { enabled: false }
-              },
-              onHover: (event, _elements, chartRef) => {
-                const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
-                if (!points.length) {
-                  hideCallout();
-                  return;
-                }
-                const idx = points[0].index;
-                const label = chartRef.data.labels[idx];
-                const g = chartRef.data.datasets[0].data[idx];
-                const p = chartRef.data.datasets[1].data[idx];
-                const x = points[0].element.x;
-                showCallout(x, label, g, p);
-              },
-              scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Minutes' } },
-                x: {
-                  grid: { display: false, drawBorder: false },
-                  ticks: {
-                    autoSkip: false,
-                    minRotation: 45,
-                    maxRotation: 45,
-                    callback: function(_value, index) {
-                      const iso = rawTimes[index];
-                      if (!iso) return '';
-                      const dt = new Date(iso);
-                      if (!shouldShowTick(dt, currentHours)) return '';
-                      return formatTick(dt, currentHours);
-                    }
-                  }
-                }
-              }
-            }
-          });
-
-          if (labels.length) {
-            const last = labels.length - 1;
-            const x = chart.scales.x.getPixelForValue(last);
-            showCallout(x, labels[last], generalMinutes[last], precheckMinutes[last]);
-          } else {
-            hideCallout();
-          }
+          lastHistoryPayload = data;
+          lastHistoryRequestHours = Number(hours);
+          buildChartFromHistory(data, hours);
         })
         .catch(e => {
           loadingEl.style.display = 'block';
           loadingEl.textContent = 'Error: ' + e.message;
+          lastHistoryPayload = null;
+          lastHistoryRequestHours = null;
           hideCallout();
+          clearFixedReadout();
+          detachChartTouchHandlers();
+          if (chart) {
+            chart.destroy();
+            chart = null;
+          }
         });
     }
 
