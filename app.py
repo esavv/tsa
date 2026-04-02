@@ -1,59 +1,14 @@
 #!/usr/bin/env python3
 """Simple webapp: latest wait times + 24h terminal history charts."""
-import json
-import logging
 import os
 import sqlite3
-import time
 from datetime import datetime, timezone, timedelta
-
 from flask import Flask, render_template, jsonify, request
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("TSA_DB_PATH", os.path.join(APP_DIR, "tsa.db"))
 
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
-
-_access_logger = logging.getLogger("tsa.access")
-_access_logger.setLevel(logging.INFO)
-if not _access_logger.handlers:
-    _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("%(message)s"))
-    _access_logger.addHandler(_h)
-_access_logger.propagate = False
-logging.getLogger("werkzeug").setLevel(logging.WARNING)
-
-
-def _access_log_enabled():
-    return os.environ.get("TSA_ACCESS_LOG", "true").lower() in ("1", "true", "yes")
-
-
-@app.before_request
-def _access_mark_start():
-    if _access_log_enabled():
-        request.environ["tsa.t0"] = time.perf_counter()
-
-
-@app.after_request
-def _access_log_line(response):
-    if not _access_log_enabled():
-        return response
-    t0 = request.environ.get("tsa.t0")
-    duration_ms = (
-        round((time.perf_counter() - t0) * 1000, 2) if t0 is not None else None
-    )
-    payload = {
-        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "client_ip": request.remote_addr,
-        "method": request.method,
-        "path": request.path,
-        "status": response.status_code,
-        "duration_ms": duration_ms,
-    }
-    _access_logger.info(json.dumps(payload, separators=(",", ":")))
-    return response
 
 
 def get_db():
