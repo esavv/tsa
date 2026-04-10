@@ -1,6 +1,6 @@
 # Webapp – view and visualize wait times
 
-- **Home:** Latest wait times for every terminal at JFK and LGA (general + PreCheck).
+- **Home:** Latest wait times for every terminal at JFK, LGA, and EWR (general + PreCheck).
 - **Terminal detail:** Click a terminal to see a 24-hour chart of general and PreCheck wait times.
 
 ## Run locally
