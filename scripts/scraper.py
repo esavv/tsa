@@ -18,10 +18,12 @@ NYC_AIRPORTS = {
 }
 LAX_WAIT_TIMES_URL = "https://www.flylax.com/wait-times"
 MIA_WAIT_TIMES_PAGE_URL = "https://www.miami-airport.com/tsa-waittimes.asp"
+SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
+DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 DEFAULT_DB_PATH = os.path.join(REPO_ROOT, "tsa.db")
-SCRAPE_AIRPORTS = ("LGA", "JFK", "EWR", "LAX", "MIA")
+SCRAPE_AIRPORTS = ("LGA", "JFK", "EWR", "LAX", "MIA", "SEA", "DCA")
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Encoding": "gzip, deflate",
@@ -75,6 +77,9 @@ def normalize_queue_type(value: str) -> str:
 
 def parse_wait_minutes(value: str) -> int:
     lowered = value.lower()
+    if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
+        return 0
+
     less_than = re.search(r"<\s*(\d+)", lowered)
     if less_than:
         return max(int(less_than.group(1)) - 1, 0)
@@ -205,6 +210,66 @@ def fetch_mia_airport() -> list[dict]:
     return rows
 
 
+def parse_microsoft_json_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = re.search(r"/Date\((\d+)\)/", value)
+    if not match:
+        return value
+    dt = datetime.fromtimestamp(int(match.group(1)) / 1000, timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def fetch_sea_airport() -> list[dict]:
+    payload = fetch_json_url(SEA_WAIT_TIMES_URL)
+    rows = []
+    for checkpoint in payload:
+        rows.append(
+            {
+                "airport": "SEA",
+                "terminal": normalize_terminal(str(checkpoint.get("Name", ""))),
+                "queue_type": "checkpoint",
+                "wait_minutes": int(checkpoint.get("WaitTimeMinutes", 0)) if checkpoint.get("IsOpen") and checkpoint.get("IsDataAvailable") else 0,
+                "source_updated_at": parse_microsoft_json_date(checkpoint.get("LastUpdated")),
+                "point_id": checkpoint.get("CheckpointID"),
+            }
+        )
+    return rows
+
+
+def fetch_dca_airport() -> list[dict]:
+    payload = fetch_json_url(DCA_WAIT_TIMES_URL)
+    rows = []
+    response = payload.get("response", {})
+    checkpoints = response.get("res", {})
+
+    for checkpoint in checkpoints.values():
+        terminal = normalize_terminal(checkpoint.get("location", ""))
+        if checkpoint.get("isDisabled") != 1:
+            rows.append(
+                {
+                    "airport": "DCA",
+                    "terminal": terminal,
+                    "queue_type": "general",
+                    "wait_minutes": parse_wait_minutes(str(checkpoint.get("waittime", "0"))),
+                    "source_updated_at": None,
+                    "point_id": None,
+                }
+            )
+        if checkpoint.get("pre_disabled") != 1:
+            rows.append(
+                {
+                    "airport": "DCA",
+                    "terminal": terminal,
+                    "queue_type": "precheck",
+                    "wait_minutes": parse_wait_minutes(str(checkpoint.get("pre", "0"))),
+                    "source_updated_at": None,
+                    "point_id": None,
+                }
+            )
+    return rows
+
+
 def fetch_airport(airport: str) -> list[dict]:
     if airport in NYC_AIRPORTS:
         return fetch_nyc_airport(airport)
@@ -212,6 +277,10 @@ def fetch_airport(airport: str) -> list[dict]:
         return fetch_lax_airport()
     if airport == "MIA":
         return fetch_mia_airport()
+    if airport == "SEA":
+        return fetch_sea_airport()
+    if airport == "DCA":
+        return fetch_dca_airport()
     raise ValueError(f"Unsupported airport: {airport}")
 
 
