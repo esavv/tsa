@@ -68,6 +68,8 @@ def normalize_queue_type(value: str) -> str:
         return "precheck"
     if "priority" in lowered:
         return "priority"
+    if "clear" in lowered:
+        return "clear"
     return "general"
 
 
