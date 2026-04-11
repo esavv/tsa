@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cron entry point: ensure DB exists, then fetch and store LGA/JFK wait times."""
+"""Cron entry point: ensure DB exists, then fetch and store supported airport wait times."""
 import os
 import sys
 
