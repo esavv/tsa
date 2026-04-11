@@ -228,7 +228,7 @@ def fetch_sea_airport() -> list[dict]:
             {
                 "airport": "SEA",
                 "terminal": normalize_terminal(str(checkpoint.get("Name", ""))),
-                "queue_type": "checkpoint",
+                "queue_type": "general",
                 "wait_minutes": int(checkpoint.get("WaitTimeMinutes", 0)) if checkpoint.get("IsOpen") and checkpoint.get("IsDataAvailable") else 0,
                 "source_updated_at": parse_microsoft_json_date(checkpoint.get("LastUpdated")),
                 "point_id": checkpoint.get("CheckpointID"),
