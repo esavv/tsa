@@ -2,7 +2,7 @@
 
 ## Summary
 
-Both **JFK** and **LGA** use the same backend API. You can get structured wait-time data with a simple HTTP GET and the right headers—**no headless browser or OCR required** for this path.
+**JFK**, **LGA**, and **EWR** use the same backend API. You can get structured wait-time data with a simple HTTP GET and the right headers, no headless browser or OCR required for this path.
 
 ---
 
@@ -12,7 +12,7 @@ Both **JFK** and **LGA** use the same backend API. You can get structured wait-t
 |------|--------|
 | **Base URL** | `https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/{AIRPORT}` |
 | **Method** | GET |
-| **Airport codes** | `LGA`, `JFK` |
+| **Airport codes** | `LGA`, `JFK`, `EWR` |
 
 ### Headers (required)
 
@@ -24,6 +24,9 @@ The API returns **401 Unauthorized** without these. Use the matching airport ori
 - **JFK:**  
   `Referer: https://www.jfkairport.com/`  
   `Origin: https://www.jfkairport.com/`
+- **EWR:**  
+  `Referer: https://www.newarkairport.com/`  
+  `Origin: https://www.newarkairport.com/`
 
 ### Example (curl)
 
@@ -35,6 +38,10 @@ curl -sS -H "Referer: https://www.laguardiaairport.com/" -H "Origin: https://www
 # JFK
 curl -sS -H "Referer: https://www.jfkairport.com/" -H "Origin: https://www.jfkairport.com/" \
   "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/JFK"
+
+# EWR
+curl -sS -H "Referer: https://www.newarkairport.com/" -H "Origin: https://www.newarkairport.com/" \
+  "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR"
 ```
 
 ---
@@ -77,4 +84,4 @@ Discovered via Cursor browser MCP: opened [laguardiaairport.com](https://www.lag
 - `https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/LGA`
 - Same host also used for parking, walk times, taxi wait times, alerts, and datetime config (e.g. `/api/v1/parking/LGA`, `/api/v1/walkTimes/LGA`, `/api/v1/TaxiWaitTimePoints/LGA`, `/api/v1/alerts/LGA`, `/api/v1/DateTimeConfigSettings/LGA`).
 
-JFK uses the same path with `JFK`; no separate browser test required once headers were set to the JFK origin.
+JFK and EWR use the same path with their matching airport codes; no separate browser test is needed once headers are set to the corresponding airport origin.
