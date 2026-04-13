@@ -111,14 +111,14 @@ def parse_wait_minutes(value: str) -> int:
 
 
 def omit_nyc_wait_point(point: dict) -> bool:
-    """Skip API points that represent closed / unavailable lanes with no wait (not literal0 min open)."""
+    """Skip API points for a closed queue with no wait. Open-but-unavailable (e.g. 'No Wait') still records 0."""
     try:
         minutes = int(point.get("timeInMinutes", 0))
     except (TypeError, ValueError):
         minutes = 0
     if minutes != 0:
         return False
-    if point.get("queueOpen") is False or point.get("isWaitTimeAvailable") is False:
+    if point.get("queueOpen") is False:
         return True
     return False
 
