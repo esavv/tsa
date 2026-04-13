@@ -119,7 +119,9 @@ def fetch_nyc_airport(airport: str) -> list[dict]:
                 "point_id": point.get("pointID"),
             }
         )
-    return rows
+    # EWR Terminal B is multiple checkpoints in the API; we only persist one row per
+    # terminal×queue today, so inserts collide and data is wrong. Skip until we store `gate`.
+    return [r for r in rows if not (airport == "EWR" and r["terminal"] == "B")]
 
 
 def fetch_lax_airport() -> list[dict]:
