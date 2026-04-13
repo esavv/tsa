@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Terminal {{ terminal }} ({{ airport }}) – TSA Wait Times{% endblock %}
+{% block title %}Terminal {{ terminal }}{% if gate %}: Gates {{ gate }}{% endif %} ({{ airport }}) – TSA Wait Times{% endblock %}
 {% block head %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
@@ -89,7 +89,7 @@
 {% endblock %}
 {% block body %}
   <p class="back"><a href="/">← Back to all terminals</a></p>
-  <h1>{{ airport }} – Terminal {{ terminal }}</h1>
+  <h1>{{ airport }} – Terminal {{ terminal }}{% if gate %}: Gates {{ gate }}{% endif %}</h1>
   <p class="muted" id="range-subtitle">Security line wait times, last 24 hours</p>
   <p class="muted" id="last-updated">Last updated: —</p>
   <div class="range-group" id="range-group">
@@ -110,6 +110,7 @@
   <script>
     const airport = "{{ airport }}";
     const terminal = "{{ terminal }}";
+    const gate = {{ gate | tojson }};
     const chartCanvas = document.getElementById('chart');
     const chartShell = document.getElementById('chart-shell');
     const readingFixedEl = document.getElementById('chart-reading-fixed');
@@ -460,9 +461,10 @@
       clearFixedReadout();
       updateRangeButtons(hours);
 
-      const url = '/api/history?airport=' + encodeURIComponent(airport)
+      let url = '/api/history?airport=' + encodeURIComponent(airport)
         + '&terminal=' + encodeURIComponent(terminal)
         + '&hours=' + encodeURIComponent(hours);
+      if (gate) url += '&gate=' + encodeURIComponent(gate);
 
       fetch(url)
         .then(r => r.json())

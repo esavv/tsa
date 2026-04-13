@@ -161,10 +161,14 @@
             const tr = document.createElement('tr');
             const general = row.general != null ? row.general + ' min' : '–';
             const precheck = row.precheck != null ? row.precheck + ' min' : '–';
-            const gCanvasId = 'spark-g-' + code + '-' + row.terminal;
-            const pCanvasId = 'spark-p-' + code + '-' + row.terminal;
+            const gate = row.gate || '';
+            const termLabel = gate ? (row.terminal + ': Gates ' + gate) : row.terminal;
+            const gateSlug = gate ? String(gate).replace(/[^a-zA-Z0-9]+/g, '_') : 'all';
+            const gateQs = gate ? ('?gate=' + encodeURIComponent(gate)) : '';
+            const gCanvasId = 'spark-g-' + code + '-' + row.terminal + '-' + gateSlug;
+            const pCanvasId = 'spark-p-' + code + '-' + row.terminal + '-' + gateSlug;
             tr.innerHTML =
-              '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + '">Terminal ' + row.terminal + '</a></td>' +
+              '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + gateQs + '">Terminal ' + termLabel + '</a></td>' +
               '<td><span class="metric-wrap"><span class="metric-value">' + general + '</span><span class="spark-slot"><canvas class="sparkline" id="' + gCanvasId + '"></canvas></span></span></td>' +
               '<td><span class="metric-wrap"><span class="metric-value">' + precheck + '</span><span class="spark-slot"><canvas class="sparkline" id="' + pCanvasId + '"></canvas></span></span></td>';
             tbody.appendChild(tr);

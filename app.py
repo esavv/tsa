@@ -22,12 +22,13 @@ def index():
 
 @app.route("/terminal/<airport>/<terminal>")
 def terminal_detail(airport: str, terminal: str):
-    return render_template("terminal.html", airport=airport, terminal=terminal)
+    gate = request.args.get("gate") or ""
+    return render_template("terminal.html", airport=airport, terminal=terminal, gate=gate)
 
 
 @app.route("/api/latest")
 def api_latest():
-    """Latest scrape + 6h sparkline series per airport/terminal/queue."""
+    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -41,35 +42,36 @@ def api_latest():
     scraped_at_utc = row[0]
     cur.execute(
         """
-        SELECT airport, terminal, queue_type, wait_minutes
+        SELECT airport, terminal, gate, queue_type, wait_minutes
         FROM wait_times
         WHERE scraped_at_utc = ?
-        ORDER BY airport, terminal, queue_type
+        ORDER BY airport, terminal, gate, queue_type
         """,
         (scraped_at_utc,),
     )
     rows = cur.fetchall()
     airports = {}
-    for airport, terminal, queue_type, wait_minutes in rows:
+    for airport, terminal, gate, queue_type, wait_minutes in rows:
         if airport not in airports:
             airports[airport] = {}
-        if terminal not in airports[airport]:
-            airports[airport][terminal] = {
+        g = gate or ""
+        key = (terminal, g)
+        if key not in airports[airport]:
+            airports[airport][key] = {
                 "general": None,
                 "precheck": None,
                 "spark_general": [],
                 "spark_precheck": [],
             }
-        key = "general" if queue_type == "general" else "precheck"
-        airports[airport][terminal][key] = wait_minutes
+        slot = "general" if queue_type == "general" else "precheck"
+        airports[airport][key][slot] = wait_minutes
 
-    # Add 6-hour sparkline history per terminal/queue.
     since_6h = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
     cur.execute(
         """
-        SELECT airport, terminal, queue_type, scraped_at_utc, wait_minutes
+        SELECT airport, terminal, gate, queue_type, scraped_at_utc, wait_minutes
         FROM wait_times
         WHERE scraped_at_utc >= ?
         ORDER BY scraped_at_utc
@@ -79,26 +81,28 @@ def api_latest():
     history_rows = cur.fetchall()
     conn.close()
 
-    for airport, terminal, queue_type, scraped_at_utc, wait_minutes in history_rows:
-        if airport not in airports or terminal not in airports[airport]:
+    for airport, terminal, gate, queue_type, scraped_at_utc, wait_minutes in history_rows:
+        g = gate or ""
+        key = (terminal, g)
+        if airport not in airports or key not in airports[airport]:
             continue
         series_key = "spark_general" if queue_type == "general" else "spark_precheck"
-        airports[airport][terminal][series_key].append(
+        airports[airport][key][series_key].append(
             {"t": scraped_at_utc, "minutes": wait_minutes}
         )
 
-    # Convert to list of { terminal, general, precheck } per airport
     result = {}
     for airport, terms in airports.items():
         result[airport] = [
             {
                 "terminal": t,
+                "gate": g,
                 "general": d["general"],
                 "precheck": d["precheck"],
                 "spark_general": d["spark_general"],
                 "spark_precheck": d["spark_precheck"],
             }
-            for t, d in sorted(terms.items())
+            for (t, g), d in sorted(terms.items(), key=lambda item: (item[0][0], item[0][1]))
         ]
 
     return jsonify(scraped_at_utc=scraped_at_utc, airports=result)
@@ -106,11 +110,13 @@ def api_latest():
 
 @app.route("/api/history")
 def api_history():
-    """History for one airport + terminal. Query params: airport, terminal, hours."""
+    """History for one airport + terminal (+ optional gate). Query: airport, terminal, hours, gate."""
     airport = request.args.get("airport")
     terminal = request.args.get("terminal")
     if not airport or not terminal:
         return jsonify(error="airport and terminal required"), 400
+
+    gate = request.args.get("gate") or ""
 
     hours = request.args.get("hours", "24")
     allowed_hours = {"6", "12", "24", "72", "168"}
@@ -126,11 +132,11 @@ def api_history():
         """
         SELECT scraped_at_utc
         FROM wait_times
-        WHERE airport = ? AND terminal = ?
+        WHERE airport = ? AND terminal = ? AND gate = ?
         ORDER BY scraped_at_utc DESC
         LIMIT 1
         """,
-        (airport, terminal),
+        (airport, terminal, gate),
     )
     latest_row = cur.fetchone()
     latest_scraped_at_utc = latest_row[0] if latest_row else None
@@ -139,10 +145,10 @@ def api_history():
         """
         SELECT scraped_at_utc, queue_type, wait_minutes
         FROM wait_times
-        WHERE airport = ? AND terminal = ? AND scraped_at_utc >= ?
+        WHERE airport = ? AND terminal = ? AND gate = ? AND scraped_at_utc >= ?
         ORDER BY scraped_at_utc
         """,
-        (airport, terminal, since),
+        (airport, terminal, gate, since),
     )
     rows = cur.fetchall()
     conn.close()

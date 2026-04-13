@@ -64,6 +64,19 @@ def normalize_terminal(value: str) -> str:
     return re.sub(r"^Terminal\s+", "", value, flags=re.IGNORECASE)
 
 
+def normalize_nyc_gate(raw) -> str:
+    """Map Port Authority API `gate` to DB key; '' means whole-terminal (e.g. All Gates)."""
+    if raw is None:
+        return ""
+    s = clean_html_text(str(raw)).strip()
+    if not s:
+        return ""
+    low = s.lower().replace("–", "-")
+    if low in ("all gates", "all gate", "all-gates", "all"):
+        return ""
+    return s
+
+
 def normalize_queue_type(value: str) -> str:
     lowered = value.lower()
     if "pre" in lowered:
@@ -113,15 +126,14 @@ def fetch_nyc_airport(airport: str) -> list[dict]:
             {
                 "airport": airport,
                 "terminal": point.get("terminal", ""),
+                "gate": normalize_nyc_gate(point.get("gate")),
                 "queue_type": "general" if point.get("queueType") == "Reg" else "precheck",
                 "wait_minutes": int(point.get("timeInMinutes", 0)),
                 "source_updated_at": point.get("updateTime") or None,
                 "point_id": point.get("pointID"),
             }
         )
-    # EWR Terminal B is multiple checkpoints in the API; we only persist one row per
-    # terminal×queue today, so inserts collide and data is wrong. Skip until we store `gate`.
-    return [r for r in rows if not (airport == "EWR" and r["terminal"] == "B")]
+    return rows
 
 
 def fetch_lax_airport() -> list[dict]:
@@ -149,6 +161,7 @@ def fetch_lax_airport() -> list[dict]:
             {
                 "airport": "LAX",
                 "terminal": terminal,
+                "gate": "",
                 "queue_type": normalize_queue_type(lane),
                 "wait_minutes": parse_wait_minutes(wait_text),
                 "source_updated_at": source_updated_at,
@@ -203,6 +216,7 @@ def fetch_mia_airport() -> list[dict]:
             {
                 "airport": "MIA",
                 "terminal": normalize_terminal(terminal),
+                "gate": "",
                 "queue_type": normalize_queue_type(lane),
                 "wait_minutes": int(wait_minutes),
                 "source_updated_at": point.get("time") or None,
@@ -230,6 +244,7 @@ def fetch_sea_airport() -> list[dict]:
             {
                 "airport": "SEA",
                 "terminal": normalize_terminal(str(checkpoint.get("Name", ""))),
+                "gate": "",
                 "queue_type": "general",
                 "wait_minutes": int(checkpoint.get("WaitTimeMinutes", 0)) if checkpoint.get("IsOpen") and checkpoint.get("IsDataAvailable") else 0,
                 "source_updated_at": parse_microsoft_json_date(checkpoint.get("LastUpdated")),
@@ -252,6 +267,7 @@ def fetch_dca_airport() -> list[dict]:
                 {
                     "airport": "DCA",
                     "terminal": terminal,
+                    "gate": "",
                     "queue_type": "general",
                     "wait_minutes": parse_wait_minutes(str(checkpoint.get("waittime", "0"))),
                     "source_updated_at": None,
@@ -263,6 +279,7 @@ def fetch_dca_airport() -> list[dict]:
                 {
                     "airport": "DCA",
                     "terminal": terminal,
+                    "gate": "",
                     "queue_type": "precheck",
                     "wait_minutes": parse_wait_minutes(str(checkpoint.get("pre", "0"))),
                     "source_updated_at": None,
@@ -295,13 +312,14 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
             cur.execute(
                 """
                 INSERT INTO wait_times
-                (scraped_at_utc, airport, terminal, queue_type, wait_minutes, source_updated_at, point_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (scraped_at_utc, airport, terminal, gate, queue_type, wait_minutes, source_updated_at, point_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     scraped_at_utc,
                     row["airport"],
                     row["terminal"],
+                    row.get("gate", ""),
                     row["queue_type"],
                     row["wait_minutes"],
                     row.get("source_updated_at"),
