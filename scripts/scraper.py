@@ -110,6 +110,19 @@ def parse_wait_minutes(value: str) -> int:
     return 0
 
 
+def omit_nyc_wait_point(point: dict) -> bool:
+    """Skip API points that represent closed / unavailable lanes with no wait (not literal0 min open)."""
+    try:
+        minutes = int(point.get("timeInMinutes", 0))
+    except (TypeError, ValueError):
+        minutes = 0
+    if minutes != 0:
+        return False
+    if point.get("queueOpen") is False or point.get("isWaitTimeAvailable") is False:
+        return True
+    return False
+
+
 def fetch_nyc_airport(airport: str) -> list[dict]:
     url = f"{NYC_API_BASE}/{airport}"
     origin = NYC_AIRPORTS[airport]
@@ -122,6 +135,8 @@ def fetch_nyc_airport(airport: str) -> list[dict]:
     )
     rows = []
     for point in points:
+        if omit_nyc_wait_point(point):
+            continue
         rows.append(
             {
                 "airport": airport,
