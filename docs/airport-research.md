@@ -8,6 +8,8 @@ Figure out which major U.S. airports appear to publish official security wait ti
 
 ## TL;DR
 
+Data coverage summary here: https://docs.google.com/spreadsheets/d/15ZGHFFi5X428Wg70I-tEvOSvy0fY2LpiZUNqgDjhOpo/edit?gid=0#gid=0
+
 Best next airports to add:
 
 1. **LAX**: easiest, raw HTML table on official page
