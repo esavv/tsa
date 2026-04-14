@@ -356,7 +356,37 @@ def preview(airport: str) -> None:
     scraped_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = fetch_airport(code)
     print(f"# preview {code} at {scraped_at_utc} ({len(rows)} rows, not stored)")
-    print(json.dumps(rows, indent=2))
+    if not rows:
+        return
+
+    keys = (
+        "airport",
+        "terminal",
+        "gate",
+        "queue_type",
+        "wait_minutes",
+        "source_updated_at",
+        "point_id",
+    )
+    headers = ("airport", "terminal", "gate", "queue", "wait", "updated", "point_id")
+
+    def cell(row: dict, key: str) -> str:
+        val = row.get(key)
+        return "" if val is None else str(val)
+
+    body = [[cell(r, k) for k in keys] for r in rows]
+    widths = [
+        max(len(headers[i]), *(len(body[j][i]) for j in range(len(body))))
+        for i in range(len(keys))
+    ]
+
+    def fmt_line(cells: tuple[str, ...] | list[str]) -> str:
+        return "  ".join(c.ljust(w) for c, w in zip(cells, widths))
+
+    print(fmt_line(list(headers)))
+    print(fmt_line(["-" * w for w in widths]))
+    for row_cells in body:
+        print(fmt_line(row_cells))
 
 
 def run(db_path: str | None = None) -> None:
@@ -390,7 +420,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--preview",
         metavar="CODE",
-        help="Airport IATA code: fetch current wait times and print JSON to stdout without writing to the database.",
+        help="Airport IATA code: fetch current wait times and print a table to stdout without writing to the database.",
     )
     args = parser.parse_args()
     if args.preview:
