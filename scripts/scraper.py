@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fetch supported airport security wait times and insert them into SQLite."""
+import argparse
 import gzip
 import html
 import json
@@ -349,6 +350,15 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
     return inserted
 
 
+def preview(airport: str) -> None:
+    """Fetch one airport and print rows to stdout (no database writes)."""
+    code = airport.strip().upper()
+    scraped_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = fetch_airport(code)
+    print(f"# preview {code} at {scraped_at_utc} ({len(rows)} rows, not stored)")
+    print(json.dumps(rows, indent=2))
+
+
 def run(db_path: str | None = None) -> None:
     db_path = db_path or os.environ.get("TSA_DB_PATH", DEFAULT_DB_PATH)
     scraped_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -374,4 +384,16 @@ def run(db_path: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser(
+        description="Fetch airport TSA wait times and store them in SQLite, or preview one airport."
+    )
+    parser.add_argument(
+        "--preview",
+        metavar="CODE",
+        help="Airport IATA code: fetch current wait times and print JSON to stdout without writing to the database.",
+    )
+    args = parser.parse_args()
+    if args.preview:
+        preview(args.preview)
+    else:
+        run()
