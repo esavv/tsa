@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sqlite3
+import urllib.parse
 import urllib.request
 import zlib
 from datetime import datetime, timezone
@@ -22,10 +23,41 @@ MIA_WAIT_TIMES_PAGE_URL = "https://www.miami-airport.com/tsa-waittimes.asp"
 SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
 DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
 ATL_TIMES_URL = "https://www.atl.com/times/"
+DFW_WAIT_TIMES_URL = "https://api.dfwairport.mobi/wait-times/checkpoint/DFW"
+DFW_MOBILE_API_KEY = "87856E0636AA4BF282150FCBE1AD63DE"
+DFW_MOBILE_API_VERSION = "170"
+CLT_WAIT_TIMES_URL = "https://api.cltairport.mobi/wait-times/checkpoint/CLT"
+CLT_MOBILE_API_KEY = "5ccb418715f9428ca6cb4df1635d4815"
+CLT_MOBILE_API_VERSION = "130"
+MCO_WAIT_TIMES_URL = "https://api.goaa.aero/wait-times/checkpoint/MCO"
+MCO_MOBILE_API_KEY = "8eaac7209c824616a8fe58d22268cd59"
+MCO_MOBILE_API_VERSION = "140"
+PHX_AVN_URL = "https://api.phx.aero/avn-wait-times/raw"
+PHX_AVN_KEY_FALLBACK = "4f85fe2ef5a240d59809b63de94ef536"
+PHX_HOME_URL = "https://www.skyharbor.com/"
+DEN_FRUITION_TSA_URL = "https://app.flyfruition.com/api/public/tsa"
+DEN_FRUITION_X_API_KEY = "vqw8ruvwqpv02pqu938bh5p028"
+LAS_SECURITY_WAIT_URL = "https://www.harryreidairport.com/security-wait-times"
+ZENSORS_TRPC_BASE = "https://embed.zensors.live/api/embeddable-widget/trpc"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 DEFAULT_DB_PATH = os.path.join(REPO_ROOT, "tsa.db")
-SCRAPE_AIRPORTS = ("LGA", "JFK", "EWR", "LAX", "MIA", "SEA", "DCA", "ATL")
+SCRAPE_AIRPORTS = (
+    "LGA",
+    "JFK",
+    "EWR",
+    "LAX",
+    "MIA",
+    "SEA",
+    "DCA",
+    "ATL",
+    "DFW",
+    "DEN",
+    "CLT",
+    "LAS",
+    "MCO",
+    "PHX",
+)
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Encoding": "gzip, deflate",
@@ -306,6 +338,332 @@ def fetch_dca_airport() -> list[dict]:
     return rows
 
 
+def _fetch_mobi_checkpoint_json(url: str, api_key: str, api_version: str) -> dict:
+    payload = fetch_json_url(
+        url,
+        headers={
+            "api-key": api_key,
+            "api-version": str(api_version),
+            "Accept": "application/json",
+        },
+    )
+    st = payload.get("status") or {}
+    code = st.get("code")
+    if code is not None and int(code) != 200:
+        raise ValueError(f"Mobi wait-times API error: {st}")
+    return payload
+
+
+def _iso_from_mobi_timestamp(ts: object) -> str | None:
+    if ts is None:
+        return None
+    try:
+        sec = int(ts)
+        if sec > 10_000_000_000:
+            sec //= 1000
+        return datetime.fromtimestamp(sec, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _mobi_lane_queue_type(lane: str) -> str:
+    s = (lane or "").strip().lower()
+    if s in ("general", "precheck"):
+        return s
+    if "pre" in s:
+        return "precheck"
+    return "general"
+
+
+def _mobi_terminal_gate(airport: str, wt: dict) -> tuple[str, str]:
+    name = (wt.get("name") or "").strip()
+    wid = str(wt.get("id") or "").strip()
+    if airport == "DFW":
+        m = re.match(r"^([A-Z])(\d+)$", name)
+        if m:
+            return m.group(1), m.group(2)
+        return name, wid or ""
+    if airport == "MCO":
+        parts = name.split(None, 1)
+        if len(parts) == 2:
+            return parts[0], parts[1]
+        return name, wid or ""
+    return name, wid or ""
+
+
+def _dedupe_wait_rows_by_checkpoint(rows: list[dict]) -> list[dict]:
+    """Merge duplicate airport/terminal/gate/queue rows (keep max wait, latest updated)."""
+    merged: dict[tuple[str, str, str, str], dict] = {}
+    for r in rows:
+        k = (r["airport"], r["terminal"], r.get("gate", ""), r["queue_type"])
+        if k not in merged:
+            merged[k] = dict(r)
+            continue
+        cur = merged[k]
+        if r["wait_minutes"] > cur["wait_minutes"]:
+            cur["wait_minutes"] = r["wait_minutes"]
+        a = r.get("source_updated_at") or ""
+        b = cur.get("source_updated_at") or ""
+        if a > b:
+            cur["source_updated_at"] = r.get("source_updated_at")
+    return list(merged.values())
+
+
+def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
+    data = payload.get("data") or {}
+    wait_times = data.get("wait_times")
+    if not isinstance(wait_times, list):
+        raise ValueError(f"{airport} wait-times API returned unexpected payload")
+    rows: list[dict] = []
+    for wt in wait_times:
+        if not wt.get("isOpen"):
+            continue
+        if wt.get("isDisplayable") is False:
+            continue
+        lane = str(wt.get("lane") or "")
+        try:
+            wait_sec = int(wt.get("waitSeconds", 0))
+        except (TypeError, ValueError):
+            wait_sec = 0
+        wait_minutes = max(0, round(wait_sec / 60))
+        terminal, gate = _mobi_terminal_gate(airport, wt)
+        wid = str(wt.get("id") or "").strip()
+        point_id: int | None
+        if wid.isdigit():
+            point_id = int(wid)
+        else:
+            point_id = None
+        rows.append(
+            {
+                "airport": airport,
+                "terminal": terminal,
+                "gate": gate,
+                "queue_type": _mobi_lane_queue_type(lane),
+                "wait_minutes": int(wait_minutes),
+                "source_updated_at": _iso_from_mobi_timestamp(wt.get("lastUpdatedTimestamp")),
+                "point_id": point_id,
+            }
+        )
+    if not rows:
+        raise ValueError(f"{airport} Mobi API returned no open displayable checkpoints")
+    return _dedupe_wait_rows_by_checkpoint(rows)
+
+
+def fetch_dfw_airport() -> list[dict]:
+    payload = _fetch_mobi_checkpoint_json(
+        DFW_WAIT_TIMES_URL, DFW_MOBILE_API_KEY, DFW_MOBILE_API_VERSION
+    )
+    return _parse_mobi_checkpoint_wait_rows("DFW", payload)
+
+
+def fetch_clt_airport() -> list[dict]:
+    payload = _fetch_mobi_checkpoint_json(
+        CLT_WAIT_TIMES_URL, CLT_MOBILE_API_KEY, CLT_MOBILE_API_VERSION
+    )
+    return _parse_mobi_checkpoint_wait_rows("CLT", payload)
+
+
+def fetch_mco_airport() -> list[dict]:
+    payload = _fetch_mobi_checkpoint_json(
+        MCO_WAIT_TIMES_URL, MCO_MOBILE_API_KEY, MCO_MOBILE_API_VERSION
+    )
+    return _parse_mobi_checkpoint_wait_rows("MCO", payload)
+
+
+def _extract_phx_avn_key() -> str:
+    page = fetch_text(PHX_HOME_URL)
+    m = re.search(r"api\.phx\.aero/avn-wait-times/raw\?Key=([a-f0-9]+)", page, flags=re.IGNORECASE)
+    if m:
+        return m.group(1)
+    return PHX_AVN_KEY_FALLBACK
+
+
+def fetch_phx_airport() -> list[dict]:
+    key = _extract_phx_avn_key()
+    url = f"{PHX_AVN_URL}?Key={urllib.parse.quote(key)}"
+    payload = fetch_json_url(
+        url,
+        headers={
+            "Referer": PHX_HOME_URL,
+            "Origin": "https://www.skyharbor.com",
+        },
+    )
+    points = payload.get("current")
+    if not isinstance(points, list) or not points:
+        raise ValueError("PHX avn-wait-times API returned no current[] data")
+    rows: list[dict] = []
+    for point in points:
+        qn = (point.get("queueName") or "").strip()
+        if not qn or " " not in qn:
+            continue
+        route, lane_word = qn.rsplit(" ", 1)
+        lane_l = lane_word.lower()
+        if "general" in lane_l:
+            queue_type = "general"
+        elif "pre" in lane_l:
+            queue_type = "precheck"
+        else:
+            queue_type = normalize_queue_type(lane_word)
+        projected_wait_seconds = point.get("projectedWaitTime")
+        if projected_wait_seconds is not None:
+            wait_minutes = round(float(projected_wait_seconds) / 60)
+        else:
+            min_wait = int(point.get("projectedMinWaitMinutes", 0))
+            max_wait = int(point.get("projectedMaxWaitMinutes", 0))
+            wait_minutes = round((min_wait + max_wait) / 2)
+        m = re.match(r"^(T\d+)\s+(.*)$", route)
+        if m:
+            terminal, gate = m.group(1), m.group(2).strip()
+        else:
+            terminal, gate = route, ""
+        rows.append(
+            {
+                "airport": "PHX",
+                "terminal": terminal,
+                "gate": gate,
+                "queue_type": queue_type,
+                "wait_minutes": int(wait_minutes),
+                "source_updated_at": point.get("time") or None,
+                "point_id": None,
+            }
+        )
+    if not rows:
+        raise ValueError("PHX avn-wait-times produced no rows")
+    return rows
+
+
+def fetch_den_airport() -> list[dict]:
+    zones = fetch_json_url(
+        DEN_FRUITION_TSA_URL,
+        headers={
+            "x-api-key": DEN_FRUITION_X_API_KEY,
+            "Referer": "https://www.flydenver.com/",
+            "Origin": "https://www.flydenver.com",
+        },
+    )
+    if not isinstance(zones, list):
+        raise ValueError("DEN FlyFruition TSA API returned unexpected payload")
+    rows: list[dict] = []
+    for zone in zones:
+        terminal = clean_html_text(str(zone.get("title") or ""))
+        if not terminal:
+            continue
+        for lane in zone.get("lanes") or []:
+            if lane.get("hide_lane"):
+                continue
+            if lane.get("closed"):
+                continue
+            lane_title = clean_html_text(str(lane.get("title") or ""))
+            if not lane_title:
+                continue
+            rows.append(
+                {
+                    "airport": "DEN",
+                    "terminal": terminal,
+                    "gate": lane_title,
+                    "queue_type": normalize_queue_type(lane_title),
+                    "wait_minutes": parse_wait_minutes(str(lane.get("wait_time") or "0")),
+                    "source_updated_at": None,
+                    "point_id": None,
+                }
+            )
+    if not rows:
+        raise ValueError("DEN FlyFruition TSA API returned no lanes")
+    return rows
+
+
+def _extract_las_zensors_slug_token(page_html: str) -> tuple[str, str]:
+    m = re.search(
+        r"embed\.zensors\.live/LAS/([^/\"\s]+)/waitTimeExplorer\?token=([^&\"\s]+)",
+        page_html,
+        flags=re.IGNORECASE,
+    )
+    if not m:
+        raise ValueError("LAS page missing Zensors embed slug/token")
+    slug, token = m.group(1), html.unescape(m.group(2))
+    return slug, token
+
+
+def _zensors_trpc_get(procedure: str, body0: dict) -> list | dict:
+    inp = json.dumps({"0": body0}, separators=(",", ":"))
+    q = urllib.parse.urlencode({"batch": "1", "input": inp})
+    url = f"{ZENSORS_TRPC_BASE}/{procedure}?{q}"
+    return fetch_json_url(url)
+
+
+def fetch_las_airport() -> list[dict]:
+    page = fetch_text(LAS_SECURITY_WAIT_URL)
+    slug, token = _extract_las_zensors_slug_token(page)
+    init_batch = _zensors_trpc_get(
+        "waitTimeExplorer.init",
+        {"slug": slug, "domainSlug": "LAS", "token": token},
+    )
+    if not isinstance(init_batch, list) or not init_batch:
+        raise ValueError("LAS Zensors init returned empty batch")
+    init_data = (init_batch[0].get("result") or {}).get("data") or {}
+    journeys = init_data.get("journeys") or {}
+    if not isinstance(journeys, dict) or not journeys:
+        raise ValueError("LAS Zensors init missing journeys")
+
+    rows: list[dict] = []
+    for journey_id, meta in journeys.items():
+        journey_name = (meta.get("name") or journey_id).strip()
+        m = re.match(r"^(T\d+)\s*-\s*(.+)$", journey_name)
+        if m:
+            terminal, gate = m.group(1), m.group(2).strip()
+        else:
+            terminal, gate = journey_name, ""
+        upd_batch = _zensors_trpc_get(
+            "waitTimeExplorer.update",
+            {"journey": journey_id, "slug": slug, "domainSlug": "LAS", "token": token},
+        )
+        if not isinstance(upd_batch, list) or not upd_batch:
+            continue
+        paths = ((upd_batch[0].get("result") or {}).get("data") or {}).get("paths") or {}
+        if not isinstance(paths, dict):
+            continue
+        for path_key, path in paths.items():
+            pk = str(path_key).lower()
+            if pk in ("general", "precheck"):
+                queue_type = pk
+            else:
+                queue_type = normalize_queue_type(str(path_key))
+            wt = (path or {}).get("waitTime") or {}
+            if not (path or {}).get("open", True):
+                continue
+            val = wt.get("value")
+            if val is None:
+                continue
+            try:
+                wait_minutes = max(0, int(round(float(val))))
+            except (TypeError, ValueError):
+                continue
+            ts = wt.get("timestamp")
+            source_updated_at: str | None
+            try:
+                ms = int(ts)
+                sec = ms // 1000 if ms > 10_000_000_000 else ms
+                source_updated_at = datetime.fromtimestamp(
+                    sec, timezone.utc
+                ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except (TypeError, ValueError, OSError):
+                source_updated_at = None
+            rows.append(
+                {
+                    "airport": "LAS",
+                    "terminal": terminal,
+                    "gate": gate,
+                    "queue_type": queue_type,
+                    "wait_minutes": wait_minutes,
+                    "source_updated_at": source_updated_at,
+                    "point_id": None,
+                }
+            )
+    if not rows:
+        raise ValueError("LAS Zensors produced no wait rows")
+    return rows
+
+
 def fetch_atl_airport() -> list[dict]:
     """Load ATL /times/ in a real browser (Cloudflare); parse checkpoint rows from the DOM."""
     from playwright.sync_api import sync_playwright
@@ -396,6 +754,18 @@ def fetch_airport(airport: str) -> list[dict]:
         return fetch_dca_airport()
     if airport == "ATL":
         return fetch_atl_airport()
+    if airport == "DFW":
+        return fetch_dfw_airport()
+    if airport == "DEN":
+        return fetch_den_airport()
+    if airport == "CLT":
+        return fetch_clt_airport()
+    if airport == "LAS":
+        return fetch_las_airport()
+    if airport == "MCO":
+        return fetch_mco_airport()
+    if airport == "PHX":
+        return fetch_phx_airport()
     raise ValueError(f"Unsupported airport: {airport}")
 
 
