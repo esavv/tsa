@@ -367,12 +367,11 @@ def fetch_atl_airport() -> list[dict]:
         queue_type = "precheck" if "pre" in sub else "general"
         checkpoint = (item.get("checkpoint") or "").strip()
         realm = (item.get("realm") or "").strip()
-        terminal = f"{realm} {checkpoint}".strip()
         rows.append(
             {
                 "airport": "ATL",
-                "terminal": terminal,
-                "gate": "",
+                "terminal": realm,
+                "gate": checkpoint,
                 "queue_type": queue_type,
                 "wait_minutes": wait_minutes,
                 "source_updated_at": None,
