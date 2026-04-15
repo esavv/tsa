@@ -10,13 +10,28 @@ Run the scraper every 15 minutes so you build a local history of TSA wait times.
    python3 scripts/init_db.py
    ```
 
-2. Test the scraper once:
+2. Install Playwright’s Chromium build (needed for **ATL** scraping):
+
+   ```bash
+   ./venv/bin/pip install -r requirements.txt
+   ./venv/bin/playwright install chromium
+   ```
+
+   On Linux servers you may also need system libraries; see [Playwright system dependencies](https://playwright.dev/docs/intro#system-requirements).
+
+3. Test the scraper once:
 
    ```bash
    python3 scripts/run_scrape.py
    ```
 
    You should see a line like `2026-03-12T01:00:00Z stored 14 rows (…/tsa.db)` and rows in `tsa.db`.
+
+   Dry-run one airport (no DB writes), including ATL:
+
+   ```bash
+   ./venv/bin/python scripts/scraper.py --preview ATL
+   ```
 
 ## Crontab
 
