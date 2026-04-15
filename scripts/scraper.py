@@ -21,10 +21,11 @@ LAX_WAIT_TIMES_URL = "https://www.flylax.com/wait-times"
 MIA_WAIT_TIMES_PAGE_URL = "https://www.miami-airport.com/tsa-waittimes.asp"
 SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
 DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
+ATL_TIMES_URL = "https://www.atl.com/times/"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 DEFAULT_DB_PATH = os.path.join(REPO_ROOT, "tsa.db")
-SCRAPE_AIRPORTS = ("LGA", "JFK", "EWR", "LAX", "MIA", "SEA", "DCA")
+SCRAPE_AIRPORTS = ("LGA", "JFK", "EWR", "LAX", "MIA", "SEA", "DCA", "ATL")
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Encoding": "gzip, deflate",
@@ -305,6 +306,84 @@ def fetch_dca_airport() -> list[dict]:
     return rows
 
 
+def fetch_atl_airport() -> list[dict]:
+    """Load ATL /times/ in a real browser (Cloudflare); parse checkpoint rows from the DOM."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1280, "height": 900},
+            locale="en-US",
+        )
+        page = context.new_page()
+        try:
+            page.goto(ATL_TIMES_URL, wait_until="domcontentloaded", timeout=120_000)
+            page.wait_for_selector(
+                "#nesclasser2 .declasser3 button span",
+                timeout=120_000,
+            )
+            page.wait_for_timeout(1500)
+            raw = page.evaluate(
+                """() => {
+                    const results = [];
+                    function scan(section, realm) {
+                        if (!section) return;
+                        for (const row of section.querySelectorAll(":scope > .row")) {
+                            const h2 = row.querySelector("h2");
+                            const span = row.querySelector(".declasser3 button span");
+                            if (!h2 || !span) continue;
+                            const h3 = row.querySelector("h3");
+                            results.push({
+                                realm,
+                                checkpoint: h2.textContent.trim(),
+                                sub: h3 ? h3.textContent.trim() : "",
+                                waitText: span.textContent.trim()
+                            });
+                        }
+                    }
+                    const root = document.querySelector("#nesclasser2");
+                    if (!root) return [];
+                    scan(root.querySelector(".col-lg-4.nesclasser2"), "Domestic");
+                    scan(root.querySelector(".col-lg-5.nesclasser1"), "International");
+                    return results;
+                }"""
+            )
+        finally:
+            context.close()
+            browser.close()
+
+    rows: list[dict] = []
+    for item in raw:
+        wait_minutes = int(re.sub(r"\D", "", item.get("waitText") or "") or 0)
+        sub = (item.get("sub") or "").lower()
+        queue_type = "precheck" if "pre" in sub else "general"
+        checkpoint = (item.get("checkpoint") or "").strip()
+        realm = (item.get("realm") or "").strip()
+        terminal = f"{realm} {checkpoint}".strip()
+        rows.append(
+            {
+                "airport": "ATL",
+                "terminal": terminal,
+                "gate": "",
+                "queue_type": queue_type,
+                "wait_minutes": wait_minutes,
+                "source_updated_at": None,
+                "point_id": None,
+            }
+        )
+    if not rows:
+        raise ValueError("ATL page loaded but no checkpoint rows were found")
+    return rows
+
+
 def fetch_airport(airport: str) -> list[dict]:
     if airport in NYC_AIRPORTS:
         return fetch_nyc_airport(airport)
@@ -316,6 +395,8 @@ def fetch_airport(airport: str) -> list[dict]:
         return fetch_sea_airport()
     if airport == "DCA":
         return fetch_dca_airport()
+    if airport == "ATL":
+        return fetch_atl_airport()
     raise ValueError(f"Unsupported airport: {airport}")
 
 
