@@ -399,6 +399,17 @@ def _mobi_lane_queue_type(lane: str) -> str:
     return "general"
 
 
+def _mobi_queue_type(airport: str, wt: dict, lane: str) -> str:
+    """Lane string is authoritative for DFW/MCO; CLT uses `attributes` (lane is always 'main')."""
+    if airport == "CLT":
+        attrs = wt.get("attributes") if isinstance(wt.get("attributes"), dict) else {}
+        if attrs.get("preCheck") is True:
+            return "precheck"
+        if attrs.get("general") is True:
+            return "general"
+    return _mobi_lane_queue_type(lane)
+
+
 def _mobi_terminal_gate(airport: str, wt: dict) -> tuple[str, str]:
     name = (wt.get("name") or "").strip()
     wid = str(wt.get("id") or "").strip()
@@ -489,7 +500,7 @@ def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
                 "airport": airport,
                 "terminal": terminal,
                 "gate": gate,
-                "queue_type": _mobi_lane_queue_type(lane),
+                "queue_type": _mobi_queue_type(airport, wt, lane),
                 "wait_minutes": int(wait_minutes),
                 "source_updated_at": _iso_from_mobi_timestamp(wt.get("lastUpdatedTimestamp")),
                 "point_id": point_id,
