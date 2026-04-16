@@ -3,10 +3,32 @@
 import os
 import sqlite3
 from datetime import datetime, timezone, timedelta
-from flask import Flask, render_template, jsonify, request
+from urllib.parse import urlencode
+
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("TSA_DB_PATH", os.path.join(APP_DIR, "tsa.db"))
+
+# Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
+AIRPORT_CODES = frozenset(
+    {
+        "LGA",
+        "JFK",
+        "EWR",
+        "LAX",
+        "MIA",
+        "SEA",
+        "DCA",
+        "ATL",
+        "DFW",
+        "DEN",
+        "CLT",
+        "LAS",
+        "MCO",
+        "PHX",
+    }
+)
 
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
 
@@ -17,13 +39,32 @@ def get_db():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return redirect(url_for("airport", code="JFK"), code=302)
+
+
+@app.route("/<code>")
+def airport(code: str):
+    c = (code or "").strip().upper()
+    if len(c) != 3 or not c.isalpha() or c not in AIRPORT_CODES:
+        abort(404)
+    initial_terminal = request.args.get("terminal") or ""
+    initial_gate = request.args.get("gate") or ""
+    return render_template(
+        "airport.html",
+        airport=c,
+        initial_terminal=initial_terminal,
+        initial_gate=initial_gate,
+    )
 
 
 @app.route("/terminal/<airport>/<terminal>")
-def terminal_detail(airport: str, terminal: str):
+def terminal_redirect(airport: str, terminal: str):
+    ap = (airport or "").strip().upper()
+    if ap not in AIRPORT_CODES:
+        abort(404)
     gate = request.args.get("gate") or ""
-    return render_template("terminal.html", airport=airport, terminal=terminal, gate=gate)
+    q = urlencode({"terminal": terminal, "gate": gate})
+    return redirect(f"/{ap}?{q}", code=301)
 
 
 @app.route("/api/latest")
