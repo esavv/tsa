@@ -7,11 +7,15 @@
       width: 100%;
     }
     .airport-cluster {
-      width: fit-content;
+      width: 100%;
       max-width: 100%;
       min-width: 0;
-      margin-left: auto;
-      margin-right: auto;
+    }
+    .airport-layout,
+    .chart-shell,
+    .chart-container {
+      width: 100%;
+      max-width: 100%;
     }
     .airport-cluster > h1 {
       margin-bottom: 0.5rem;
@@ -171,7 +175,6 @@
       <h2 class="airport-subtitle" id="airport-page-title">{{ airport }}</h2>
       <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
       <p class="muted" id="last-scraped-at"></p>
-      <p class="muted" id="range-subtitle">Security line wait times, last 24 hours</p>
       <div class="range-group" id="range-group">
         <button type="button" class="range-btn" data-hours="6">6H</button>
         <button type="button" class="range-btn" data-hours="12">12H</button>
@@ -281,14 +284,11 @@
     let currentHours = 24;
     let lastHistoryPayload = null;
     let lastHistoryRequestHours = null;
-    const rangeSubtitle = document.getElementById('range-subtitle');
     const loadingEl = document.getElementById('chart-loading');
     const calloutEl = document.getElementById('chart-callout');
     const lastScrapedEl = document.getElementById('last-scraped-at');
     const tabRowEl = document.getElementById('tab-row');
     const airportTitleEl = document.getElementById('airport-page-title');
-    const rangeLabels = { 6: '6 hours', 12: '12 hours', 24: '24 hours', 72: '3 days', 168: '7 days' };
-
     airportTitleEl.textContent = airportDisplayNames[pageAirport] || pageAirport;
 
     const mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
@@ -438,7 +438,6 @@
       document.querySelectorAll('.range-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.hours === String(hours));
       });
-      rangeSubtitle.textContent = 'Security line wait times, last ' + rangeLabels[hours];
     }
 
     function shouldShowTick(dateObj, hours) {
