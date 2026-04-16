@@ -85,7 +85,7 @@
   <main class="home-layout">
     <div class="home-cluster">
       <h1>TSA Wait Times</h1>
-      <p class="muted home-subhead">Security line wait times at every airport we scrape</p>
+      <p class="muted home-subhead">Security line wait times at major US airports</p>
       <div id="loading">Loading…</div>
       <div id="content" style="display: none;">
         <p class="muted" id="scraped-at"></p>
@@ -122,6 +122,47 @@
       return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
         return c.toUpperCase();
       });
+    }
+
+    function titleCaseWords(s) {
+      return String(s)
+        .split(/\s+/)
+        .map(function (word) {
+          if (!word) return word;
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
+    }
+
+    /** Display + URL gate: CLT ignores gate (nonsensical id until scrape fix propagates). */
+    function effectiveGate(code, gate) {
+      if (code === 'CLT') return '';
+      return gate || '';
+    }
+
+    /** Plain-text label inside the terminal link (no HTML). */
+    function homeTerminalLinkLabel(code, terminal, gateRaw) {
+      const t = terminal || '';
+      const g = effectiveGate(code, gateRaw);
+      if (code === 'CLT') {
+        return t;
+      }
+      if (!g) {
+        return 'Terminal ' + t;
+      }
+      if (code === 'ATL') {
+        return 'Terminal ' + t + ': ' + titleCaseWords(g);
+      }
+      if (code === 'DFW') {
+        return 'Terminal ' + t + ': Gate ' + g;
+      }
+      if (code === 'LAS' || code === 'PHX') {
+        return 'Terminal ' + t + ': ' + g;
+      }
+      if (code === 'EWR' || code === 'MCO') {
+        return 'Terminal ' + t + ': Gates ' + g;
+      }
+      return 'Terminal ' + t + ': Gates ' + g;
     }
 
     function queueTypesWithData(rows) {
@@ -244,12 +285,20 @@
           table.appendChild(tbody);
           for (const row of terminals) {
             const tr = document.createElement('tr');
-            const gate = row.gate || '';
-            const termLabel = gate ? (row.terminal + ': Gates ' + gate) : row.terminal;
+            const gate = effectiveGate(code, row.gate || '');
+            const linkLabel = homeTerminalLinkLabel(code, row.terminal, row.gate || '');
             const gateSlug = gate ? String(gate).replace(/[^a-zA-Z0-9]+/g, '_') : 'all';
             const gateQs = gate ? ('?gate=' + encodeURIComponent(gate)) : '';
             const qmap = row.queues || {};
-            let tds = '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + gateQs + '">Terminal ' + termLabel + '</a></td>';
+            let tds =
+              '<td><a class="terminal-link" href="/terminal/' +
+              code +
+              '/' +
+              encodeURIComponent(row.terminal) +
+              gateQs +
+              '">' +
+              linkLabel +
+              '</a></td>';
             for (let ci = 0; ci < queueCols.length; ci++) {
               const qt = queueCols[ci];
               const slot = qmap[qt] || {};
