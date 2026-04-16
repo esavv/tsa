@@ -370,6 +370,9 @@ def _mobi_lane_queue_type(lane: str) -> str:
     s = (lane or "").strip().lower()
     if s in ("general", "precheck"):
         return s
+    if "priority" in s:
+        return "priority"
+    # DFW uses "TSA Pre"; substring "pre" maps to precheck.
     if "pre" in s:
         return "precheck"
     return "general"
