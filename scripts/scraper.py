@@ -408,10 +408,23 @@ def _mobi_terminal_gate(airport: str, wt: dict) -> tuple[str, str]:
             return m.group(1), m.group(2)
         return name, wid or ""
     if airport == "MCO":
-        parts = name.split(None, 1)
-        if len(parts) == 2:
-            return parts[0], parts[1]
-        return name, wid or ""
+        # Terminal: API `name` without lane-type suffix (queue comes from `lane`).
+        terminal = re.sub(
+            r"\s+(?:TSA\s+Pre(?:Check|check)?|Pre\s*Check|Standard)\s*$",
+            "",
+            name.strip(),
+            flags=re.IGNORECASE,
+        ).strip()
+        attrs = wt.get("attributes") if isinstance(wt.get("attributes"), dict) else {}
+        ming = str(attrs.get("minGate") or "").strip()
+        maxg = str(attrs.get("maxGate") or "").strip()
+        if ming and maxg:
+            gate = f"{ming}-{maxg}"
+        elif ming or maxg:
+            gate = ming or maxg
+        else:
+            gate = ""
+        return terminal, gate
     return name, wid or ""
 
 
