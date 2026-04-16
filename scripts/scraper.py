@@ -594,6 +594,7 @@ def fetch_den_airport() -> list[dict]:
     rows: list[dict] = []
     for zone in zones:
         terminal = clean_html_text(str(zone.get("title") or ""))
+        terminal = re.sub(r"\s+Security\s*$", "", terminal, flags=re.IGNORECASE).strip()
         if not terminal:
             continue
         for lane in zone.get("lanes") or []:
@@ -608,7 +609,7 @@ def fetch_den_airport() -> list[dict]:
                 {
                     "airport": "DEN",
                     "terminal": terminal,
-                    "gate": lane_title,
+                    "gate": "",
                     "queue_type": normalize_queue_type(lane_title),
                     "wait_minutes": parse_den_wait_minutes(str(lane.get("wait_time") or "0")),
                     "source_updated_at": None,
