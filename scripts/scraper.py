@@ -425,6 +425,9 @@ def _mobi_terminal_gate(airport: str, wt: dict) -> tuple[str, str]:
         else:
             gate = ""
         return terminal, gate
+    if airport == "CLT":
+        # CLT Mobi uses numeric `id` (checkpoint id), not a gate range; keep gate empty.
+        return name, ""
     return name, wid or ""
 
 
