@@ -28,7 +28,7 @@ def terminal_detail(airport: str, terminal: str):
 
 @app.route("/api/latest")
 def api_latest():
-    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue."""
+    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue_type."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -50,21 +50,18 @@ def api_latest():
         (scraped_at_utc,),
     )
     rows = cur.fetchall()
-    airports = {}
+    airports: dict[str, dict[tuple[str, str], dict]] = {}
     for airport, terminal, gate, queue_type, wait_minutes in rows:
         if airport not in airports:
             airports[airport] = {}
         g = gate or ""
         key = (terminal, g)
         if key not in airports[airport]:
-            airports[airport][key] = {
-                "general": None,
-                "precheck": None,
-                "spark_general": [],
-                "spark_precheck": [],
-            }
-        slot = "general" if queue_type == "general" else "precheck"
-        airports[airport][key][slot] = wait_minutes
+            airports[airport][key] = {"queues": {}}
+        slot = airports[airport][key]["queues"]
+        if queue_type not in slot:
+            slot[queue_type] = {"minutes": None, "spark": []}
+        slot[queue_type]["minutes"] = wait_minutes
 
     since_6h = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
@@ -86,8 +83,10 @@ def api_latest():
         key = (terminal, g)
         if airport not in airports or key not in airports[airport]:
             continue
-        series_key = "spark_general" if queue_type == "general" else "spark_precheck"
-        airports[airport][key][series_key].append(
+        queues = airports[airport][key]["queues"]
+        if queue_type not in queues:
+            queues[queue_type] = {"minutes": None, "spark": []}
+        queues[queue_type]["spark"].append(
             {"t": scraped_at_utc, "minutes": wait_minutes}
         )
 
@@ -97,10 +96,7 @@ def api_latest():
             {
                 "terminal": t,
                 "gate": g,
-                "general": d["general"],
-                "precheck": d["precheck"],
-                "spark_general": d["spark_general"],
-                "spark_precheck": d["spark_precheck"],
+                "queues": d["queues"],
             }
             for (t, g), d in sorted(terms.items(), key=lambda item: (item[0][0], item[0][1]))
         ]

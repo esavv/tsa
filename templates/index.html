@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}TSA Wait Times – U.S. airports{% endblock %}
+{% block title %}TSA Times - Major US Airports{% endblock %}
 {% block head %}
   <style>
     /* One shrink-wrapped column: title + tables share the same left edge;
@@ -44,10 +44,8 @@
       width: max-content;
       max-width: none; /* don’t squeeze columns; narrow viewports scroll instead */
     }
-    #airports > .airport-section th:nth-child(2),
-    #airports > .airport-section th:nth-child(3),
-    #airports > .airport-section td:nth-child(2),
-    #airports > .airport-section td:nth-child(3) {
+    #airports > .airport-section th:not(:first-child),
+    #airports > .airport-section td:not(:first-child) {
       white-space: nowrap;
       padding-right: 0.45rem;
     }
@@ -96,6 +94,50 @@
     </div>
   </main>
   <script>
+    const QUEUE_TYPE_ORDER = [
+      'general', 'precheck', 'priority', 'clear',
+    ];
+    const SPARKLINE_COLORS = [
+      '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
+    ];
+
+    function sortQueueTypes(types) {
+      const set = new Set(types);
+      const out = [];
+      for (const q of QUEUE_TYPE_ORDER) {
+        if (set.has(q)) out.push(q);
+      }
+      const rest = [...set].filter(q => !QUEUE_TYPE_ORDER.includes(q)).sort();
+      return out.concat(rest);
+    }
+
+    function queueTypeLabel(qt) {
+      const labels = {
+        general: 'General',
+        precheck: 'PreCheck',
+        priority: 'Priority',
+        clear: 'CLEAR',
+      };
+      if (labels[qt]) return labels[qt];
+      return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    }
+
+    function queueTypesWithData(rows) {
+      const found = new Set();
+      for (const row of rows) {
+        const qmap = row.queues || {};
+        for (const qt of Object.keys(qmap)) {
+          const slot = qmap[qt] || {};
+          const mins = slot.minutes;
+          const spark = slot.spark || [];
+          if (mins != null || spark.length > 0) found.add(qt);
+        }
+      }
+      return sortQueueTypes([...found]);
+    }
+
     function drawSparkline(canvas, points, color) {
       if (!canvas || !points || points.length < 2) return;
       const w = 72;
@@ -184,29 +226,52 @@
           const section = document.createElement('div');
           section.className = 'airport-section';
           section.innerHTML = '<h2>' + (airportNames[code] || code) + '</h2>';
+          const queueCols = queueTypesWithData(terminals);
+          const theadRow = document.createElement('tr');
+          const thTerminal = document.createElement('th');
+          thTerminal.textContent = 'Terminal';
+          theadRow.appendChild(thTerminal);
+          for (const qt of queueCols) {
+            const th = document.createElement('th');
+            th.textContent = queueTypeLabel(qt);
+            theadRow.appendChild(th);
+          }
+          const thead = document.createElement('thead');
+          thead.appendChild(theadRow);
+          const tbody = document.createElement('tbody');
           const table = document.createElement('table');
-          table.innerHTML = '<thead><tr><th>Terminal</th><th>General</th><th>PreCheck</th></tr></thead><tbody></tbody>';
-          const tbody = table.querySelector('tbody');
+          table.appendChild(thead);
+          table.appendChild(tbody);
           for (const row of terminals) {
             const tr = document.createElement('tr');
-            const general = row.general != null ? row.general + ' min' : '–';
-            const precheck = row.precheck != null ? row.precheck + ' min' : '–';
             const gate = row.gate || '';
             const termLabel = gate ? (row.terminal + ': Gates ' + gate) : row.terminal;
             const gateSlug = gate ? String(gate).replace(/[^a-zA-Z0-9]+/g, '_') : 'all';
             const gateQs = gate ? ('?gate=' + encodeURIComponent(gate)) : '';
-            const gCanvasId = 'spark-g-' + code + '-' + row.terminal + '-' + gateSlug;
-            const pCanvasId = 'spark-p-' + code + '-' + row.terminal + '-' + gateSlug;
-            tr.innerHTML =
-              '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + gateQs + '">Terminal ' + termLabel + '</a></td>' +
-              '<td><span class="metric-wrap"><span class="metric-value">' + general + '</span><span class="spark-slot"><canvas class="sparkline" id="' + gCanvasId + '"></canvas></span></span></td>' +
-              '<td><span class="metric-wrap"><span class="metric-value">' + precheck + '</span><span class="spark-slot"><canvas class="sparkline" id="' + pCanvasId + '"></canvas></span></span></td>';
+            const qmap = row.queues || {};
+            let tds = '<td><a class="terminal-link" href="/terminal/' + code + '/' + encodeURIComponent(row.terminal) + gateQs + '">Terminal ' + termLabel + '</a></td>';
+            for (let ci = 0; ci < queueCols.length; ci++) {
+              const qt = queueCols[ci];
+              const slot = qmap[qt] || {};
+              const mins = slot.minutes;
+              const spark = slot.spark || [];
+              const valText = mins != null ? mins + ' min' : '–';
+              const canvasId =
+                'spark-' + code + '-' + row.terminal + '-' + gateSlug + '-' + qt.replace(/[^a-zA-Z0-9]+/g, '_');
+              tds +=
+                '<td><span class="metric-wrap"><span class="metric-value">' + valText +
+                '</span><span class="spark-slot"><canvas class="sparkline" id="' + canvasId +
+                '"></canvas></span></span></td>';
+            }
+            tr.innerHTML = tds;
             tbody.appendChild(tr);
-
-            // Draw tiny 6-hour trend lines.
             const rowCanvases = tr.querySelectorAll('canvas.sparkline');
-            drawSparkline(rowCanvases[0], row.spark_general || [], '#2563eb');
-            drawSparkline(rowCanvases[1], row.spark_precheck || [], '#16a34a');
+            for (let ci = 0; ci < queueCols.length; ci++) {
+              const qt = queueCols[ci];
+              const slot = qmap[qt] || {};
+              const spark = slot.spark || [];
+              drawSparkline(rowCanvases[ci], spark, SPARKLINE_COLORS[ci % SPARKLINE_COLORS.length]);
+            }
           }
           const scrollWrap = document.createElement('div');
           scrollWrap.className = 'home-table-scroll';
