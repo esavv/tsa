@@ -51,15 +51,19 @@
     }
     .tab-btn {
       border: 1px solid #d0d7e2;
-      border-radius: 999px;
+      border-radius: 12px;
       background: #fff;
       color: #334155;
       font-size: 0.8rem;
-      padding: 0.3rem 0.65rem;
+      padding: 0.4rem 0.65rem 0.45rem;
       cursor: pointer;
-      max-width: 100%;
       text-align: left;
       line-height: 1.25;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.15rem;
+      max-width: 17rem;
     }
     .tab-btn.active {
       background: #1f2937;
@@ -71,7 +75,32 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: 16rem;
+      max-width: 15.5rem;
+      font-weight: 500;
+    }
+    .tab-btn .tab-waits {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.2rem 0.45rem;
+      font-size: 0.68rem;
+      line-height: 1.35;
+      font-weight: 400;
+      color: #64748b;
+      max-width: 15.5rem;
+    }
+    .tab-btn.active .tab-waits {
+      color: rgba(226, 232, 240, 0.95);
+    }
+    .tab-btn .tab-wait-chip {
+      white-space: nowrap;
+    }
+    .tab-btn .tab-wait-more {
+      color: #94a3b8;
+      font-size: 0.65rem;
+      align-self: center;
+    }
+    .tab-btn.active .tab-wait-more {
+      color: rgba(226, 232, 240, 0.75);
     }
     .range-group {
       display: flex;
@@ -231,6 +260,47 @@
     function effectiveGate(code, gate) {
       if (code === 'CLT') return '';
       return gate || '';
+    }
+
+    const QUEUE_TAB_ORDER = ['general', 'precheck', 'priority', 'clear'];
+
+    function sortedQueueTypesWithMinutes(queues) {
+      const q = queues || {};
+      const keys = Object.keys(q).filter(function (qt) {
+        const slot = q[qt];
+        return slot && slot.minutes != null;
+      });
+      const out = [];
+      for (const qt of QUEUE_TAB_ORDER) {
+        if (keys.includes(qt)) out.push(qt);
+      }
+      const rest = keys.filter(function (qt) {
+        return QUEUE_TAB_ORDER.indexOf(qt) === -1;
+      }).sort();
+      return out.concat(rest);
+    }
+
+    function queueTabAbbrev(qt) {
+      const map = {
+        general: 'Gen',
+        precheck: 'Pre',
+        priority: 'Pri',
+        clear: 'Clear',
+      };
+      if (map[qt]) return map[qt];
+      if (qt.length <= 5) return qt;
+      return qt.slice(0, 4) + '…';
+    }
+
+    /** Short wait summary for a tab (latest scrape only). */
+    function tabWaitsTitleFragment(row) {
+      const types = sortedQueueTypesWithMinutes(row.queues);
+      if (!types.length) return '';
+      return types
+        .map(function (qt) {
+          return queueTabAbbrev(qt) + ' ' + row.queues[qt].minutes + 'm';
+        })
+        .join(', ');
     }
 
     function tabLabelForRow(code, terminal, gateRaw) {
@@ -598,16 +668,14 @@
 
       if (labels.length) {
         const last = labels.length - 1;
-        chart.$readoutIndex = last;
         if (touchChartUi()) {
+          chart.$readoutIndex = last;
           setFixedReadout(labels[last], generalMinutes[last], precheckMinutes[last]);
           chart.update('none');
           attachChartTouchScrub(chart);
         } else {
-          const meta0 = chart.getDatasetMeta(0);
-          const el = meta0.data[last];
-          const x = el ? el.x : chart.scales.x.getPixelForTick(last);
-          showCallout(x, labels[last], generalMinutes[last], precheckMinutes[last]);
+          chart.$readoutIndex = null;
+          hideCallout();
           chart.update('none');
         }
       } else {
@@ -669,6 +737,7 @@
 
     function buildTabs(rows, activeIndex) {
       tabRowEl.innerHTML = '';
+      const maxChips = 6;
       rows.forEach((row, i) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -677,11 +746,33 @@
         btn.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
         btn.dataset.index = String(i);
         const label = tabLabelForRow(pageAirport, row.terminal, row.gate);
-        btn.title = label;
+        const waitFrag = tabWaitsTitleFragment(row);
+        btn.title = waitFrag ? label + ' — ' + waitFrag : label;
         const span = document.createElement('span');
         span.className = 'tab-label-short';
         span.textContent = label;
         btn.appendChild(span);
+        const types = sortedQueueTypesWithMinutes(row.queues);
+        const wrap = document.createElement('div');
+        wrap.className = 'tab-waits';
+        wrap.setAttribute('aria-hidden', 'true');
+        if (!types.length) {
+          wrap.textContent = '—';
+        } else {
+          types.slice(0, maxChips).forEach(function (qt) {
+            const chip = document.createElement('span');
+            chip.className = 'tab-wait-chip';
+            chip.textContent = queueTabAbbrev(qt) + ' ' + row.queues[qt].minutes + 'm';
+            wrap.appendChild(chip);
+          });
+          if (types.length > maxChips) {
+            const more = document.createElement('span');
+            more.className = 'tab-wait-more';
+            more.textContent = '+' + (types.length - maxChips);
+            wrap.appendChild(more);
+          }
+        }
+        btn.appendChild(wrap);
         btn.addEventListener('click', () => selectTabByIndex(Number(btn.dataset.index)));
         tabRowEl.appendChild(btn);
       });
