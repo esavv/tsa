@@ -147,11 +147,16 @@
       if (code === 'CLT') {
         return t;
       }
+      if (code === 'ATL') {
+        if (!g) return t;
+        return t + ': ' + titleCaseWords(g);
+      }
+      if (code === 'MIA') {
+        if (!g) return 'Checkpoint ' + t;
+        return 'Checkpoint ' + t + ': Gates ' + g;
+      }
       if (!g) {
         return 'Terminal ' + t;
-      }
-      if (code === 'ATL') {
-        return 'Terminal ' + t + ': ' + titleCaseWords(g);
       }
       if (code === 'DFW') {
         return 'Terminal ' + t + ': Gate ' + g;
