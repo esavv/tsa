@@ -144,6 +144,27 @@ def parse_wait_minutes(value: str) -> int:
     return 0
 
 
+def parse_den_wait_minutes(value: str) -> int:
+    """Parse DEN FlyFruition `wait_time` strings; numeric ranges use the high end (conservative)."""
+    lowered = value.lower()
+    if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
+        return 0
+
+    less_than = re.search(r"<\s*(\d+)", lowered)
+    if less_than:
+        return max(int(less_than.group(1)) - 1, 0)
+
+    range_match = re.search(r"(\d+)\s*[-–]\s*(\d+)", lowered)
+    if range_match:
+        return int(range_match.group(2))
+
+    integer_match = re.search(r"(\d+)", lowered)
+    if integer_match:
+        return int(integer_match.group(1))
+
+    return 0
+
+
 def omit_nyc_wait_point(point: dict) -> bool:
     """Skip API points for a closed queue with no wait. Open-but-unavailable (e.g. 'No Wait') still records 0."""
     try:
@@ -424,10 +445,21 @@ def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
         if wt.get("isDisplayable") is False:
             continue
         lane = str(wt.get("lane") or "")
-        try:
-            wait_sec = int(wt.get("waitSeconds", 0))
-        except (TypeError, ValueError):
-            wait_sec = 0
+        if airport == "MCO":
+            max_ws = wt.get("maxWaitSeconds")
+            ws = wt.get("waitSeconds")
+            try:
+                if max_ws is not None:
+                    wait_sec = int(max_ws)
+                else:
+                    wait_sec = int(ws or 0)
+            except (TypeError, ValueError):
+                wait_sec = 0
+        else:
+            try:
+                wait_sec = int(wt.get("waitSeconds", 0))
+            except (TypeError, ValueError):
+                wait_sec = 0
         wait_minutes = max(0, round(wait_sec / 60))
         terminal, gate = _mobi_terminal_gate(airport, wt)
         wid = str(wt.get("id") or "").strip()
@@ -565,7 +597,7 @@ def fetch_den_airport() -> list[dict]:
                     "terminal": terminal,
                     "gate": lane_title,
                     "queue_type": normalize_queue_type(lane_title),
-                    "wait_minutes": parse_wait_minutes(str(lane.get("wait_time") or "0")),
+                    "wait_minutes": parse_den_wait_minutes(str(lane.get("wait_time") or "0")),
                     "source_updated_at": None,
                     "point_id": None,
                 }
@@ -803,6 +835,21 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
     return inserted
 
 
+def print_mobi_raw(airport: str) -> None:
+    """Print the raw Mobi checkpoint JSON (DFW / CLT / MCO) for taxonomy / field inspection."""
+    code = airport.strip().upper()
+    endpoints: dict[str, tuple[str, str, str]] = {
+        "DFW": (DFW_WAIT_TIMES_URL, DFW_MOBILE_API_KEY, DFW_MOBILE_API_VERSION),
+        "CLT": (CLT_WAIT_TIMES_URL, CLT_MOBILE_API_KEY, CLT_MOBILE_API_VERSION),
+        "MCO": (MCO_WAIT_TIMES_URL, MCO_MOBILE_API_KEY, MCO_MOBILE_API_VERSION),
+    }
+    if code not in endpoints:
+        raise SystemExit("--raw supports DFW, CLT, and MCO (same Mobi API family).")
+    url, api_key, api_version = endpoints[code]
+    payload = _fetch_mobi_checkpoint_json(url, api_key, api_version)
+    print(json.dumps(payload, indent=2))
+
+
 def preview(airport: str) -> None:
     """Fetch one airport and print rows to stdout (no database writes)."""
     code = airport.strip().upper()
@@ -868,15 +915,23 @@ def run(db_path: str | None = None) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Fetch airport TSA wait times and store them in SQLite, or preview one airport."
+        description="Fetch airport TSA wait times and store them in SQLite, or preview / inspect one airport."
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--preview",
         metavar="CODE",
         help="Airport IATA code: fetch current wait times and print a table to stdout without writing to the database.",
     )
+    group.add_argument(
+        "--raw",
+        metavar="CODE",
+        help="DFW, CLT, or MCO only: print raw Mobi checkpoint JSON (includes attributes) for inspection; no DB write.",
+    )
     args = parser.parse_args()
     if args.preview:
         preview(args.preview)
+    elif args.raw:
+        print_mobi_raw(args.raw)
     else:
         run()
