@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}TSA Wait Times – JFK, LGA & EWR{% endblock %}
+{% block title %}TSA Wait Times – U.S. airports{% endblock %}
 {% block head %}
   <style>
     /* One shrink-wrapped column: title + tables share the same left edge;
@@ -87,7 +87,7 @@
   <main class="home-layout">
     <div class="home-cluster">
       <h1>TSA Wait Times</h1>
-      <p class="muted home-subhead">Security line wait times at JFK, LGA, and EWR</p>
+      <p class="muted home-subhead">Security line wait times at every airport we scrape</p>
       <div id="loading">Loading…</div>
       <div id="content" style="display: none;">
         <p class="muted" id="scraped-at"></p>
@@ -145,15 +145,45 @@
               minute: '2-digit'
             });
         }
-        const names = { LGA: 'LaGuardia (LGA)', JFK: 'JFK', EWR: 'Newark (EWR)' };
-        const order = ['JFK', 'LGA', 'EWR'];
+        /* Display order mirrors scripts/scraper.py SCRAPE_AIRPORTS (NYC first). */
+        const airportNames = {
+          JFK: 'JFK',
+          LGA: 'LaGuardia (LGA)',
+          EWR: 'Newark (EWR)',
+          LAX: 'Los Angeles (LAX)',
+          MIA: 'Miami (MIA)',
+          SEA: 'Seattle-Tacoma (SEA)',
+          DCA: 'Reagan National (DCA)',
+          ATL: 'Hartsfield-Jackson Atlanta (ATL)',
+          DFW: 'Dallas/Fort Worth (DFW)',
+          DEN: 'Denver (DEN)',
+          CLT: 'Charlotte Douglas (CLT)',
+          LAS: 'Harry Reid Las Vegas (LAS)',
+          MCO: 'Orlando (MCO)',
+          PHX: 'Phoenix Sky Harbor (PHX)',
+        };
+        const airportOrder = [
+          'JFK', 'LGA', 'EWR', 'LAX', 'MIA', 'SEA', 'DCA', 'ATL', 'DFW', 'DEN', 'CLT', 'LAS', 'MCO', 'PHX',
+        ];
+        const byCode = data.airports || {};
+        const seen = new Set();
+        const codes = [];
+        for (const code of airportOrder) {
+          if (byCode[code]) {
+            codes.push(code);
+            seen.add(code);
+          }
+        }
+        for (const code of Object.keys(byCode).sort()) {
+          if (!seen.has(code)) codes.push(code);
+        }
         const container = document.getElementById('airports');
-        for (const code of order) {
-          const terminals = (data.airports || {})[code];
+        for (const code of codes) {
+          const terminals = byCode[code];
           if (!terminals) continue;
           const section = document.createElement('div');
           section.className = 'airport-section';
-          section.innerHTML = '<h2>' + (names[code] || code) + '</h2>';
+          section.innerHTML = '<h2>' + (airportNames[code] || code) + '</h2>';
           const table = document.createElement('table');
           table.innerHTML = '<thead><tr><th>Terminal</th><th>General</th><th>PreCheck</th></tr></thead><tbody></tbody>';
           const tbody = table.querySelector('tbody');
