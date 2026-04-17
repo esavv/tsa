@@ -128,7 +128,7 @@
       display: none;
       text-align: left;
       margin-bottom: 0.5rem;
-      min-height: 2.8rem;
+      min-height: 3.2rem;
     }
     .chart-shell.touch-chart-ui .chart-reading-fixed {
       display: block;
@@ -144,6 +144,12 @@
       font-size: 0.85rem;
       line-height: 1.35;
     }
+    .chart-reading-fixed .line3 {
+      color: #334155;
+      font-size: 0.85rem;
+      line-height: 1.35;
+      margin-top: 0.12rem;
+    }
     .chart-container { position: relative; }
     .chart-callout {
       position: absolute;
@@ -157,7 +163,8 @@
       font-size: 0.8rem;
       line-height: 1.3;
       pointer-events: none;
-      white-space: nowrap;
+      white-space: normal;
+      max-width: min(22rem, calc(100vw - 2rem));
       display: none;
       z-index: 10;
       border: 1px solid #dbe2ea;
@@ -175,6 +182,11 @@
     .chart-callout .line2 {
       color: #334155;
       font-size: 0.78rem;
+    }
+    .chart-callout .line3 {
+      color: #334155;
+      font-size: 0.78rem;
+      margin-top: 0.1rem;
     }
     .chart-container {
       height: 390px;
@@ -292,6 +304,31 @@
       return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
         return c.toUpperCase();
       });
+    }
+
+    /** Hover / fixed readout: same phrasing as the old two-line readout (PreCheck, not TSA PreCheck). */
+    function queueReadoutLabel(qt) {
+      const labels = {
+        general: 'General',
+        precheck: 'PreCheck',
+        priority: 'Priority',
+        clear: 'Clear',
+      };
+      if (labels[qt]) return labels[qt];
+      return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    }
+
+    const QUEUE_FILL_BY_TYPE = {
+      general: 'rgba(37,99,235,0.1)',
+      precheck: 'rgba(22,163,74,0.1)',
+      priority: 'rgba(202,138,4,0.12)',
+      clear: 'rgba(147,51,234,0.12)',
+    };
+
+    function queueFillColor(qt) {
+      return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
     }
 
     function sortedQueueTypesWithMinutes(queues) {
@@ -457,15 +494,26 @@
       calloutEl.style.display = 'none';
     }
 
+    function formatReadoutLine(qts, byQt) {
+      return qts
+        .map(function (qt) {
+          const v = byQt[qt];
+          return queueReadoutLabel(qt) + ': ' + (v != null ? v + ' min' : '–');
+        })
+        .join(' · ');
+    }
+
     function readoutHtml(label, byQt, order) {
-      const parts = (order || []).map(function (qt) {
-        const v = byQt[qt];
-        return queueTabAbbrev(qt) + ': ' + (v != null ? v + ' min' : '–');
-      });
-      return (
-        '<div class="line1">' + label + '</div>' +
-        '<div class="line2">' + parts.join(' · ') + '</div>'
-      );
+      const ord = order || [];
+      let body = '';
+      if (ord.length <= 2) {
+        body = '<div class="line2">' + formatReadoutLine(ord, byQt) + '</div>';
+      } else {
+        body =
+          '<div class="line2">' + formatReadoutLine(ord.slice(0, 2), byQt) + '</div>' +
+          '<div class="line3">' + formatReadoutLine(ord.slice(2), byQt) + '</div>';
+      }
+      return '<div class="line1">' + label + '</div>' + body;
     }
 
     function readoutValuesAtIndex(chartRef, idx) {
@@ -641,6 +689,7 @@
         rawTimes.push(row.t);
       }
 
+      const useAreaFill = queueTypes.length <= 2;
       const datasets = queueTypes.map(function (qt, i) {
         return {
           label: queueChartDatasetLabel(qt),
@@ -650,10 +699,10 @@
           }),
           borderColor: CHART_LINE_COLORS[i % CHART_LINE_COLORS.length],
           borderWidth: 2,
-          backgroundColor: 'transparent',
+          backgroundColor: useAreaFill ? queueFillColor(qt) : 'transparent',
           pointRadius: 0,
           pointHoverRadius: 5,
-          fill: false,
+          fill: useAreaFill,
           tension: 0.2,
         };
       });
