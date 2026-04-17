@@ -128,7 +128,7 @@
       display: none;
       text-align: left;
       margin-bottom: 0.5rem;
-      min-height: 3.2rem;
+      min-height: 2.8rem;
     }
     .chart-shell.touch-chart-ui .chart-reading-fixed {
       display: block;
@@ -138,17 +138,20 @@
       color: #0f172a;
       font-size: 0.95rem;
       margin-bottom: 0.15rem;
+      white-space: nowrap;
     }
     .chart-reading-fixed .line2 {
       color: #334155;
       font-size: 0.85rem;
       line-height: 1.35;
+      white-space: nowrap;
     }
     .chart-reading-fixed .line3 {
       color: #334155;
       font-size: 0.85rem;
       line-height: 1.35;
       margin-top: 0.12rem;
+      white-space: nowrap;
     }
     .chart-container { position: relative; }
     .chart-callout {
@@ -163,14 +166,21 @@
       font-size: 0.8rem;
       line-height: 1.3;
       pointer-events: none;
-      white-space: normal;
-      max-width: min(22rem, calc(100vw - 2rem));
+      white-space: nowrap;
       display: none;
       z-index: 10;
       border: 1px solid #dbe2ea;
       box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
+    }
+    .chart-callout.chart-callout--stacked {
+      white-space: normal;
+    }
+    .chart-callout .line1,
+    .chart-callout .line2,
+    .chart-callout .line3 {
+      white-space: nowrap;
     }
     .chart-shell.touch-chart-ui .chart-callout {
       display: none !important;
@@ -492,6 +502,7 @@
 
     function hideCallout() {
       calloutEl.style.display = 'none';
+      calloutEl.className = 'chart-callout';
     }
 
     function formatReadoutLine(qts, byQt) {
@@ -528,6 +539,8 @@
 
     function showCallout(x, label, chartRef, idx) {
       const order = chartRef.$queueTypeOrder || [];
+      const stacked = order.length > 2;
+      calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
       calloutEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
       calloutEl.style.left = x + 'px';
       calloutEl.style.display = 'block';
@@ -535,11 +548,14 @@
 
     function setFixedReadout(label, chartRef, idx) {
       const order = chartRef.$queueTypeOrder || [];
+      const stacked = order.length > 2;
+      readingFixedEl.className = 'chart-reading-fixed' + (stacked ? ' chart-reading-fixed--stacked' : '');
       readingFixedEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
     }
 
     function clearFixedReadout() {
       readingFixedEl.innerHTML = '';
+      readingFixedEl.className = 'chart-reading-fixed';
     }
 
     function xToClosestIndex(chartRef, pixelX) {
