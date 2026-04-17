@@ -264,6 +264,36 @@
 
     const QUEUE_TAB_ORDER = ['general', 'precheck', 'priority', 'clear'];
 
+    function sortQueueTypesFromKeys(types) {
+      const set = new Set(types);
+      const out = [];
+      for (const q of QUEUE_TAB_ORDER) {
+        if (set.has(q)) out.push(q);
+      }
+      const rest = [...set].filter(function (q) {
+        return QUEUE_TAB_ORDER.indexOf(q) === -1;
+      }).sort();
+      return out.concat(rest);
+    }
+
+    const CHART_LINE_COLORS = [
+      '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
+      '#db2777', '#0d9488', '#7c3aed',
+    ];
+
+    function queueChartDatasetLabel(qt) {
+      const labels = {
+        general: 'General',
+        precheck: 'TSA PreCheck',
+        priority: 'Priority',
+        clear: 'Clear',
+      };
+      if (labels[qt]) return labels[qt];
+      return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    }
+
     function sortedQueueTypesWithMinutes(queues) {
       const q = queues || {};
       const keys = Object.keys(q).filter(function (qt) {
@@ -381,15 +411,18 @@
       afterDatasetsDraw(chartRef) {
         const idx = chartRef.$readoutIndex;
         if (idx == null || idx < 0) return;
-        const meta0 = chartRef.getDatasetMeta(0);
-        const meta1 = chartRef.getDatasetMeta(1);
-        const p0 = meta0.data[idx];
-        const p1 = meta1.data[idx];
-        const ok0 = p0 && !p0.skip;
-        const ok1 = p1 && !p1.skip;
-        const x = ok0 ? p0.x : (ok1 ? p1.x : null);
-        if (x == null) return;
+        let x = null;
         const { ctx, chartArea } = chartRef;
+        const n = chartRef.data.datasets.length;
+        for (let di = 0; di < n; di++) {
+          const meta = chartRef.getDatasetMeta(di);
+          const pt = meta.data[idx];
+          if (pt && !pt.skip) {
+            x = pt.x;
+            break;
+          }
+        }
+        if (x == null) return;
         ctx.save();
         ctx.beginPath();
         ctx.setLineDash([3, 4]);
@@ -408,8 +441,13 @@
           ctx.lineWidth = 2;
           ctx.stroke();
         }
-        if (ok0) dot(p0.x, p0.y, '#2563eb');
-        if (ok1) dot(p1.x, p1.y, '#16a34a');
+        for (let di = 0; di < n; di++) {
+          const meta = chartRef.getDatasetMeta(di);
+          const pt = meta.data[idx];
+          if (!pt || pt.skip) continue;
+          const fill = chartRef.data.datasets[di].borderColor || '#334155';
+          dot(pt.x, pt.y, fill);
+        }
         ctx.restore();
       }
     };
@@ -419,23 +457,37 @@
       calloutEl.style.display = 'none';
     }
 
-    function readoutHtml(label, general, precheck) {
-      const gText = (general != null ? general + ' min' : '-');
-      const pText = (precheck != null ? precheck + ' min' : '-');
+    function readoutHtml(label, byQt, order) {
+      const parts = (order || []).map(function (qt) {
+        const v = byQt[qt];
+        return queueTabAbbrev(qt) + ': ' + (v != null ? v + ' min' : '–');
+      });
       return (
         '<div class="line1">' + label + '</div>' +
-        '<div class="line2">General: ' + gText + ' · PreCheck: ' + pText + '</div>'
+        '<div class="line2">' + parts.join(' · ') + '</div>'
       );
     }
 
-    function showCallout(x, label, general, precheck) {
-      calloutEl.innerHTML = readoutHtml(label, general, precheck);
+    function readoutValuesAtIndex(chartRef, idx) {
+      const byQt = {};
+      for (let di = 0; di < chartRef.data.datasets.length; di++) {
+        const ds = chartRef.data.datasets[di];
+        const k = ds.queueTypeKey;
+        if (k) byQt[k] = ds.data[idx];
+      }
+      return byQt;
+    }
+
+    function showCallout(x, label, chartRef, idx) {
+      const order = chartRef.$queueTypeOrder || [];
+      calloutEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
       calloutEl.style.left = x + 'px';
       calloutEl.style.display = 'block';
     }
 
-    function setFixedReadout(label, general, precheck) {
-      readingFixedEl.innerHTML = readoutHtml(label, general, precheck);
+    function setFixedReadout(label, chartRef, idx) {
+      const order = chartRef.$queueTypeOrder || [];
+      readingFixedEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
     }
 
     function clearFixedReadout() {
@@ -443,15 +495,13 @@
     }
 
     function xToClosestIndex(chartRef, pixelX) {
-      const meta = chartRef.getDatasetMeta(0);
-      const pts = meta.data;
-      if (!pts.length) return null;
+      const n = chartRef.data.labels.length;
+      if (!n) return null;
       let best = 0;
       let bestDist = Infinity;
-      for (let i = 0; i < pts.length; i++) {
-        const pt = pts[i];
-        if (!pt || pt.skip) continue;
-        const d = Math.abs(pixelX - pt.x);
+      for (let i = 0; i < n; i++) {
+        const x = chartRef.scales.x.getPixelForTick(i);
+        const d = Math.abs(pixelX - x);
         if (d < bestDist) {
           bestDist = d;
           best = i;
@@ -463,18 +513,21 @@
     function applyReadoutAtIndex(chartRef, idx) {
       if (idx == null || idx < 0) return;
       const label = chartRef.data.labels[idx];
-      const g = chartRef.data.datasets[0].data[idx];
-      const p = chartRef.data.datasets[1].data[idx];
       chartRef.$readoutIndex = idx;
       if (touchChartUi()) {
         hideCallout();
-        setFixedReadout(label, g, p);
+        setFixedReadout(label, chartRef, idx);
         chartRef.update('none');
       } else {
-        const meta0 = chartRef.getDatasetMeta(0);
-        const el = meta0.data[idx];
-        const x = el ? el.x : chartRef.scales.x.getPixelForTick(idx);
-        showCallout(x, label, g, p);
+        let x = chartRef.scales.x.getPixelForTick(idx);
+        for (let di = 0; di < chartRef.data.datasets.length; di++) {
+          const el = chartRef.getDatasetMeta(di).data[idx];
+          if (el && !el.skip) {
+            x = el.x;
+            break;
+          }
+        }
+        showCallout(x, label, chartRef, idx);
         chartRef.update('none');
       }
     }
@@ -556,24 +609,59 @@
 
       const labels = [];
       const rawTimes = [];
-      const generalMinutes = [];
-      const precheckMinutes = [];
+      const queues = data.queues || {};
+      const queueTypes = sortQueueTypesFromKeys(
+        Object.keys(queues).filter(function (qt) {
+          return (queues[qt] || []).length > 0;
+        })
+      );
+
       const byTime = {};
-
-      for (const p of data.general || []) {
-        byTime[p.t] = { t: p.t, general: p.minutes, precheck: null };
+      for (let qi = 0; qi < queueTypes.length; qi++) {
+        const qt = queueTypes[qi];
+        for (const p of queues[qt] || []) {
+          if (!byTime[p.t]) byTime[p.t] = { t: p.t };
+          byTime[p.t][qt] = p.minutes;
+        }
       }
-      for (const p of data.precheck || []) {
-        if (!byTime[p.t]) byTime[p.t] = { t: p.t, general: null, precheck: null };
-        byTime[p.t].precheck = p.minutes;
+
+      const sorted = Object.values(byTime).sort(function (a, b) {
+        return a.t.localeCompare(b.t);
+      });
+      for (let si = 0; si < sorted.length; si++) {
+        const row = sorted[si];
+        labels.push(
+          new Date(row.t).toLocaleString([], {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        );
+        rawTimes.push(row.t);
       }
 
-      const sorted = Object.values(byTime).sort((a, b) => a.t.localeCompare(b.t));
-      for (const p of sorted) {
-        labels.push(new Date(p.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
-        rawTimes.push(p.t);
-        generalMinutes.push(p.general != null ? p.general : null);
-        precheckMinutes.push(p.precheck != null ? p.precheck : null);
+      const datasets = queueTypes.map(function (qt, i) {
+        return {
+          label: queueChartDatasetLabel(qt),
+          queueTypeKey: qt,
+          data: sorted.map(function (row) {
+            return row[qt] != null ? row[qt] : null;
+          }),
+          borderColor: CHART_LINE_COLORS[i % CHART_LINE_COLORS.length],
+          borderWidth: 2,
+          backgroundColor: 'transparent',
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          fill: false,
+          tension: 0.2,
+        };
+      });
+
+      if (!datasets.length) {
+        hideCallout();
+        clearFixedReadout();
+        return;
       }
 
       const ctx = chartCanvas.getContext('2d');
@@ -581,30 +669,7 @@
         type: 'line',
         data: {
           labels,
-          datasets: [
-            {
-              label: 'General',
-              data: generalMinutes,
-              borderColor: '#2563eb',
-              borderWidth: 2,
-              backgroundColor: 'rgba(37,99,235,0.1)',
-              pointRadius: 0,
-              pointHoverRadius: 5,
-              fill: true,
-              tension: 0.2
-            },
-            {
-              label: 'TSA PreCheck',
-              data: precheckMinutes,
-              borderColor: '#16a34a',
-              borderWidth: 2,
-              backgroundColor: 'rgba(22,163,74,0.1)',
-              pointRadius: 0,
-              pointHoverRadius: 5,
-              fill: true,
-              tension: 0.2
-            }
-          ]
+          datasets,
         },
         options: {
           responsive: true,
@@ -618,9 +683,10 @@
               labels: {
                 usePointStyle: true,
                 pointStyle: 'line',
-                boxWidth: 40,
-                boxHeight: 8
-              }
+                boxWidth: 36,
+                boxHeight: 8,
+                font: { size: 10 },
+              },
             },
             tooltip: { enabled: false }
           },
@@ -635,11 +701,9 @@
             }
             const idx = points[0].index;
             const label = chartRef.data.labels[idx];
-            const g = chartRef.data.datasets[0].data[idx];
-            const p = chartRef.data.datasets[1].data[idx];
             const x = points[0].element.x;
             chartRef.$readoutIndex = idx;
-            showCallout(x, label, g, p);
+            showCallout(x, label, chartRef, idx);
             chartRef.update('none');
           },
           scales: {
@@ -665,12 +729,13 @@
           }
         }
       });
+      chart.$queueTypeOrder = queueTypes;
 
       if (labels.length) {
         const last = labels.length - 1;
         if (touchChartUi()) {
           chart.$readoutIndex = last;
-          setFixedReadout(labels[last], generalMinutes[last], precheckMinutes[last]);
+          setFixedReadout(labels[last], chart, last);
           chart.update('none');
           attachChartTouchScrub(chart);
         } else {

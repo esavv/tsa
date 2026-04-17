@@ -153,7 +153,7 @@ def api_latest():
 
 @app.route("/api/history")
 def api_history():
-    """History for one airport + terminal (+ optional gate). Query: airport, terminal, hours, gate."""
+    """History for one airport + terminal (+ optional gate). Returns queues keyed by queue_type."""
     airport = request.args.get("airport")
     terminal = request.args.get("terminal")
     if not airport or not terminal:
@@ -196,18 +196,15 @@ def api_history():
     rows = cur.fetchall()
     conn.close()
 
-    general = []
-    precheck = []
+    queues: dict[str, list[dict]] = {}
     for scraped_at_utc, queue_type, wait_minutes in rows:
         point = {"t": scraped_at_utc, "minutes": wait_minutes}
-        if queue_type == "general":
-            general.append(point)
-        else:
-            precheck.append(point)
+        if queue_type not in queues:
+            queues[queue_type] = []
+        queues[queue_type].append(point)
 
     return jsonify(
-        general=general,
-        precheck=precheck,
+        queues=queues,
         latest_scraped_at_utc=latest_scraped_at_utc,
     )
 
