@@ -42,6 +42,12 @@ def index():
     return redirect(url_for("airport", code="JFK"), code=302)
 
 
+@app.route("/all")
+def all_airports():
+    """Full multi-airport table (not linked from main UI)."""
+    return render_template("all_airports.html")
+
+
 @app.route("/<code>")
 def airport(code: str):
     c = (code or "").strip().upper()
