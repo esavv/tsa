@@ -246,7 +246,7 @@
 
   var MAX_TERMINAL_CHIPS = 3;
 
-  function buildTerminalChipsHtml(code, latest) {
+  function buildTerminalChipsHtml(code, latest, catalogRows) {
     var terminals = latest && latest.airports && latest.airports[code];
     if (!terminals || !terminals.length) {
       return (
@@ -256,7 +256,7 @@
         '</div>'
       );
     }
-    var apEntry = catalogEntryForCode(rows, code);
+    var apEntry = catalogEntryForCode(catalogRows || [], code);
     var sorted = sortTerminalRows(apEntry, terminals);
     var show = sorted.slice(0, MAX_TERMINAL_CHIPS);
     var more = sorted.length - show.length;
@@ -407,7 +407,7 @@
               ? '<div class="airport-search-row__meta muted">' + esc(meta) + '</div>'
               : '') +
             '</div>' +
-            buildTerminalChipsHtml(row.code, latestJson) +
+            buildTerminalChipsHtml(row.code, latestJson, rows) +
             '</div>';
 
           div.addEventListener('mousedown', function (e) {
