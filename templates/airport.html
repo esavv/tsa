@@ -328,10 +328,18 @@
     .tab-btn .tab-wait-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
-      column-gap: 0.35rem;
+      column-gap: 0;
       row-gap: 0.12rem;
       width: 100%;
       align-items: baseline;
+    }
+    /* Tight label → time; keep wider space between first time and second label (pair gap). */
+    .tab-btn .tab-wait-lbl:nth-child(4n + 1),
+    .tab-btn .tab-wait-lbl:nth-child(4n + 3) {
+      margin-right: 0.1rem;
+    }
+    .tab-btn .tab-wait-val:nth-child(4n + 2) {
+      margin-right: 0.35rem;
     }
     .tab-btn .tab-wait-lbl {
       min-width: 0;
