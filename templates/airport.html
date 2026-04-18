@@ -324,10 +324,10 @@
     .tab-btn.active .tab-waits {
       color: rgba(226, 232, 240, 0.95);
     }
-    /* Unequal fr on label cols: col1 grows half as much as col3 (was equal 1fr/1fr; pure auto was too tight). */
+    /* One grid for all queue rows so time columns line up (label | val | label | val). */
     .tab-btn .tab-wait-grid {
       display: grid;
-      grid-template-columns: minmax(0, 0.5fr) auto minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
       column-gap: 0;
       row-gap: 0.12rem;
       width: 100%;
