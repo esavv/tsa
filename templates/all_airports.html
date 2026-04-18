@@ -150,14 +150,78 @@
       margin-top: 0.2rem;
       line-height: 1.35;
     }
-    .airport-search-row__waits {
-      font-size: 0.78rem;
-      margin-top: 0.25rem;
-      color: #334155;
-      font-weight: 500;
+    .airport-search-row__main {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0.55rem 1rem;
+      width: 100%;
     }
-    .airport-search-row__waits--empty {
+    .airport-search-row__left {
+      flex: 1 1 12rem;
+      min-width: 0;
+    }
+    .airport-search-row__chips {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: stretch;
+      flex: 0 1 auto;
+      margin-left: auto;
+      max-width: 100%;
+      justify-content: flex-end;
+    }
+    .airport-search-row__chips--empty {
+      align-self: center;
+      font-size: 0.78rem;
       font-weight: 400;
+    }
+    .airport-search-chip {
+      border: 1px solid #d0d7e2;
+      border-radius: 10px;
+      background: #fff;
+      padding: 0.28rem 0.48rem 0.32rem;
+      min-width: 0;
+      max-width: 9.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+    .airport-search-chip__label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #334155;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .airport-search-chip__waits {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.12rem 0.32rem;
+      font-size: 0.62rem;
+      line-height: 1.25;
+      font-weight: 400;
+      color: #64748b;
+    }
+    .airport-search-chip__wait--empty {
+      color: #94a3b8;
+    }
+    .airport-search-chip-more {
+      align-self: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      padding: 0 0.15rem;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      pointer-events: none;
     }
   </style>
 {% endblock %}

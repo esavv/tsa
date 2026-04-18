@@ -173,22 +173,134 @@
     return scored;
   }
 
-  function summarizeWaits(code, latest) {
-    var terminals = latest && latest.airports && latest.airports[code];
-    if (!terminals || !terminals.length) return '';
-    var minGen = null;
-    var minPre = null;
-    for (var t = 0; t < terminals.length; t++) {
-      var qmap = terminals[t].queues || {};
-      var g = qmap.general && qmap.general.minutes;
-      if (g != null) minGen = minGen == null ? g : Math.min(minGen, g);
-      var p = qmap.precheck && qmap.precheck.minutes;
-      if (p != null) minPre = minPre == null ? p : Math.min(minPre, p);
+  function titleCaseWords(s) {
+    return String(s)
+      .split(/\s+/)
+      .map(function (word) {
+        if (!word) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  }
+
+  function effectiveGate(code, gate) {
+    if (code === 'CLT') return '';
+    return gate || '';
+  }
+
+  /** Match /airport terminal tab labels (tabLabelForRow). */
+  function tabLabelForRow(code, terminal, gateRaw) {
+    var t = terminal || '';
+    var g = effectiveGate(code, gateRaw);
+    if (code === 'CLT') {
+      return t;
     }
+    if (code === 'ATL') {
+      if (!g) return t;
+      return t + ': ' + titleCaseWords(g);
+    }
+    if (code === 'MIA') {
+      if (!g) return 'Checkpoint ' + t;
+      return 'Checkpoint ' + t + ': Gates ' + g;
+    }
+    if (!g) {
+      return 'Terminal ' + t;
+    }
+    if (code === 'DFW') {
+      return 'Terminal ' + t + ': Gate ' + g;
+    }
+    if (code === 'LAS' || code === 'PHX') {
+      return 'Terminal ' + t + ': ' + g;
+    }
+    if (code === 'EWR' || code === 'MCO') {
+      return 'Terminal ' + t + ': Gates ' + g;
+    }
+    return 'Terminal ' + t + ': Gates ' + g;
+  }
+
+  function sortTerminalRows(code, rows) {
+    return rows.slice().sort(function (a, b) {
+      var ga = effectiveGate(code, (a && a.gate) || '');
+      var gb = effectiveGate(code, (b && b.gate) || '');
+      var ka = String((a && a.terminal) || '') + '\0' + ga;
+      var kb = String((b && b.terminal) || '') + '\0' + gb;
+      return ka.localeCompare(kb);
+    });
+  }
+
+  /** Gen / Pre only for dropdown chips (matches common tab readout). */
+  function chipGenPreParts(queues) {
+    var q = queues || {};
     var parts = [];
-    if (minGen != null) parts.push('General ' + minGen + 'm');
-    if (minPre != null) parts.push('PreCheck ' + minPre + 'm');
-    return parts.join(' · ');
+    if (q.general && q.general.minutes != null) {
+      parts.push({ abbrev: 'Gen', m: q.general.minutes });
+    }
+    if (q.precheck && q.precheck.minutes != null) {
+      parts.push({ abbrev: 'Pre', m: q.precheck.minutes });
+    }
+    return parts;
+  }
+
+  var MAX_TERMINAL_CHIPS = 3;
+
+  function buildTerminalChipsHtml(code, latest) {
+    var terminals = latest && latest.airports && latest.airports[code];
+    if (!terminals || !terminals.length) {
+      return (
+        '<div class="airport-search-row__chips airport-search-row__chips--empty muted" role="presentation">' +
+        'No checkpoint data' +
+        '</div>'
+      );
+    }
+    var sorted = sortTerminalRows(code, terminals);
+    var show = sorted.slice(0, MAX_TERMINAL_CHIPS);
+    var more = sorted.length - show.length;
+    var html = '<div class="airport-search-row__chips" role="presentation">';
+    for (var i = 0; i < show.length; i++) {
+      var row = show[i];
+      var label = tabLabelForRow(code, row.terminal, row.gate);
+      var parts = chipGenPreParts(row.queues);
+      var waitsHtml = '';
+      if (parts.length) {
+        for (var p = 0; p < parts.length; p++) {
+          waitsHtml +=
+            '<span class="airport-search-chip__wait">' +
+            esc(parts[p].abbrev + ' ' + parts[p].m + 'm') +
+            '</span>';
+        }
+      } else {
+        waitsHtml =
+          '<span class="airport-search-chip__wait airport-search-chip__wait--empty">—</span>';
+      }
+      html +=
+        '<div class="airport-search-chip">' +
+        '<span class="airport-search-chip__label" title="' +
+        esc(label) +
+        '">' +
+        esc(label) +
+        '</span>' +
+        '<div class="airport-search-chip__waits">' +
+        waitsHtml +
+        '</div>' +
+        '</div>';
+    }
+    if (more > 0) {
+      var moreTitle =
+        more +
+        ' more terminal' +
+        (more === 1 ? '' : 's') +
+        ' — open ' +
+        code +
+        ' for full list';
+      html +=
+        '<span class="airport-search-chip-more" title="' +
+        esc(moreTitle) +
+        '">+' +
+        more +
+        '</span>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function esc(s) {
@@ -270,7 +382,6 @@
           div.dataset.code = row.code;
           if (row.code === currentCode) div.classList.add('airport-search-row--current');
 
-          var waits = summarizeWaits(row.code, latestJson);
           var loc = [row.city, row.state].filter(Boolean).join(', ');
           var metaParts = [];
           if (loc) metaParts.push(loc);
@@ -278,6 +389,8 @@
           var meta = metaParts.join(' · ');
 
           div.innerHTML =
+            '<div class="airport-search-row__main">' +
+            '<div class="airport-search-row__left">' +
             '<div class="airport-search-row__top">' +
             '<span class="airport-search-code">' +
             esc(row.code) +
@@ -288,9 +401,9 @@
             (meta
               ? '<div class="airport-search-row__meta muted">' + esc(meta) + '</div>'
               : '') +
-            (waits
-              ? '<div class="airport-search-row__waits">' + esc(waits) + '</div>'
-              : '<div class="airport-search-row__waits airport-search-row__waits--empty muted">No checkpoint data</div>');
+            '</div>' +
+            buildTerminalChipsHtml(row.code, latestJson) +
+            '</div>';
 
           div.addEventListener('mousedown', function (e) {
             e.preventDefault();
