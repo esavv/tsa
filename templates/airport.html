@@ -605,7 +605,7 @@
 
     function rowMatchesInitial(row) {
       if (row.terminal !== initialTerminal) return false;
-      if (pageAirportEntry.terminal_tab && pageAirportEntry.terminal_tab.preset === 'clt') return true;
+      if (pageAirportEntry.terminal_tab && pageAirportEntry.terminal_tab.ignore_gate === true) return true;
       return String(row.gate || '') === String(initialGate || '');
     }
 

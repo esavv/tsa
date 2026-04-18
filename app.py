@@ -32,13 +32,20 @@ def catalog_airport_entry(code: str) -> Optional[dict]:
     return None
 
 
+_DEFAULT_TERMINAL_TAB = {
+    "ignore_gate": False,
+    "without_gate": "Terminal {terminal}",
+    "with_gate": "Terminal {terminal}: Gates {gate}",
+}
+
+
 def airport_catalog_entry_for_js(code: str) -> dict:
-    """Catalog row for the current airport, with defaults for terminal_tab (client JS)."""
+    """Catalog row for the current airport; terminal_tab merged with template defaults if partial."""
     raw = dict(catalog_airport_entry(code) or {})
     raw["code"] = code
     tab = dict(raw.get("terminal_tab") or {})
-    tab.setdefault("preset", "standard")
-    raw["terminal_tab"] = tab
+    merged = {**_DEFAULT_TERMINAL_TAB, **tab}
+    raw["terminal_tab"] = merged
     return raw
 
 # Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS

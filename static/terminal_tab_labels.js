@@ -1,8 +1,25 @@
 /**
- * Terminal / checkpoint labels from catalog terminal_tab (preset + optional strings).
- * Used by airport pages, /all, and search chips.
+ * Terminal / checkpoint tab labels from airport catalog `terminal_tab`.
+ *
+ * Each airport sets explicit templates (no named presets):
+ *   - without_gate: shown when there is no gate (e.g. "Terminal {terminal}")
+ *   - with_gate:    shown when there is a gate (e.g. "Terminal {terminal}: Gates {gate}")
+ * Placeholders: {terminal}, {gate} (gate is transformed per gate_transform before insert).
+ *
+ * Optional:
+ *   - ignore_gate: if true, gate is omitted for URLs, sorting, and matching; only without_gate is used.
+ *   - gate_transform: "titlecase_words" to title-case each whitespace-delimited word of the gate for display.
+ *
+ * If templates are missing, defaults match the common "Terminal … / Gates …" pattern.
  */
 (function (global) {
+  var DEFAULT_TAB = {
+    ignore_gate: false,
+    gate_transform: 'none',
+    without_gate: 'Terminal {terminal}',
+    with_gate: 'Terminal {terminal}: Gates {gate}',
+  };
+
   function titleCaseWords(s) {
     return String(s)
       .split(/\s+/)
@@ -13,71 +30,58 @@
       .join(' ');
   }
 
-  function terminalTabConfig(airportEntry) {
-    var tab = (airportEntry && airportEntry.terminal_tab) || {};
-    var out = {};
-    out.preset = tab.preset || 'standard';
-    out.strings = tab.strings || {};
-    return out;
+  /**
+   * @param {object|null|undefined} tab raw terminal_tab from catalog
+   * @returns {{ ignore_gate: boolean, gate_transform: string, without_gate: string, with_gate: string }}
+   */
+  function normalizeTerminalTab(tab) {
+    var t = tab && typeof tab === 'object' ? tab : {};
+    return {
+      ignore_gate: t.ignore_gate === true,
+      gate_transform: t.gate_transform === 'titlecase_words' ? 'titlecase_words' : 'none',
+      without_gate: typeof t.without_gate === 'string' && t.without_gate ? t.without_gate : DEFAULT_TAB.without_gate,
+      with_gate: typeof t.with_gate === 'string' && t.with_gate ? t.with_gate : DEFAULT_TAB.with_gate,
+    };
   }
 
-  function str(strings, key, def) {
-    if (strings && strings[key]) return strings[key];
-    return def;
+  function terminalTabConfig(airportEntry) {
+    return normalizeTerminalTab(airportEntry && airportEntry.terminal_tab);
+  }
+
+  function displayGateForLabel(cfg, gateRaw) {
+    var g = gateRaw || '';
+    if (!g) return '';
+    if (cfg.gate_transform === 'titlecase_words') return titleCaseWords(g);
+    return g;
+  }
+
+  function interpolate(template, terminal, gateDisplay) {
+    return String(template)
+      .replace(/\{terminal\}/g, terminal || '')
+      .replace(/\{gate\}/g, gateDisplay || '');
   }
 
   /**
-   * Gate value for URLs and matching; empty when catalog says to ignore gate in label (e.g. CLT).
+   * Gate value for URLs and matching; empty when catalog says to ignore gate (e.g. CLT).
    */
   function effectiveGateForTab(airportEntry, gateRaw) {
     var cfg = terminalTabConfig(airportEntry);
-    if (cfg.preset === 'clt') return '';
-    if (airportEntry && airportEntry.terminal_tab && airportEntry.terminal_tab.ignore_gate === true) {
-      return '';
-    }
+    if (cfg.ignore_gate) return '';
     return gateRaw || '';
   }
 
   /**
-   * @param {object} airportEntry catalog row: { code, terminal_tab: { preset, strings?, ignore_gate? } }
+   * @param {object} airportEntry catalog row with terminal_tab
    */
   function terminalTabLabel(airportEntry, terminal, gateRaw) {
     var cfg = terminalTabConfig(airportEntry);
-    var preset = cfg.preset;
-    var strings = cfg.strings;
     var t = terminal || '';
     var g = effectiveGateForTab(airportEntry, gateRaw);
-
-    var terminalWord = str(strings, 'terminal_prefix', 'Terminal ');
-    var checkpointWord = str(strings, 'checkpoint_prefix', 'Checkpoint ');
-    var gatesPlural = str(strings, 'gates_plural', 'Gates ');
-    var gateSingular = str(strings, 'gate_singular', 'Gate ');
-
-    switch (preset) {
-      case 'clt':
-        return t;
-      case 'atl':
-        if (!g) return t;
-        return t + ': ' + titleCaseWords(g);
-      case 'mia':
-        if (!g) return checkpointWord + t;
-        return checkpointWord + t + ': ' + gatesPlural + g;
-      case 'dfw':
-        if (!g) return terminalWord + t;
-        return terminalWord + t + ': ' + gateSingular + g;
-      case 'las_phx':
-        if (!g) return terminalWord + t;
-        return terminalWord + t + ': ' + g;
-      case 'ewr_mco':
-        if (!g) return terminalWord + t;
-        return terminalWord + t + ': ' + gatesPlural + g;
-      case 'standard':
-      default:
-        if (!g) return terminalWord + t;
-        return terminalWord + t + ': ' + gatesPlural + g;
-    }
+    if (!g) return interpolate(cfg.without_gate, t, '');
+    return interpolate(cfg.with_gate, t, displayGateForLabel(cfg, gateRaw));
   }
 
+  global.normalizeTerminalTab = normalizeTerminalTab;
   global.effectiveGateForTab = effectiveGateForTab;
   global.terminalTabLabel = terminalTabLabel;
 })(typeof window !== 'undefined' ? window : this);

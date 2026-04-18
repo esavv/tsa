@@ -333,11 +333,11 @@
       for (const a of catalogAirports) {
         if (a.code === code) {
           const tab = { ...(a.terminal_tab || {}) };
-          if (!tab.preset) tab.preset = 'standard';
+          delete tab.preset;
           return { ...a, code: a.code, terminal_tab: tab };
         }
       }
-      return { code, terminal_tab: { preset: 'standard' } };
+      return { code, terminal_tab: {} };
     }
 
     function terminalHref(airportEntry, terminal, gateRaw) {

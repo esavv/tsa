@@ -108,9 +108,12 @@
         metroLabel = metros[ap.metro_key].display_name || ap.metro_key;
       }
       var tt = ap.terminal_tab || {};
-      var terminalTab = { preset: tt.preset || 'standard' };
-      if (tt.strings) terminalTab.strings = tt.strings;
-      if (tt.ignore_gate === true) terminalTab.ignore_gate = true;
+      var terminalTab = {};
+      for (var tk in tt) {
+        if (Object.prototype.hasOwnProperty.call(tt, tk) && tk !== 'preset') {
+          terminalTab[tk] = tt[tk];
+        }
+      }
       out.push({
         code: ap.code,
         display_name: ap.display_name,
@@ -188,7 +191,7 @@
     for (var i = 0; i < list.length; i++) {
       if (list[i].code === code) return list[i];
     }
-    return { code: code, terminal_tab: { preset: 'standard' } };
+    return { code: code, terminal_tab: {} };
   }
 
   function sortTerminalRows(catalogEntry, terminalRows) {

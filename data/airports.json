@@ -21,7 +21,10 @@
       "city": "New York",
       "state": "NY",
       "state_name": "New York",
-      "terminal_tab": { "preset": "standard" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "lga",
         "laguardia",
@@ -39,7 +42,10 @@
       "city": "New York",
       "state": "NY",
       "state_name": "New York",
-      "terminal_tab": { "preset": "standard" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "jfk",
         "john f kennedy",
@@ -59,7 +65,10 @@
       "city": "Newark",
       "state": "NJ",
       "state_name": "New Jersey",
-      "terminal_tab": { "preset": "ewr_mco" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "ewr",
         "newark",
@@ -78,7 +87,10 @@
       "city": "Los Angeles",
       "state": "CA",
       "state_name": "California",
-      "terminal_tab": { "preset": "standard" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "lax",
         "los angeles international",
@@ -96,7 +108,10 @@
       "city": "Miami",
       "state": "FL",
       "state_name": "Florida",
-      "terminal_tab": { "preset": "mia" },
+      "terminal_tab": {
+        "without_gate": "Checkpoint {terminal}",
+        "with_gate": "Checkpoint {terminal}: Gates {gate}"
+      },
       "aliases": [
         "mia",
         "miami international",
@@ -113,7 +128,10 @@
       "city": "Seattle",
       "state": "WA",
       "state_name": "Washington",
-      "terminal_tab": { "preset": "standard" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "sea",
         "seatac",
@@ -132,7 +150,10 @@
       "city": "Washington",
       "state": "DC",
       "state_name": "District of Columbia",
-      "terminal_tab": { "preset": "standard" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "dca",
         "reagan",
@@ -156,7 +177,11 @@
       "city": "Atlanta",
       "state": "GA",
       "state_name": "Georgia",
-      "terminal_tab": { "preset": "atl" },
+      "terminal_tab": {
+        "gate_transform": "titlecase_words",
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: {gate}"
+      },
       "aliases": [
         "atl",
         "atlanta airport",
@@ -174,7 +199,10 @@
       "city": "Dallas-Fort Worth",
       "state": "TX",
       "state_name": "Texas",
-      "terminal_tab": { "preset": "dfw" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gate {gate}"
+      },
       "aliases": [
         "dfw",
         "dallas fort worth",
@@ -191,7 +219,10 @@
       "city": "Denver",
       "state": "CO",
       "state_name": "Colorado",
-      "terminal_tab": { "preset": "standard" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "den",
         "dia",
@@ -208,7 +239,11 @@
       "city": "Charlotte",
       "state": "NC",
       "state_name": "North Carolina",
-      "terminal_tab": { "preset": "clt" },
+      "terminal_tab": {
+        "ignore_gate": true,
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}"
+      },
       "aliases": [
         "clt",
         "charlotte airport",
@@ -225,7 +260,10 @@
       "city": "Las Vegas",
       "state": "NV",
       "state_name": "Nevada",
-      "terminal_tab": { "preset": "las_phx" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: {gate}"
+      },
       "aliases": [
         "las",
         "las vegas airport",
@@ -243,7 +281,10 @@
       "city": "Orlando",
       "state": "FL",
       "state_name": "Florida",
-      "terminal_tab": { "preset": "ewr_mco" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
       "aliases": [
         "mco",
         "orlando airport",
@@ -260,7 +301,10 @@
       "city": "Phoenix",
       "state": "AZ",
       "state_name": "Arizona",
-      "terminal_tab": { "preset": "las_phx" },
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: {gate}"
+      },
       "aliases": [
         "phx",
         "phoenix airport",
