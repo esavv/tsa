@@ -123,9 +123,9 @@
       "code": "DCA",
       "display_name": "Ronald Reagan Washington National Airport",
       "metro_key": null,
-      "city": "Arlington",
-      "state": "VA",
-      "state_name": "Virginia",
+      "city": "Washington",
+      "state": "DC",
+      "state_name": "District of Columbia",
       "aliases": [
         "dca",
         "reagan",
@@ -134,7 +134,10 @@
         "national airport",
         "washington national",
         "dc airport",
-        "washington dca"
+        "washington dca",
+        "arlington",
+        "va",
+        "virginia"
       ],
       "wait_times_url": "https://www.flyreagan.com/security-wait-times",
       "api_url": null
