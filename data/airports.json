@@ -2,8 +2,6 @@
   "metros": {
     "nyc": {
       "display_name": "New York",
-      "area_detail": "NY & NJ",
-      "country": "United States",
       "airport_codes": ["LGA", "JFK", "EWR"],
       "search_aliases": [
         "nyc",
@@ -22,7 +20,6 @@
       "metro_key": "nyc",
       "city": "New York",
       "state": "NY",
-      "country": "United States",
       "aliases": [
         "lga",
         "laguardia",
@@ -39,7 +36,6 @@
       "metro_key": "nyc",
       "city": "New York",
       "state": "NY",
-      "country": "United States",
       "aliases": [
         "jfk",
         "john f kennedy",
@@ -58,7 +54,6 @@
       "metro_key": "nyc",
       "city": "Newark",
       "state": "NJ",
-      "country": "United States",
       "aliases": [
         "ewr",
         "newark",
@@ -76,7 +71,6 @@
       "metro_key": null,
       "city": "Los Angeles",
       "state": "CA",
-      "country": "United States",
       "aliases": [
         "lax",
         "los angeles international",
@@ -93,7 +87,6 @@
       "metro_key": null,
       "city": "Miami",
       "state": "FL",
-      "country": "United States",
       "aliases": [
         "mia",
         "miami international",
@@ -109,7 +102,6 @@
       "metro_key": null,
       "city": "Seattle",
       "state": "WA",
-      "country": "United States",
       "aliases": [
         "sea",
         "seatac",
@@ -118,7 +110,7 @@
         "seattle airport",
         "seattle international"
       ],
-      "wait_times_url": null,
+      "wait_times_url": "https://www.portseattle.org/page/live-estimated-checkpoint-wait-times",
       "api_url": "https://www.portseattle.org/api/cwt/wait-times"
     },
     {
@@ -127,7 +119,6 @@
       "metro_key": null,
       "city": "Arlington",
       "state": "VA",
-      "country": "United States",
       "aliases": [
         "dca",
         "reagan",
@@ -147,7 +138,6 @@
       "metro_key": null,
       "city": "Atlanta",
       "state": "GA",
-      "country": "United States",
       "aliases": [
         "atl",
         "atlanta airport",
@@ -164,14 +154,13 @@
       "metro_key": null,
       "city": "Dallas-Fort Worth",
       "state": "TX",
-      "country": "United States",
       "aliases": [
         "dfw",
         "dallas fort worth",
         "dallas airport",
         "fort worth airport"
       ],
-      "wait_times_url": null,
+      "wait_times_url": "https://www.dfwairport.com/security/",
       "api_url": "https://api.dfwairport.mobi/wait-times/checkpoint/DFW"
     },
     {
@@ -180,14 +169,13 @@
       "metro_key": null,
       "city": "Denver",
       "state": "CO",
-      "country": "United States",
       "aliases": [
         "den",
         "dia",
         "denver airport",
         "denver international"
       ],
-      "wait_times_url": null,
+      "wait_times_url": "https://www.flydenver.com/security/",
       "api_url": "https://app.flyfruition.com/api/public/tsa"
     },
     {
@@ -196,14 +184,13 @@
       "metro_key": null,
       "city": "Charlotte",
       "state": "NC",
-      "country": "United States",
       "aliases": [
         "clt",
         "charlotte airport",
         "charlotte douglas",
         "douglas airport"
       ],
-      "wait_times_url": null,
+      "wait_times_url": "https://www.cltairport.com/airport-info/security/",
       "api_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT"
     },
     {
@@ -212,7 +199,6 @@
       "metro_key": null,
       "city": "Las Vegas",
       "state": "NV",
-      "country": "United States",
       "aliases": [
         "las",
         "las vegas airport",
@@ -229,14 +215,13 @@
       "metro_key": null,
       "city": "Orlando",
       "state": "FL",
-      "country": "United States",
       "aliases": [
         "mco",
         "orlando airport",
         "orlando international",
         "oia"
       ],
-      "wait_times_url": null,
+      "wait_times_url": "https://flymco.com/security/",
       "api_url": "https://api.goaa.aero/wait-times/checkpoint/MCO"
     },
     {
@@ -245,7 +230,6 @@
       "metro_key": null,
       "city": "Phoenix",
       "state": "AZ",
-      "country": "United States",
       "aliases": [
         "phx",
         "phoenix airport",
@@ -253,7 +237,7 @@
         "skyharbor",
         "phoenix sky harbor"
       ],
-      "wait_times_url": null,
+      "wait_times_url": "https://www.skyharbor.com/",
       "api_url": "https://api.phx.aero/avn-wait-times/raw"
     }
   ]
