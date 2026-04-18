@@ -324,12 +324,27 @@
     .tab-btn.active .tab-waits {
       color: rgba(226, 232, 240, 0.95);
     }
-    .tab-btn .tab-wait-line {
-      display: block;
+    /* One grid for all queue rows so time columns line up (label | val | label | val). */
+    .tab-btn .tab-wait-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+      column-gap: 0.35rem;
+      row-gap: 0.12rem;
+      width: 100%;
+      align-items: baseline;
+    }
+    .tab-btn .tab-wait-lbl {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      text-align: left;
+    }
+    .tab-btn .tab-wait-val {
+      text-align: right;
+      justify-self: end;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
     .range-group {
       display: flex;
@@ -563,10 +578,9 @@
       return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
     }
 
-    /** Tooltip: same rows as the tab chip (all queues, " min", optional second row). */
+    /** Tooltip: matches tab chip queues (compact "6m" style). */
     function tabWaitsTitleFragment(row) {
-      const lines = window.airportTabQueueWaitRows(row.queues);
-      return lines.length ? lines.join(' | ') : '';
+      return window.airportTabQueueWaitTitle(row.queues) || '';
     }
 
     function syncUrl() {
@@ -1042,16 +1056,31 @@
         const wrap = document.createElement('div');
         wrap.className = 'tab-waits';
         wrap.setAttribute('aria-hidden', 'true');
-        const waitRows = window.airportTabQueueWaitRows(row.queues);
-        if (!waitRows.length) {
+        const gridRows = window.airportTabQueueWaitGridRows(row.queues);
+        if (!gridRows.length) {
           wrap.textContent = '—';
         } else {
-          waitRows.forEach(function (line) {
-            const lineEl = document.createElement('span');
-            lineEl.className = 'tab-wait-line';
-            lineEl.textContent = line;
-            wrap.appendChild(lineEl);
+          const grid = document.createElement('div');
+          grid.className = 'tab-wait-grid';
+          gridRows.forEach(function (pairs) {
+            for (let p = 0; p < 2; p++) {
+              const seg = pairs[p];
+              const lbl = document.createElement('span');
+              lbl.className = 'tab-wait-lbl';
+              const val = document.createElement('span');
+              val.className = 'tab-wait-val';
+              if (seg) {
+                lbl.textContent = seg.label;
+                val.textContent = String(seg.minutes) + 'm';
+              } else {
+                lbl.textContent = '\u00a0';
+                val.textContent = '\u00a0';
+              }
+              grid.appendChild(lbl);
+              grid.appendChild(val);
+            }
           });
+          wrap.appendChild(grid);
         }
         btn.appendChild(wrap);
         btn.addEventListener('click', () => selectTabByIndex(Number(btn.dataset.index)));

@@ -1,8 +1,9 @@
 /**
  * Shared queue labeling for search chips vs airport terminal tabs.
  *
- * chipQueueWaitLine — compact search dropdown: up to 2 queues, " · ", no "min" suffix.
- * airportTabQueueWaitRows — /airport tabs: every queue with minutes, max 2 per row, " min" suffix.
+ * chipQueueWaitLine — compact search dropdown: up to 2 queues, " · ", no unit suffix on minutes.
+ * airportTabQueueWaitGridRows — /airport tabs: structured rows of up to 2 {label, minutes} pairs
+ *   (minutes rendered as "6m" in the template). airportTabQueueWaitTitle builds a plain-text tooltip.
  */
 (function (global) {
   var CHIP_QUEUE_PRIORITY = ['general', 'precheck', 'clear', 'priority'];
@@ -70,25 +71,39 @@
   }
 
   /**
-   * One string per row; each row has at most two "Label N min" segments joined by " · ".
-   * @returns {string[]}
+   * Each item is one visual row of the tab chip: up to two { label, minutes } (for a 4-column grid).
+   * @returns {Array<Array<{ label: string, minutes: number }>>}
    */
-  function airportTabQueueWaitRows(queues) {
+  function airportTabQueueWaitGridRows(queues) {
     var ordered = queuesWithMinutesOrdered(queues);
     if (!ordered.length) return [];
     var rows = [];
     for (var start = 0; start < ordered.length; start += 2) {
       var slice = ordered.slice(start, start + 2);
-      var segs = [];
-      for (var s = 0; s < slice.length; s++) {
-        segs.push(chipQueueTypeLabel(slice[s].qt) + ' ' + slice[s].minutes + ' min');
-      }
-      rows.push(segs.join(' · '));
+      rows.push(
+        slice.map(function (x) {
+          return { label: chipQueueTypeLabel(x.qt), minutes: x.minutes };
+        })
+      );
     }
     return rows;
   }
 
+  /** Plain-text summary for title attributes (includes "6m" style). */
+  function airportTabQueueWaitTitle(queues) {
+    return airportTabQueueWaitGridRows(queues)
+      .map(function (pairs) {
+        return pairs
+          .map(function (s) {
+            return s.label + ' ' + s.minutes + 'm';
+          })
+          .join(' · ');
+      })
+      .join(' | ');
+  }
+
   global.chipQueueTypeLabel = chipQueueTypeLabel;
   global.chipQueueWaitLine = chipQueueWaitLine;
-  global.airportTabQueueWaitRows = airportTabQueueWaitRows;
+  global.airportTabQueueWaitGridRows = airportTabQueueWaitGridRows;
+  global.airportTabQueueWaitTitle = airportTabQueueWaitTitle;
 })(typeof window !== 'undefined' ? window : this);
