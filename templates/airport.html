@@ -410,7 +410,6 @@
       margin-top: 0.12rem;
       white-space: nowrap;
     }
-    .chart-container { position: relative; }
     .chart-callout {
       position: absolute;
       top: 8px;
@@ -456,12 +455,33 @@
       margin-top: 0.1rem;
     }
     .chart-container {
+      position: relative;
       height: 390px;
     }
     @media (min-width: 1200px) {
       .chart-container {
         height: 460px;
       }
+    }
+    .chart-loading-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0.75rem;
+      background: rgba(248, 250, 252, 0.88);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      border-radius: 4px;
+    }
+    .chart-loading-overlay:not([hidden]) {
+      display: flex;
+    }
+    .chart-bootstrap-msg {
+      margin: 0.35rem 0 0.5rem;
     }
   </style>
 {% endblock %}
@@ -508,11 +528,14 @@
         <div id="chart-shell" class="chart-shell">
           <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
           <div class="chart-container">
+            <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
+              Loading…
+            </div>
             <div id="chart-callout" class="chart-callout"></div>
             <canvas id="chart"></canvas>
           </div>
         </div>
-        <div id="chart-loading" class="muted">Loading…</div>
+        <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
         <div
           id="airport-search-panel"
           class="airport-search-panel airport-search-panel--chart-overlay"
@@ -619,7 +642,9 @@
     let currentHours = 24;
     let lastHistoryPayload = null;
     let lastHistoryRequestHours = null;
+    let historyFetchAbort = null;
     const loadingEl = document.getElementById('chart-loading');
+    const bootstrapMsgEl = document.getElementById('chart-bootstrap-msg');
     const calloutEl = document.getElementById('chart-callout');
     const lastScrapedEl = document.getElementById('last-scraped-at');
     const tabRowEl = document.getElementById('tab-row');
@@ -912,6 +937,7 @@
       if (!datasets.length) {
         hideCallout();
         clearFixedReadout();
+        hideChartLoading();
         return;
       }
 
@@ -998,12 +1024,25 @@
         hideCallout();
         clearFixedReadout();
       }
+      hideChartLoading();
+    }
+
+    function showChartLoading(message) {
+      loadingEl.hidden = false;
+      loadingEl.textContent = message;
+    }
+
+    function hideChartLoading() {
+      loadingEl.hidden = true;
     }
 
     function renderChart(hours) {
       currentHours = Number(hours);
-      loadingEl.style.display = 'block';
-      loadingEl.textContent = 'Loading history...';
+      if (historyFetchAbort) {
+        historyFetchAbort.abort();
+      }
+      historyFetchAbort = new AbortController();
+      showChartLoading('Loading history...');
       hideCallout();
       clearFixedReadout();
       updateRangeButtons(hours);
@@ -1013,19 +1052,17 @@
         + '&hours=' + encodeURIComponent(hours);
       if (selectedGate) url += '&gate=' + encodeURIComponent(selectedGate);
 
-      fetch(url)
+      fetch(url, { signal: historyFetchAbort.signal })
         .then(r => r.json())
         .then(data => {
           if (data.error) throw new Error(data.error);
-          loadingEl.style.display = 'none';
-
           lastHistoryPayload = data;
           lastHistoryRequestHours = Number(hours);
           buildChartFromHistory(data, hours);
         })
         .catch(e => {
-          loadingEl.style.display = 'block';
-          loadingEl.textContent = 'Error: ' + e.message;
+          if (e.name === 'AbortError') return;
+          showChartLoading('Error: ' + e.message);
           lastHistoryPayload = null;
           lastHistoryRequestHours = null;
           hideCallout();
@@ -1155,10 +1192,14 @@
           lastScrapedEl.textContent = 'Last updated: —';
         }
         if (!rows || !rows.length) {
-          loadingEl.textContent = 'No wait time data for this airport yet.';
+          bootstrapMsgEl.textContent = 'No wait time data for this airport yet.';
+          bootstrapMsgEl.hidden = false;
           chartShell.style.display = 'none';
+          hideChartLoading();
           return;
         }
+        bootstrapMsgEl.hidden = true;
+        chartShell.style.display = '';
         terminalRows = rows;
         let pick = 0;
         if (initialTerminal) {
@@ -1172,8 +1213,10 @@
         renderChart(24);
       })
       .catch(e => {
-        loadingEl.textContent = 'Error: ' + e.message;
+        bootstrapMsgEl.textContent = 'Error: ' + e.message;
+        bootstrapMsgEl.hidden = false;
         chartShell.style.display = 'none';
+        hideChartLoading();
       });
   </script>
   <script src="{{ url_for('static', filename='airport_search.js') }}"></script>
