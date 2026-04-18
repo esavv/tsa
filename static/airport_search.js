@@ -285,14 +285,12 @@
    * @param {HTMLInputElement} opts.input
    * @param {HTMLElement} opts.panel
    * @param {HTMLElement} opts.list
-   * @param {string} [opts.currentAirportCode]
    * @param {number} [opts.maxResults]
    */
   function initTsaAirportSearch(opts) {
     var input = opts.input;
     var panel = opts.panel;
     var list = opts.list;
-    var currentCode = (opts.currentAirportCode || '').toUpperCase();
     var maxResults = opts.maxResults || DEFAULT_MAX_RESULTS;
 
     var rows = [];
@@ -345,7 +343,6 @@
           div.setAttribute('role', 'option');
           div.id = listId + '-opt-' + i;
           div.dataset.code = row.code;
-          if (row.code === currentCode) div.classList.add('airport-search-row--current');
 
           var loc = [row.city, row.state].filter(Boolean).join(', ');
           var metaParts = [];
@@ -398,7 +395,7 @@
         rows = normalizeAirports(cat);
         matchOrderState.prevSetKey = null;
         matchOrderState.prevOrder = [];
-        input.placeholder = 'Search airports (code, name, city, metro)…';
+        input.placeholder = 'Search airports';
         if (open) refreshList();
       })
       .catch(function () {
