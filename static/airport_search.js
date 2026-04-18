@@ -248,7 +248,8 @@
     if (!terminals || !terminals.length) {
       return (
         '<div class="airport-search-row__chips airport-search-row__chips--empty muted" role="presentation">' +
-        'No checkpoint data' +
+        '<span class="airport-search-row__chips-msg">No checkpoint data</span>' +
+        '<span class="airport-search-more-slot" aria-hidden="true"></span>' +
         '</div>'
       );
     }
@@ -256,6 +257,7 @@
     var show = sorted.slice(0, MAX_TERMINAL_CHIPS);
     var more = sorted.length - show.length;
     var html = '<div class="airport-search-row__chips" role="presentation">';
+    html += '<div class="airport-search-row__chip-run">';
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = tabLabelForRow(code, row.terminal, row.gate);
@@ -284,6 +286,8 @@
         '</div>' +
         '</div>';
     }
+    html += '</div>';
+    html += '<span class="airport-search-more-slot">';
     if (more > 0) {
       var moreTitle =
         more +
@@ -299,6 +303,7 @@
         more +
         '</span>';
     }
+    html += '</span>';
     html += '</div>';
     return html;
   }

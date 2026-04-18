@@ -129,18 +129,47 @@
     .airport-search-row__chips {
       display: flex;
       flex-direction: row;
-      flex-wrap: wrap;
-      gap: 0.35rem;
+      flex-wrap: nowrap;
       align-items: stretch;
+      gap: 0.35rem;
       flex: 0 1 auto;
       margin-left: auto;
       max-width: 100%;
+      min-width: 0;
+    }
+    .airport-search-row__chip-run {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: stretch;
       justify-content: flex-end;
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+    .airport-search-more-slot {
+      box-sizing: border-box;
+      flex: 0 0 2.5rem;
+      width: 2.5rem;
+      min-width: 2.5rem;
+      max-width: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      align-self: stretch;
     }
     .airport-search-row__chips--empty {
-      align-self: center;
+      align-items: center;
+      flex-wrap: nowrap;
+      width: 100%;
+      max-width: 100%;
+    }
+    .airport-search-row__chips-msg {
+      flex: 1 1 auto;
+      min-width: 0;
       font-size: 0.78rem;
       font-weight: 400;
+      text-align: left;
     }
     .airport-search-chip {
       box-sizing: border-box;
@@ -183,13 +212,17 @@
       color: #94a3b8;
     }
     .airport-search-chip-more {
-      align-self: center;
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
       font-size: 0.72rem;
       font-weight: 700;
       color: #94a3b8;
-      padding: 0 0.15rem;
       white-space: nowrap;
       letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      line-height: 1.2;
       pointer-events: none;
     }
     .airport-subtitle {
