@@ -200,13 +200,20 @@
       text-overflow: ellipsis;
     }
     .airport-search-chip__waits {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.12rem 0.32rem;
+      display: block;
+      width: 100%;
+      min-width: 0;
       font-size: 0.62rem;
       line-height: 1.25;
       font-weight: 400;
       color: #64748b;
+    }
+    .airport-search-chip__wait-line {
+      display: block;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .airport-search-chip__wait--empty {
       color: #94a3b8;

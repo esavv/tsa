@@ -228,17 +228,20 @@
     });
   }
 
-  /** General / PreCheck only for dropdown chips. */
-  function chipGenPreParts(queues) {
+  /**
+   * General / PreCheck for dropdown chips — same phrasing and " · " separator as chart callout
+   * (formatReadoutLine: "General: N min · PreCheck: N min").
+   */
+  function chipGenPreLine(queues) {
     var q = queues || {};
-    var parts = [];
+    var segments = [];
     if (q.general && q.general.minutes != null) {
-      parts.push({ label: 'General', m: q.general.minutes });
+      segments.push('General: ' + q.general.minutes + ' min');
     }
     if (q.precheck && q.precheck.minutes != null) {
-      parts.push({ label: 'PreCheck', m: q.precheck.minutes });
+      segments.push('PreCheck: ' + q.precheck.minutes + ' min');
     }
-    return parts;
+    return segments.join(' · ');
   }
 
   var MAX_TERMINAL_CHIPS = 3;
@@ -261,15 +264,11 @@
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = tabLabelForRow(code, row.terminal, row.gate);
-      var parts = chipGenPreParts(row.queues);
+      var waitLine = chipGenPreLine(row.queues);
       var waitsHtml = '';
-      if (parts.length) {
-        for (var p = 0; p < parts.length; p++) {
-          waitsHtml +=
-            '<span class="airport-search-chip__wait">' +
-            esc(parts[p].label + ' ' + parts[p].m + 'm') +
-            '</span>';
-        }
+      if (waitLine) {
+        waitsHtml =
+          '<span class="airport-search-chip__wait-line">' + esc(waitLine) + '</span>';
       } else {
         waitsHtml =
           '<span class="airport-search-chip__wait airport-search-chip__wait--empty">—</span>';
