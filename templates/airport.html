@@ -58,6 +58,17 @@
       max-height: min(340px, 55vh);
       overflow-y: auto;
     }
+    .airport-search-panel.airport-search-panel--chart-overlay {
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      max-height: none;
+      margin: 0;
+      border-radius: 10px;
+      z-index: 50;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    }
     .airport-search-results {
       padding: 0.25rem 0;
     }
@@ -194,7 +205,10 @@
       color: #fff;
       border-color: #1f2937;
     }
-    .chart-shell { margin: 0.5rem 0 1rem; }
+    .chart-shell {
+      position: relative;
+      margin: 0.5rem 0 1rem;
+    }
     .chart-reading-fixed {
       display: none;
       text-align: left;
@@ -295,9 +309,6 @@
             aria-label="Search airports"
             aria-expanded="false"
           />
-          <div id="airport-search-panel" class="airport-search-panel" hidden>
-            <div id="airport-search-results" class="airport-search-results"></div>
-          </div>
         </div>
       </div>
       <h2 class="airport-subtitle" id="airport-page-title">{{ airport }}</h2>
@@ -315,6 +326,13 @@
         <div class="chart-container">
           <div id="chart-callout" class="chart-callout"></div>
           <canvas id="chart"></canvas>
+        </div>
+        <div
+          id="airport-search-panel"
+          class="airport-search-panel airport-search-panel--chart-overlay"
+          hidden
+        >
+          <div id="airport-search-results" class="airport-search-results"></div>
         </div>
       </div>
       <div id="chart-loading" class="muted">Loading…</div>

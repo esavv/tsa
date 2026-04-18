@@ -5,7 +5,7 @@
 (function () {
   var CATALOG_URL = '/api/catalog';
   var LATEST_URL = '/api/latest';
-  var LATEST_TTL_MS = 45000;
+  var LATEST_TTL_MS = 60000;
   var DEFAULT_MAX_RESULTS = 16;
 
   var catalogPromise = null;
@@ -118,6 +118,10 @@
     return out;
   }
 
+  /**
+   * Filter by substring rules (airportScore !== Infinity); sort by IATA code only.
+   * Call stabilizeMatchOrder after this when the matched set should keep order across keystrokes.
+   */
   function rankRows(rows, metros, ql) {
     var scored = [];
     var q = (ql || '').trim().toLowerCase();
@@ -128,8 +132,43 @@
       scored.push({ row: r, score: sc });
     }
     scored.sort(function (a, b) {
-      if (a.score !== b.score) return a.score - b.score;
       return a.row.code.localeCompare(b.row.code);
+    });
+    return scored;
+  }
+
+  /**
+   * If the matched airport set is identical to the last render, keep the previous row order
+   * (avoids reordering when refining e.g. "ny" → "nyc"). Otherwise rankRows' order stands.
+   */
+  function stabilizeMatchOrder(scored, st) {
+    if (!scored.length) {
+      st.prevSetKey = null;
+      st.prevOrder = [];
+      return scored;
+    }
+    var setKey = scored
+      .map(function (s) {
+        return s.row.code;
+      })
+      .sort()
+      .join(',');
+    if (
+      st.prevSetKey != null &&
+      setKey === st.prevSetKey &&
+      st.prevOrder.length === scored.length
+    ) {
+      var pos = {};
+      for (var i = 0; i < st.prevOrder.length; i++) {
+        pos[st.prevOrder[i]] = i;
+      }
+      scored.sort(function (a, b) {
+        return pos[a.row.code] - pos[b.row.code];
+      });
+    }
+    st.prevSetKey = setKey;
+    st.prevOrder = scored.map(function (s) {
+      return s.row.code;
     });
     return scored;
   }
@@ -184,6 +223,7 @@
     var activeIndex = -1;
     var open = false;
     var listId = list.id || 'airport-search-results';
+    var matchOrderState = { prevSetKey: null, prevOrder: [] };
 
     input.disabled = false;
     input.removeAttribute('disabled');
@@ -215,6 +255,7 @@
     function render() {
       var ql = input.value.trim().toLowerCase();
       var ranked = rankRows(rows, metros, ql);
+      ranked = stabilizeMatchOrder(ranked, matchOrderState);
       var slice = ranked.slice(0, maxResults);
       if (activeIndex >= slice.length) {
         activeIndex = slice.length > 0 ? slice.length - 1 : -1;
@@ -277,6 +318,8 @@
       .then(function (cat) {
         metros = cat.metros || {};
         rows = normalizeAirports(cat);
+        matchOrderState.prevSetKey = null;
+        matchOrderState.prevOrder = [];
         input.placeholder = 'Search airports (code, name, city, metro)…';
         if (open) refreshList();
       })
