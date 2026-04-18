@@ -3,6 +3,7 @@
 import json
 import os
 import sqlite3
+from typing import Optional
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
@@ -22,6 +23,13 @@ try:
     AIRPORT_CATALOG = load_airport_catalog()
 except (OSError, json.JSONDecodeError):
     AIRPORT_CATALOG = {"metros": {}, "airports": []}
+
+
+def catalog_airport_entry(code: str) -> Optional[dict]:
+    for ap in AIRPORT_CATALOG.get("airports", []):
+        if ap.get("code") == code:
+            return ap
+    return None
 
 # Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
 AIRPORT_CODES = frozenset(
@@ -68,9 +76,17 @@ def airport(code: str):
         abort(404)
     initial_terminal = request.args.get("terminal") or ""
     initial_gate = request.args.get("gate") or ""
+    entry = catalog_airport_entry(c)
+    airport_display_name = (entry or {}).get("display_name") or c
+    city = (entry or {}).get("city") or ""
+    state = (entry or {}).get("state") or ""
+    locale_bits = [x for x in (city, state) if x]
+    airport_locale_line = ", ".join(locale_bits) if locale_bits else None
     return render_template(
         "airport.html",
         airport=c,
+        airport_display_name=airport_display_name,
+        airport_locale_line=airport_locale_line,
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
     )

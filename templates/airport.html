@@ -232,10 +232,37 @@
       line-height: 1.2;
       pointer-events: none;
     }
-    .airport-subtitle {
+    .airport-page-heading {
       margin: 0 0 0.5rem;
-      font-size: 1.25rem;
+      font-size: inherit;
       font-weight: 600;
+      line-height: 1.2;
+    }
+    .airport-page-heading__top {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .airport-page-heading__code {
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+      color: #0f172a;
+      flex-shrink: 0;
+    }
+    .airport-page-heading__name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1e293b;
+      line-height: 1.3;
+    }
+    .airport-page-heading__locale {
+      display: block;
+      margin-top: 0.2rem;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      font-weight: 400;
     }
     .tab-row {
       display: flex;
@@ -423,7 +450,15 @@
         </div>
       </div>
       <div class="airport-below-search">
-        <h2 class="airport-subtitle" id="airport-page-title">{{ airport }}</h2>
+        <h2 class="airport-page-heading" id="airport-page-title">
+          <span class="airport-page-heading__top">
+            <span class="airport-page-heading__code">{{ airport }}</span>
+            <span class="airport-page-heading__name">{{ airport_display_name }}</span>
+          </span>
+          {% if airport_locale_line %}
+            <span class="airport-page-heading__locale muted">{{ airport_locale_line }}</span>
+          {% endif %}
+        </h2>
         <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
         <p class="muted" id="last-scraped-at"></p>
         <div class="range-group" id="range-group">
@@ -455,23 +490,6 @@
     const pageAirport = {{ airport | tojson }};
     const initialTerminal = {{ initial_terminal | tojson }};
     const initialGate = {{ initial_gate | tojson }};
-
-    const airportDisplayNames = {
-      JFK: 'JFK',
-      LGA: 'LaGuardia (LGA)',
-      EWR: 'Newark (EWR)',
-      LAX: 'Los Angeles (LAX)',
-      MIA: 'Miami (MIA)',
-      SEA: 'Seattle-Tacoma (SEA)',
-      DCA: 'Reagan National (DCA)',
-      ATL: 'Hartsfield-Jackson Atlanta (ATL)',
-      DFW: 'Dallas/Fort Worth (DFW)',
-      DEN: 'Denver (DEN)',
-      CLT: 'Charlotte Douglas (CLT)',
-      LAS: 'Harry Reid Las Vegas (LAS)',
-      MCO: 'Orlando (MCO)',
-      PHX: 'Phoenix Sky Harbor (PHX)',
-    };
 
     let selectedTerminal = '';
     let selectedGate = '';
@@ -643,8 +661,6 @@
     const calloutEl = document.getElementById('chart-callout');
     const lastScrapedEl = document.getElementById('last-scraped-at');
     const tabRowEl = document.getElementById('tab-row');
-    const airportTitleEl = document.getElementById('airport-page-title');
-    airportTitleEl.textContent = airportDisplayNames[pageAirport] || pageAirport;
 
     const mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
     function touchChartUi() {
