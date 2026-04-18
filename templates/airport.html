@@ -273,20 +273,24 @@
       margin: 0.5rem 0 0.75rem;
     }
     .tab-btn {
+      box-sizing: border-box;
       border: 1px solid #d0d7e2;
       border-radius: 12px;
       background: #fff;
       color: #334155;
       font-size: 0.8rem;
-      padding: 0.4rem 0.65rem 0.45rem;
+      padding: 0.45rem 0.55rem 0.5rem;
       cursor: pointer;
       text-align: left;
       line-height: 1.25;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.15rem;
-      max-width: 17rem;
+      gap: 0.2rem;
+      width: 11rem;
+      min-width: 11rem;
+      max-width: 11rem;
+      flex-shrink: 0;
     }
     .tab-btn.active {
       background: #1f2937;
@@ -295,35 +299,35 @@
     }
     .tab-btn .tab-label-short {
       display: block;
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: 15.5rem;
-      font-weight: 500;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.2;
     }
     .tab-btn .tab-waits {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.2rem 0.45rem;
-      font-size: 0.68rem;
-      line-height: 1.35;
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      font-size: 0.72rem;
+      line-height: 1.3;
       font-weight: 400;
       color: #64748b;
-      max-width: 15.5rem;
     }
     .tab-btn.active .tab-waits {
       color: rgba(226, 232, 240, 0.95);
     }
-    .tab-btn .tab-wait-chip {
+    .tab-btn .tab-wait-line {
+      display: block;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    .tab-btn .tab-wait-more {
-      color: #94a3b8;
-      font-size: 0.65rem;
-      align-self: center;
-    }
-    .tab-btn.active .tab-wait-more {
-      color: rgba(226, 232, 240, 0.75);
     }
     .range-group {
       display: flex;
@@ -489,6 +493,7 @@
     </div>
   </main>
   <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
+  <script src="{{ url_for('static', filename='queue_wait_line.js') }}"></script>
   <script>
     const pageAirport = {{ airport | tojson }};
     const pageAirportEntry = {{ airport_catalog_entry | tojson }};
@@ -556,43 +561,9 @@
       return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
     }
 
-    function sortedQueueTypesWithMinutes(queues) {
-      const q = queues || {};
-      const keys = Object.keys(q).filter(function (qt) {
-        const slot = q[qt];
-        return slot && slot.minutes != null;
-      });
-      const out = [];
-      for (const qt of QUEUE_TAB_ORDER) {
-        if (keys.includes(qt)) out.push(qt);
-      }
-      const rest = keys.filter(function (qt) {
-        return QUEUE_TAB_ORDER.indexOf(qt) === -1;
-      }).sort();
-      return out.concat(rest);
-    }
-
-    function queueTabAbbrev(qt) {
-      const map = {
-        general: 'Gen',
-        precheck: 'Pre',
-        priority: 'Pri',
-        clear: 'Clear',
-      };
-      if (map[qt]) return map[qt];
-      if (qt.length <= 5) return qt;
-      return qt.slice(0, 4) + '…';
-    }
-
-    /** Short wait summary for a tab (latest scrape only). */
+    /** Tooltip / title line: same phrasing as search terminal chips (two queues max, " · "). */
     function tabWaitsTitleFragment(row) {
-      const types = sortedQueueTypesWithMinutes(row.queues);
-      if (!types.length) return '';
-      return types
-        .map(function (qt) {
-          return queueTabAbbrev(qt) + ' ' + row.queues[qt].minutes + 'm';
-        })
-        .join(', ');
+      return window.chipQueueWaitLine(row.queues) || '';
     }
 
     function syncUrl() {
@@ -1051,7 +1022,6 @@
 
     function buildTabs(rows, activeIndex) {
       tabRowEl.innerHTML = '';
-      const maxChips = 6;
       rows.forEach((row, i) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1066,25 +1036,17 @@
         span.className = 'tab-label-short';
         span.textContent = label;
         btn.appendChild(span);
-        const types = sortedQueueTypesWithMinutes(row.queues);
         const wrap = document.createElement('div');
         wrap.className = 'tab-waits';
         wrap.setAttribute('aria-hidden', 'true');
-        if (!types.length) {
+        const waitLine = window.chipQueueWaitLine(row.queues);
+        if (!waitLine) {
           wrap.textContent = '—';
         } else {
-          types.slice(0, maxChips).forEach(function (qt) {
-            const chip = document.createElement('span');
-            chip.className = 'tab-wait-chip';
-            chip.textContent = queueTabAbbrev(qt) + ' ' + row.queues[qt].minutes + 'm';
-            wrap.appendChild(chip);
-          });
-          if (types.length > maxChips) {
-            const more = document.createElement('span');
-            more.className = 'tab-wait-more';
-            more.textContent = '+' + (types.length - maxChips);
-            wrap.appendChild(more);
-          }
+          const lineEl = document.createElement('span');
+          lineEl.className = 'tab-wait-line';
+          lineEl.textContent = waitLine;
+          wrap.appendChild(lineEl);
         }
         btn.appendChild(wrap);
         btn.addEventListener('click', () => selectTabByIndex(Number(btn.dataset.index)));
