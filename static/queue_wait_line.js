@@ -1,6 +1,8 @@
 /**
- * Shared "chip" wait line for search dropdown and airport terminal tabs:
- * up to two queue types with full labels (General, PreCheck, …), " · " separator, no "m" suffix.
+ * Shared queue labeling for search chips vs airport terminal tabs.
+ *
+ * chipQueueWaitLine — compact search dropdown: up to 2 queues, " · ", no "min" suffix.
+ * airportTabQueueWaitRows — /airport tabs: every queue with minutes, max 2 per row, " min" suffix.
  */
 (function (global) {
   var CHIP_QUEUE_PRIORITY = ['general', 'precheck', 'clear', 'priority'];
@@ -39,6 +41,54 @@
     return segments.join(' · ');
   }
 
+  /**
+   * All queue types that have numeric minutes, in CHIP_QUEUE_PRIORITY order then any others sorted.
+   * @returns {{ qt: string, minutes: number }[]}
+   */
+  function queuesWithMinutesOrdered(queues) {
+    var q = queues || {};
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < CHIP_QUEUE_PRIORITY.length; i++) {
+      var qt = CHIP_QUEUE_PRIORITY[i];
+      var slot = q[qt];
+      if (slot && slot.minutes != null) {
+        out.push({ qt: qt, minutes: slot.minutes });
+        seen[qt] = true;
+      }
+    }
+    var rest = Object.keys(q)
+      .filter(function (k) {
+        return !seen[k] && q[k] && q[k].minutes != null;
+      })
+      .sort();
+    for (var j = 0; j < rest.length; j++) {
+      var rqt = rest[j];
+      out.push({ qt: rqt, minutes: q[rqt].minutes });
+    }
+    return out;
+  }
+
+  /**
+   * One string per row; each row has at most two "Label N min" segments joined by " · ".
+   * @returns {string[]}
+   */
+  function airportTabQueueWaitRows(queues) {
+    var ordered = queuesWithMinutesOrdered(queues);
+    if (!ordered.length) return [];
+    var rows = [];
+    for (var start = 0; start < ordered.length; start += 2) {
+      var slice = ordered.slice(start, start + 2);
+      var segs = [];
+      for (var s = 0; s < slice.length; s++) {
+        segs.push(chipQueueTypeLabel(slice[s].qt) + ' ' + slice[s].minutes + ' min');
+      }
+      rows.push(segs.join(' · '));
+    }
+    return rows;
+  }
+
   global.chipQueueTypeLabel = chipQueueTypeLabel;
   global.chipQueueWaitLine = chipQueueWaitLine;
+  global.airportTabQueueWaitRows = airportTabQueueWaitRows;
 })(typeof window !== 'undefined' ? window : this);

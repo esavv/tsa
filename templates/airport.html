@@ -310,7 +310,9 @@
       line-height: 1.2;
     }
     .tab-btn .tab-waits {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
       box-sizing: border-box;
       width: 100%;
       min-width: 0;
@@ -561,9 +563,10 @@
       return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
     }
 
-    /** Tooltip / title line: same phrasing as search terminal chips (two queues max, " · "). */
+    /** Tooltip: same rows as the tab chip (all queues, " min", optional second row). */
     function tabWaitsTitleFragment(row) {
-      return window.chipQueueWaitLine(row.queues) || '';
+      const lines = window.airportTabQueueWaitRows(row.queues);
+      return lines.length ? lines.join(' | ') : '';
     }
 
     function syncUrl() {
@@ -1039,14 +1042,16 @@
         const wrap = document.createElement('div');
         wrap.className = 'tab-waits';
         wrap.setAttribute('aria-hidden', 'true');
-        const waitLine = window.chipQueueWaitLine(row.queues);
-        if (!waitLine) {
+        const waitRows = window.airportTabQueueWaitRows(row.queues);
+        if (!waitRows.length) {
           wrap.textContent = '—';
         } else {
-          const lineEl = document.createElement('span');
-          lineEl.className = 'tab-wait-line';
-          lineEl.textContent = waitLine;
-          wrap.appendChild(lineEl);
+          waitRows.forEach(function (line) {
+            const lineEl = document.createElement('span');
+            lineEl.className = 'tab-wait-line';
+            lineEl.textContent = line;
+            wrap.appendChild(lineEl);
+          });
         }
         btn.appendChild(wrap);
         btn.addEventListener('click', () => selectTabByIndex(Number(btn.dataset.index)));
