@@ -179,12 +179,15 @@
       font-weight: 400;
     }
     .airport-search-chip {
+      box-sizing: border-box;
+      width: 8.75rem;
+      min-width: 8.75rem;
+      max-width: 8.75rem;
+      flex-shrink: 0;
       border: 1px solid #d0d7e2;
       border-radius: 10px;
       background: #fff;
       padding: 0.28rem 0.48rem 0.32rem;
-      min-width: 0;
-      max-width: 9.75rem;
       display: flex;
       flex-direction: column;
       gap: 0.1rem;
@@ -192,6 +195,9 @@
       pointer-events: none;
     }
     .airport-search-chip__label {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
       font-size: 0.68rem;
       font-weight: 600;
       color: #334155;
@@ -199,7 +205,6 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100%;
     }
     .airport-search-chip__waits {
       display: flex;
