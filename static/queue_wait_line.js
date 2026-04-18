@@ -1,7 +1,7 @@
 /**
  * Shared queue labeling for search chips vs airport terminal tabs.
  *
- * chipQueueWaitLine — compact search dropdown: up to 2 queues, " · ", no unit suffix on minutes.
+ * chipQueueWaitLine — plain text (tools); chipQueueWaitLineHtml — search chips with colored minute pills.
  * airportTabQueueWaitGridRows — /airport tabs: structured rows of up to 2 {label, minutes} pairs
  *   (minutes rendered as "6m" in the template). airportTabQueueWaitTitle builds a plain-text tooltip.
  */
@@ -23,7 +23,7 @@
       });
   }
 
-  function chipQueueWaitLine(queues) {
+  function chipQueueFirstTwoWithMinutes(queues) {
     var q = queues || {};
     var picked = [];
     for (var i = 0; i < CHIP_QUEUE_PRIORITY.length; i++) {
@@ -34,12 +34,51 @@
         picked.push({ qt: qt, minutes: slot.minutes });
       }
     }
+    return picked;
+  }
+
+  function chipQueueWaitLine(queues) {
+    var picked = chipQueueFirstTwoWithMinutes(queues);
     if (!picked.length) return '';
     var segments = [];
     for (var j = 0; j < picked.length; j++) {
       segments.push(chipQueueTypeLabel(picked[j].qt) + ' ' + picked[j].minutes);
     }
     return segments.join(' · ');
+  }
+
+  /** CSS class for wait-time pill (0–14 low, 15–29 mid, 30+ high). */
+  function waitTimePillClass(minutes) {
+    var m = Number(minutes);
+    if (isNaN(m)) return 'wait-time-pill wait-time-pill--high';
+    if (m <= 14) return 'wait-time-pill wait-time-pill--low';
+    if (m <= 29) return 'wait-time-pill wait-time-pill--mid';
+    return 'wait-time-pill wait-time-pill--high';
+  }
+
+  /**
+   * Search chip wait line: labels plain, each minute in a colored pill. `esc` required for HTML safety.
+   */
+  function chipQueueWaitLineHtml(queues, esc) {
+    var picked = chipQueueFirstTwoWithMinutes(queues);
+    if (!picked.length) return '';
+    var parts = [];
+    for (var j = 0; j < picked.length; j++) {
+      if (j > 0) {
+        parts.push(
+          '<span class="airport-search-chip__wait-sep" aria-hidden="true"> · </span>'
+        );
+      }
+      parts.push(
+        esc(chipQueueTypeLabel(picked[j].qt)) +
+          ' <span class="' +
+          waitTimePillClass(picked[j].minutes) +
+          '">' +
+          esc(String(picked[j].minutes)) +
+          '</span>'
+      );
+    }
+    return parts.join('');
   }
 
   /**
@@ -103,7 +142,10 @@
   }
 
   global.chipQueueTypeLabel = chipQueueTypeLabel;
+  global.chipQueueFirstTwoWithMinutes = chipQueueFirstTwoWithMinutes;
   global.chipQueueWaitLine = chipQueueWaitLine;
+  global.chipQueueWaitLineHtml = chipQueueWaitLineHtml;
+  global.waitTimePillClass = waitTimePillClass;
   global.airportTabQueueWaitGridRows = airportTabQueueWaitGridRows;
   global.airportTabQueueWaitTitle = airportTabQueueWaitTitle;
 })(typeof window !== 'undefined' ? window : this);

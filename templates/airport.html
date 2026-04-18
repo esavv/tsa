@@ -352,6 +352,9 @@
       text-align: left;
     }
     .tab-btn .tab-wait-val {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
       text-align: right;
       justify-self: end;
       white-space: nowrap;
@@ -1098,7 +1101,10 @@
               val.className = 'tab-wait-val';
               if (seg) {
                 lbl.textContent = seg.label;
-                val.textContent = String(seg.minutes) + 'm';
+                const pill = document.createElement('span');
+                pill.className = window.waitTimePillClass(seg.minutes);
+                pill.textContent = String(seg.minutes) + 'm';
+                val.appendChild(pill);
               } else {
                 lbl.textContent = '\u00a0';
                 val.textContent = '\u00a0';

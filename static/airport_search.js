@@ -225,11 +225,11 @@
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = terminalTabLabel(apEntry, row.terminal, row.gate);
-      var waitLine = window.chipQueueWaitLine(row.queues);
+      var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc);
       var waitsHtml = '';
-      if (waitLine) {
+      if (waitLineHtml) {
         waitsHtml =
-          '<span class="airport-search-chip__wait-line">' + esc(waitLine) + '</span>';
+          '<span class="airport-search-chip__wait-line">' + waitLineHtml + '</span>';
       } else {
         waitsHtml =
           '<span class="airport-search-chip__wait airport-search-chip__wait--empty">—</span>';
