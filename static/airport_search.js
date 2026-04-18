@@ -235,10 +235,10 @@
     var q = queues || {};
     var segments = [];
     if (q.general && q.general.minutes != null) {
-      segments.push('General ' + q.general.minutes + 'm');
+      segments.push('General ' + q.general.minutes);
     }
     if (q.precheck && q.precheck.minutes != null) {
-      segments.push('PreCheck ' + q.precheck.minutes + 'm');
+      segments.push('PreCheck ' + q.precheck.minutes);
     }
     return segments.join(' · ');
   }
