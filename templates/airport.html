@@ -263,12 +263,61 @@
       font-size: 0.78rem;
       line-height: 1.35;
     }
+    .tab-row-scroll {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
     .tab-row {
       display: flex;
       flex-wrap: wrap;
       align-items: stretch;
       gap: 0.4rem;
       margin: 0.5rem 0 0.35rem;
+    }
+    .tab-row-scroll-hint {
+      display: none;
+      margin: 0;
+      padding: 0;
+      font-size: 0.72rem;
+      color: #64748b;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+    @media (max-width: 768px) {
+      .tab-row-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+        margin: 0.5rem 0 0.25rem;
+        padding-bottom: 2px;
+        box-shadow: inset -20px 0 18px -14px rgba(248, 250, 252, 0.95),
+          inset -28px 0 24px -18px rgba(15, 23, 42, 0.12);
+      }
+      .tab-row-scroll::-webkit-scrollbar {
+        height: 5px;
+      }
+      .tab-row-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+      }
+      .tab-row-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .tab-row-scroll .tab-row {
+        flex-wrap: nowrap;
+        margin: 0;
+        width: max-content;
+        max-width: none;
+        min-width: min(100%, max-content);
+      }
+      .tab-row-scroll-hint {
+        display: block;
+        margin-top: -0.15rem;
+        margin-bottom: 0.2rem;
+      }
     }
     .tab-btn {
       box-sizing: border-box;
@@ -516,7 +565,10 @@
             <span class="airport-page-heading__locale muted">{{ airport_locale_line }}</span>
           {% endif %}
         </h2>
-        <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
+        <div class="tab-row-scroll">
+          <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
+        </div>
+        <p class="tab-row-scroll-hint" aria-hidden="true">Swipe sideways for more terminals</p>
         <p class="muted" id="last-scraped-at"></p>
         <div class="range-group" id="range-group">
           <button type="button" class="range-btn" data-hours="6">6H</button>
@@ -1075,6 +1127,15 @@
         });
     }
 
+    function tabRowMobileActiveIntoView(activeIndex) {
+      if (!window.matchMedia('(max-width: 768px)').matches) return;
+      const btns = tabRowEl.querySelectorAll('.tab-btn');
+      const el = btns[activeIndex];
+      if (el) {
+        el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
     function selectTabByIndex(i) {
       if (i < 0 || i >= terminalRows.length) return;
       const row = terminalRows[i];
@@ -1085,6 +1146,7 @@
         btn.setAttribute('aria-selected', j === i ? 'true' : 'false');
       });
       syncUrl();
+      tabRowMobileActiveIntoView(i);
       renderChart(currentHours);
     }
 
@@ -1158,6 +1220,7 @@
       });
       requestAnimationFrame(function () {
         equalizeTabChipHeights();
+        tabRowMobileActiveIntoView(activeIndex);
       });
     }
 
