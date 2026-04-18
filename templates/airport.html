@@ -26,7 +26,7 @@
       margin-bottom: 0.75rem;
     }
     .airport-search-wrap {
-      margin: 0.75rem 0 1rem;
+      margin: 0.75rem 0 0.35rem;
     }
     .airport-search-field {
       position: relative;
@@ -58,7 +58,10 @@
       max-height: min(340px, 55vh);
       overflow-y: auto;
     }
-    .airport-search-panel.airport-search-panel--chart-overlay {
+    .airport-below-search {
+      position: relative;
+    }
+    .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
       left: 0;
       right: 0;
       top: 0;
@@ -206,7 +209,6 @@
       border-color: #1f2937;
     }
     .chart-shell {
-      position: relative;
       margin: 0.5rem 0 1rem;
     }
     .chart-reading-fixed {
@@ -311,22 +313,25 @@
           />
         </div>
       </div>
-      <h2 class="airport-subtitle" id="airport-page-title">{{ airport }}</h2>
-      <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
-      <p class="muted" id="last-scraped-at"></p>
-      <div class="range-group" id="range-group">
-        <button type="button" class="range-btn" data-hours="6">6H</button>
-        <button type="button" class="range-btn" data-hours="12">12H</button>
-        <button type="button" class="range-btn active" data-hours="24">24H</button>
-        <button type="button" class="range-btn" data-hours="72">3D</button>
-        <button type="button" class="range-btn" data-hours="168">7D</button>
-      </div>
-      <div id="chart-shell" class="chart-shell">
-        <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
-        <div class="chart-container">
-          <div id="chart-callout" class="chart-callout"></div>
-          <canvas id="chart"></canvas>
+      <div class="airport-below-search">
+        <h2 class="airport-subtitle" id="airport-page-title">{{ airport }}</h2>
+        <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
+        <p class="muted" id="last-scraped-at"></p>
+        <div class="range-group" id="range-group">
+          <button type="button" class="range-btn" data-hours="6">6H</button>
+          <button type="button" class="range-btn" data-hours="12">12H</button>
+          <button type="button" class="range-btn active" data-hours="24">24H</button>
+          <button type="button" class="range-btn" data-hours="72">3D</button>
+          <button type="button" class="range-btn" data-hours="168">7D</button>
         </div>
+        <div id="chart-shell" class="chart-shell">
+          <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
+          <div class="chart-container">
+            <div id="chart-callout" class="chart-callout"></div>
+            <canvas id="chart"></canvas>
+          </div>
+        </div>
+        <div id="chart-loading" class="muted">Loading…</div>
         <div
           id="airport-search-panel"
           class="airport-search-panel airport-search-panel--chart-overlay"
@@ -335,7 +340,6 @@
           <div id="airport-search-results" class="airport-search-results"></div>
         </div>
       </div>
-      <div id="chart-loading" class="muted">Loading…</div>
     </div>
   </main>
   <script>
