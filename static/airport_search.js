@@ -229,17 +229,16 @@
   }
 
   /**
-   * General / PreCheck for dropdown chips — same phrasing and " · " separator as chart callout
-   * (formatReadoutLine: "General: N min · PreCheck: N min").
+   * General / PreCheck on one line; segments joined with " · " (same separator as chart callout).
    */
   function chipGenPreLine(queues) {
     var q = queues || {};
     var segments = [];
     if (q.general && q.general.minutes != null) {
-      segments.push('General: ' + q.general.minutes + ' min');
+      segments.push('General ' + q.general.minutes + 'm');
     }
     if (q.precheck && q.precheck.minutes != null) {
-      segments.push('PreCheck: ' + q.precheck.minutes + ' min');
+      segments.push('PreCheck ' + q.precheck.minutes + 'm');
     }
     return segments.join(' · ');
   }
