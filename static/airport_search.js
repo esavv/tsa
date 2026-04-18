@@ -228,17 +228,42 @@
     });
   }
 
+  var CHIP_QUEUE_PRIORITY = ['general', 'precheck', 'clear', 'priority'];
+
+  function chipQueueTypeLabel(qt) {
+    var map = {
+      general: 'General',
+      precheck: 'PreCheck',
+      clear: 'Clear',
+      priority: 'Priority',
+    };
+    if (map[qt]) return map[qt];
+    return String(qt)
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+  }
+
   /**
-   * General / PreCheck on one line; segments joined with " · " (same separator as chart callout).
+   * Up to two queue types that have minutes, in order General → PreCheck → Clear → Priority.
+   * Each segment is "Label minutes" (no unit suffix); segments joined with " · ".
    */
-  function chipGenPreLine(queues) {
+  function chipQueueWaitLine(queues) {
     var q = queues || {};
-    var segments = [];
-    if (q.general && q.general.minutes != null) {
-      segments.push('General ' + q.general.minutes);
+    var picked = [];
+    for (var i = 0; i < CHIP_QUEUE_PRIORITY.length; i++) {
+      if (picked.length >= 2) break;
+      var qt = CHIP_QUEUE_PRIORITY[i];
+      var slot = q[qt];
+      if (slot && slot.minutes != null) {
+        picked.push({ qt: qt, minutes: slot.minutes });
+      }
     }
-    if (q.precheck && q.precheck.minutes != null) {
-      segments.push('PreCheck ' + q.precheck.minutes);
+    if (!picked.length) return '';
+    var segments = [];
+    for (var j = 0; j < picked.length; j++) {
+      segments.push(chipQueueTypeLabel(picked[j].qt) + ' ' + picked[j].minutes);
     }
     return segments.join(' · ');
   }
@@ -263,7 +288,7 @@
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = tabLabelForRow(code, row.terminal, row.gate);
-      var waitLine = chipGenPreLine(row.queues);
+      var waitLine = chipQueueWaitLine(row.queues);
       var waitsHtml = '';
       if (waitLine) {
         waitsHtml =
