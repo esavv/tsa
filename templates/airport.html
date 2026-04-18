@@ -28,15 +28,86 @@
     .airport-search-wrap {
       margin: 0.75rem 0 1rem;
     }
+    .airport-search-field {
+      position: relative;
+      max-width: min(28rem, 100%);
+    }
     .airport-search {
       width: 100%;
-      max-width: 22rem;
+      max-width: 100%;
       padding: 0.45rem 0.65rem;
       font-size: 0.95rem;
       border: 1px solid #ccc;
       border-radius: 8px;
       background: #f9fafb;
+      color: #0f172a;
+    }
+    .airport-search::placeholder {
       color: #64748b;
+    }
+    .airport-search-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 40;
+      background: #fff;
+      border: 1px solid #d0d7e2;
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      max-height: min(340px, 55vh);
+      overflow-y: auto;
+    }
+    .airport-search-results {
+      padding: 0.25rem 0;
+    }
+    .airport-search-row {
+      padding: 0.55rem 0.75rem 0.6rem;
+      cursor: pointer;
+      border-bottom: 1px solid #eef2f7;
+    }
+    .airport-search-row:last-child {
+      border-bottom: none;
+    }
+    .airport-search-row:hover,
+    .airport-search-row.is-active {
+      background: #f1f5f9;
+    }
+    .airport-search-row--current {
+      outline: 1px solid #cbd5e1;
+      outline-offset: -1px;
+    }
+    .airport-search-row__top {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .airport-search-code {
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.04em;
+      color: #0f172a;
+      flex-shrink: 0;
+    }
+    .airport-search-name {
+      font-size: 0.9rem;
+      color: #1e293b;
+      line-height: 1.3;
+    }
+    .airport-search-row__meta {
+      font-size: 0.78rem;
+      margin-top: 0.2rem;
+      line-height: 1.35;
+    }
+    .airport-search-row__waits {
+      font-size: 0.78rem;
+      margin-top: 0.25rem;
+      color: #334155;
+      font-weight: 500;
+    }
+    .airport-search-row__waits--empty {
+      font-weight: 400;
     }
     .airport-subtitle {
       margin: 0 0 0.5rem;
@@ -214,14 +285,20 @@
       <h1>TSA Wait Times</h1>
       <p class="muted airport-subhead">Security line wait times at major US airports</p>
       <div class="airport-search-wrap">
-        <input
-          type="search"
-          class="airport-search"
-          id="airport-search"
-          disabled
-          placeholder="Change airport (coming soon)"
-          aria-label="Change airport"
-        />
+        <div class="airport-search-field">
+          <input
+            type="search"
+            class="airport-search"
+            id="airport-search"
+            disabled
+            placeholder="Loading airport list…"
+            aria-label="Search airports"
+            aria-expanded="false"
+          />
+          <div id="airport-search-panel" class="airport-search-panel" hidden>
+            <div id="airport-search-results" class="airport-search-results"></div>
+          </div>
+        </div>
       </div>
       <h2 class="airport-subtitle" id="airport-page-title">{{ airport }}</h2>
       <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
@@ -959,5 +1036,21 @@
         loadingEl.textContent = 'Error: ' + e.message;
         chartShell.style.display = 'none';
       });
+  </script>
+  <script src="{{ url_for('static', filename='airport_search.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof initTsaAirportSearch !== 'function') return;
+      var inp = document.getElementById('airport-search');
+      var panel = document.getElementById('airport-search-panel');
+      var list = document.getElementById('airport-search-results');
+      if (!inp || !panel || !list) return;
+      initTsaAirportSearch({
+        input: inp,
+        panel: panel,
+        list: list,
+        currentAirportCode: pageAirport,
+      });
+    });
   </script>
 {% endblock %}

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Simple webapp: latest wait times + 24h terminal history charts."""
+import json
 import os
 import sqlite3
 from datetime import datetime, timezone, timedelta
@@ -9,6 +10,18 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, url
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("TSA_DB_PATH", os.path.join(APP_DIR, "tsa.db"))
+CATALOG_PATH = os.path.join(APP_DIR, "data", "airports.json")
+
+
+def load_airport_catalog():
+    with open(CATALOG_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+try:
+    AIRPORT_CATALOG = load_airport_catalog()
+except (OSError, json.JSONDecodeError):
+    AIRPORT_CATALOG = {"metros": {}, "airports": []}
 
 # Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
 AIRPORT_CODES = frozenset(
@@ -71,6 +84,12 @@ def terminal_redirect(airport: str, terminal: str):
     gate = request.args.get("gate") or ""
     q = urlencode({"terminal": terminal, "gate": gate})
     return redirect(f"/{ap}?{q}", code=301)
+
+
+@app.route("/api/catalog")
+def api_catalog():
+    """Airport + metro metadata for client-side search (see data/airports.json)."""
+    return jsonify(AIRPORT_CATALOG)
 
 
 @app.route("/api/latest")
