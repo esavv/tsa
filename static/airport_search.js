@@ -73,9 +73,14 @@
     scores.push(matchScore(ap.display_name, ql, 200));
     if (ap.city) scores.push(matchScore(ap.city, ql, 400));
     if (ap.state) scores.push(matchScore(ap.state, ql, 500));
+    if (ap.state_name) scores.push(matchScore(ap.state_name, ql, 500));
     if (ap.city && ap.state) {
       scores.push(matchScore(ap.city + ' ' + ap.state, ql, 420));
       scores.push(matchScore(ap.city + ', ' + ap.state, ql, 420));
+    }
+    if (ap.city && ap.state_name) {
+      scores.push(matchScore(ap.city + ' ' + ap.state_name, ql, 420));
+      scores.push(matchScore(ap.city + ', ' + ap.state_name, ql, 420));
     }
     var aliases = ap.aliases || [];
     for (var a = 0; a < aliases.length; a++) {
@@ -107,6 +112,7 @@
         display_name: ap.display_name,
         city: ap.city || '',
         state: ap.state || '',
+        state_name: ap.state_name || '',
         metro_key: ap.metro_key,
         metro_label: metroLabel,
         aliases: ap.aliases || [],

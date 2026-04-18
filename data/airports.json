@@ -20,6 +20,7 @@
       "metro_key": "nyc",
       "city": "New York",
       "state": "NY",
+      "state_name": "New York",
       "aliases": [
         "lga",
         "laguardia",
@@ -36,6 +37,7 @@
       "metro_key": "nyc",
       "city": "New York",
       "state": "NY",
+      "state_name": "New York",
       "aliases": [
         "jfk",
         "john f kennedy",
@@ -54,6 +56,7 @@
       "metro_key": "nyc",
       "city": "Newark",
       "state": "NJ",
+      "state_name": "New Jersey",
       "aliases": [
         "ewr",
         "newark",
@@ -71,6 +74,7 @@
       "metro_key": null,
       "city": "Los Angeles",
       "state": "CA",
+      "state_name": "California",
       "aliases": [
         "lax",
         "los angeles international",
@@ -87,6 +91,7 @@
       "metro_key": null,
       "city": "Miami",
       "state": "FL",
+      "state_name": "Florida",
       "aliases": [
         "mia",
         "miami international",
@@ -102,6 +107,7 @@
       "metro_key": null,
       "city": "Seattle",
       "state": "WA",
+      "state_name": "Washington",
       "aliases": [
         "sea",
         "seatac",
@@ -119,6 +125,7 @@
       "metro_key": null,
       "city": "Arlington",
       "state": "VA",
+      "state_name": "Virginia",
       "aliases": [
         "dca",
         "reagan",
@@ -138,6 +145,7 @@
       "metro_key": null,
       "city": "Atlanta",
       "state": "GA",
+      "state_name": "Georgia",
       "aliases": [
         "atl",
         "atlanta airport",
@@ -154,6 +162,7 @@
       "metro_key": null,
       "city": "Dallas-Fort Worth",
       "state": "TX",
+      "state_name": "Texas",
       "aliases": [
         "dfw",
         "dallas fort worth",
@@ -169,6 +178,7 @@
       "metro_key": null,
       "city": "Denver",
       "state": "CO",
+      "state_name": "Colorado",
       "aliases": [
         "den",
         "dia",
@@ -184,6 +194,7 @@
       "metro_key": null,
       "city": "Charlotte",
       "state": "NC",
+      "state_name": "North Carolina",
       "aliases": [
         "clt",
         "charlotte airport",
@@ -199,6 +210,7 @@
       "metro_key": null,
       "city": "Las Vegas",
       "state": "NV",
+      "state_name": "Nevada",
       "aliases": [
         "las",
         "las vegas airport",
@@ -215,6 +227,7 @@
       "metro_key": null,
       "city": "Orlando",
       "state": "FL",
+      "state_name": "Florida",
       "aliases": [
         "mco",
         "orlando airport",
@@ -230,6 +243,7 @@
       "metro_key": null,
       "city": "Phoenix",
       "state": "AZ",
+      "state_name": "Arizona",
       "aliases": [
         "phx",
         "phoenix airport",
