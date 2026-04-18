@@ -297,6 +297,7 @@
       </div>
     </div>
   </main>
+  <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
   <script>
     const QUEUE_TYPE_ORDER = [
       'general', 'precheck', 'priority', 'clear',
@@ -328,53 +329,20 @@
       });
     }
 
-    function titleCaseWords(s) {
-      return String(s)
-        .split(/\s+/)
-        .map(function (word) {
-          if (!word) return word;
-          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-        })
-        .join(' ');
+    function airportCatalogEntry(catalogAirports, code) {
+      for (const a of catalogAirports) {
+        if (a.code === code) {
+          const tab = { ...(a.terminal_tab || {}) };
+          if (!tab.preset) tab.preset = 'standard';
+          return { ...a, code: a.code, terminal_tab: tab };
+        }
+      }
+      return { code, terminal_tab: { preset: 'standard' } };
     }
 
-    function effectiveGate(code, gate) {
-      if (code === 'CLT') return '';
-      return gate || '';
-    }
-
-    function homeTerminalLinkLabel(code, terminal, gateRaw) {
-      const t = terminal || '';
-      const g = effectiveGate(code, gateRaw);
-      if (code === 'CLT') {
-        return t;
-      }
-      if (code === 'ATL') {
-        if (!g) return t;
-        return t + ': ' + titleCaseWords(g);
-      }
-      if (code === 'MIA') {
-        if (!g) return 'Checkpoint ' + t;
-        return 'Checkpoint ' + t + ': Gates ' + g;
-      }
-      if (!g) {
-        return 'Terminal ' + t;
-      }
-      if (code === 'DFW') {
-        return 'Terminal ' + t + ': Gate ' + g;
-      }
-      if (code === 'LAS' || code === 'PHX') {
-        return 'Terminal ' + t + ': ' + g;
-      }
-      if (code === 'EWR' || code === 'MCO') {
-        return 'Terminal ' + t + ': Gates ' + g;
-      }
-      return 'Terminal ' + t + ': Gates ' + g;
-    }
-
-    function terminalHref(code, terminal, gateRaw) {
-      const g = effectiveGate(code, gateRaw);
-      let u = '/' + encodeURIComponent(code) + '?terminal=' + encodeURIComponent(terminal || '');
+    function terminalHref(airportEntry, terminal, gateRaw) {
+      const g = effectiveGateForTab(airportEntry, gateRaw || '');
+      let u = '/' + encodeURIComponent(airportEntry.code) + '?terminal=' + encodeURIComponent(terminal || '');
       if (g) u += '&gate=' + encodeURIComponent(g);
       return u;
     }
@@ -426,9 +394,9 @@
       ctx.stroke();
     }
 
-    fetch('/api/latest')
-      .then(r => r.json())
-      .then(data => {
+    Promise.all([fetch('/api/catalog').then(r => r.json()), fetch('/api/latest').then(r => r.json())])
+      .then(([catalog, data]) => {
+        const catalogAirports = catalog.airports || [];
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
         if (data.scraped_at_utc) {
@@ -477,6 +445,7 @@
         for (const code of codes) {
           const terminals = byCode[code];
           if (!terminals) continue;
+          const catalogEntry = airportCatalogEntry(catalogAirports, code);
           const section = document.createElement('div');
           section.className = 'airport-section';
           section.innerHTML = '<h2>' + (airportNames[code] || code) + '</h2>';
@@ -498,10 +467,10 @@
           table.appendChild(tbody);
           for (const row of terminals) {
             const tr = document.createElement('tr');
-            const gate = effectiveGate(code, row.gate || '');
-            const linkLabel = homeTerminalLinkLabel(code, row.terminal, row.gate || '');
+            const gate = effectiveGateForTab(catalogEntry, row.gate || '');
+            const linkLabel = terminalTabLabel(catalogEntry, row.terminal, row.gate || '');
             const gateSlug = gate ? String(gate).replace(/[^a-zA-Z0-9]+/g, '_') : 'all';
-            const href = terminalHref(code, row.terminal, row.gate || '');
+            const href = terminalHref(catalogEntry, row.terminal, row.gate || '');
             const qmap = row.queues || {};
             let tds =
               '<td><a class="terminal-link" href="' +

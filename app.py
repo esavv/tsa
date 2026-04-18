@@ -31,6 +31,16 @@ def catalog_airport_entry(code: str) -> Optional[dict]:
             return ap
     return None
 
+
+def airport_catalog_entry_for_js(code: str) -> dict:
+    """Catalog row for the current airport, with defaults for terminal_tab (client JS)."""
+    raw = dict(catalog_airport_entry(code) or {})
+    raw["code"] = code
+    tab = dict(raw.get("terminal_tab") or {})
+    tab.setdefault("preset", "standard")
+    raw["terminal_tab"] = tab
+    return raw
+
 # Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
 AIRPORT_CODES = frozenset(
     {
@@ -87,6 +97,7 @@ def airport(code: str):
         airport=c,
         airport_display_name=airport_display_name,
         airport_locale_line=airport_locale_line,
+        airport_catalog_entry=airport_catalog_entry_for_js(c),
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
     )

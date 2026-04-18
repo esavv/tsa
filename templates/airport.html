@@ -488,29 +488,16 @@
       </div>
     </div>
   </main>
+  <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
   <script>
     const pageAirport = {{ airport | tojson }};
+    const pageAirportEntry = {{ airport_catalog_entry | tojson }};
     const initialTerminal = {{ initial_terminal | tojson }};
     const initialGate = {{ initial_gate | tojson }};
 
     let selectedTerminal = '';
     let selectedGate = '';
     let terminalRows = [];
-
-    function titleCaseWords(s) {
-      return String(s)
-        .split(/\s+/)
-        .map(function (word) {
-          if (!word) return word;
-          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-        })
-        .join(' ');
-    }
-
-    function effectiveGate(code, gate) {
-      if (code === 'CLT') return '';
-      return gate || '';
-    }
 
     const QUEUE_TAB_ORDER = ['general', 'precheck', 'priority', 'clear'];
 
@@ -608,46 +595,17 @@
         .join(', ');
     }
 
-    function tabLabelForRow(code, terminal, gateRaw) {
-      const t = terminal || '';
-      const g = effectiveGate(code, gateRaw);
-      if (code === 'CLT') {
-        return t;
-      }
-      if (code === 'ATL') {
-        if (!g) return t;
-        return t + ': ' + titleCaseWords(g);
-      }
-      if (code === 'MIA') {
-        if (!g) return 'Checkpoint ' + t;
-        return 'Checkpoint ' + t + ': Gates ' + g;
-      }
-      if (!g) {
-        return 'Terminal ' + t;
-      }
-      if (code === 'DFW') {
-        return 'Terminal ' + t + ': Gate ' + g;
-      }
-      if (code === 'LAS' || code === 'PHX') {
-        return 'Terminal ' + t + ': ' + g;
-      }
-      if (code === 'EWR' || code === 'MCO') {
-        return 'Terminal ' + t + ': Gates ' + g;
-      }
-      return 'Terminal ' + t + ': Gates ' + g;
-    }
-
     function syncUrl() {
       const u = new URL(window.location.origin + '/' + pageAirport);
       if (selectedTerminal) u.searchParams.set('terminal', selectedTerminal);
-      const eg = effectiveGate(pageAirport, selectedGate);
+      const eg = effectiveGateForTab(pageAirportEntry, selectedGate);
       if (eg) u.searchParams.set('gate', eg);
       history.replaceState({}, '', u.pathname + u.search);
     }
 
     function rowMatchesInitial(row) {
       if (row.terminal !== initialTerminal) return false;
-      if (pageAirport === 'CLT') return true;
+      if (pageAirportEntry.terminal_tab && pageAirportEntry.terminal_tab.preset === 'clt') return true;
       return String(row.gate || '') === String(initialGate || '');
     }
 
@@ -1101,7 +1059,7 @@
         btn.setAttribute('role', 'tab');
         btn.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
         btn.dataset.index = String(i);
-        const label = tabLabelForRow(pageAirport, row.terminal, row.gate);
+        const label = terminalTabLabel(pageAirportEntry, row.terminal, row.gate);
         const waitFrag = tabWaitsTitleFragment(row);
         btn.title = waitFrag ? label + ' — ' + waitFrag : label;
         const span = document.createElement('span');

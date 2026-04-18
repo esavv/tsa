@@ -107,6 +107,10 @@
       if (ap.metro_key && metros[ap.metro_key]) {
         metroLabel = metros[ap.metro_key].display_name || ap.metro_key;
       }
+      var tt = ap.terminal_tab || {};
+      var terminalTab = { preset: tt.preset || 'standard' };
+      if (tt.strings) terminalTab.strings = tt.strings;
+      if (tt.ignore_gate === true) terminalTab.ignore_gate = true;
       out.push({
         code: ap.code,
         display_name: ap.display_name,
@@ -116,6 +120,7 @@
         metro_key: ap.metro_key,
         metro_label: metroLabel,
         aliases: ap.aliases || [],
+        terminal_tab: terminalTab,
       });
     }
     out.sort(function (a, b) {
@@ -179,55 +184,17 @@
     return scored;
   }
 
-  function titleCaseWords(s) {
-    return String(s)
-      .split(/\s+/)
-      .map(function (word) {
-        if (!word) return word;
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      })
-      .join(' ');
+  function catalogEntryForCode(list, code) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].code === code) return list[i];
+    }
+    return { code: code, terminal_tab: { preset: 'standard' } };
   }
 
-  function effectiveGate(code, gate) {
-    if (code === 'CLT') return '';
-    return gate || '';
-  }
-
-  /** Match /airport terminal tab labels (tabLabelForRow). */
-  function tabLabelForRow(code, terminal, gateRaw) {
-    var t = terminal || '';
-    var g = effectiveGate(code, gateRaw);
-    if (code === 'CLT') {
-      return t;
-    }
-    if (code === 'ATL') {
-      if (!g) return t;
-      return t + ': ' + titleCaseWords(g);
-    }
-    if (code === 'MIA') {
-      if (!g) return 'Checkpoint ' + t;
-      return 'Checkpoint ' + t + ': Gates ' + g;
-    }
-    if (!g) {
-      return 'Terminal ' + t;
-    }
-    if (code === 'DFW') {
-      return 'Terminal ' + t + ': Gate ' + g;
-    }
-    if (code === 'LAS' || code === 'PHX') {
-      return 'Terminal ' + t + ': ' + g;
-    }
-    if (code === 'EWR' || code === 'MCO') {
-      return 'Terminal ' + t + ': Gates ' + g;
-    }
-    return 'Terminal ' + t + ': Gates ' + g;
-  }
-
-  function sortTerminalRows(code, rows) {
-    return rows.slice().sort(function (a, b) {
-      var ga = effectiveGate(code, (a && a.gate) || '');
-      var gb = effectiveGate(code, (b && b.gate) || '');
+  function sortTerminalRows(catalogEntry, terminalRows) {
+    return terminalRows.slice().sort(function (a, b) {
+      var ga = effectiveGateForTab(catalogEntry, (a && a.gate) || '');
+      var gb = effectiveGateForTab(catalogEntry, (b && b.gate) || '');
       var ka = String((a && a.terminal) || '') + '\0' + ga;
       var kb = String((b && b.terminal) || '') + '\0' + gb;
       return ka.localeCompare(kb);
@@ -286,14 +253,15 @@
         '</div>'
       );
     }
-    var sorted = sortTerminalRows(code, terminals);
+    var apEntry = catalogEntryForCode(rows, code);
+    var sorted = sortTerminalRows(apEntry, terminals);
     var show = sorted.slice(0, MAX_TERMINAL_CHIPS);
     var more = sorted.length - show.length;
     var html = '<div class="airport-search-row__chips" role="presentation">';
     html += '<div class="airport-search-row__chip-run">';
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
-      var label = tabLabelForRow(code, row.terminal, row.gate);
+      var label = terminalTabLabel(apEntry, row.terminal, row.gate);
       var waitLine = chipQueueWaitLine(row.queues);
       var waitsHtml = '';
       if (waitLine) {
