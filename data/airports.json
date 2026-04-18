@@ -88,8 +88,8 @@
       "state": "CA",
       "state_name": "California",
       "terminal_tab": {
-        "without_gate": "Terminal {terminal}",
-        "with_gate": "Terminal {terminal}: Gates {gate}"
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: Gates {gate}"
       },
       "aliases": [
         "lax",
@@ -220,7 +220,7 @@
       "state": "CO",
       "state_name": "Colorado",
       "terminal_tab": {
-        "without_gate": "Terminal {terminal}",
+        "without_gate": "{terminal} Terminal",
         "with_gate": "Terminal {terminal}: Gates {gate}"
       },
       "aliases": [
@@ -261,8 +261,8 @@
       "state": "NV",
       "state_name": "Nevada",
       "terminal_tab": {
-        "without_gate": "Terminal {terminal}",
-        "with_gate": "Terminal {terminal}: {gate}"
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: {gate}"
       },
       "aliases": [
         "las",
@@ -282,8 +282,8 @@
       "state": "FL",
       "state_name": "Florida",
       "terminal_tab": {
-        "without_gate": "Terminal {terminal}",
-        "with_gate": "Terminal {terminal}: Gates {gate}"
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: Gates {gate}"
       },
       "aliases": [
         "mco",
@@ -302,8 +302,8 @@
       "state": "AZ",
       "state_name": "Arizona",
       "terminal_tab": {
-        "without_gate": "Terminal {terminal}",
-        "with_gate": "Terminal {terminal}: {gate}"
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: {gate}"
       },
       "aliases": [
         "phx",
