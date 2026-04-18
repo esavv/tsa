@@ -1,8 +1,4 @@
 {
-  "catalog_version": 1,
-  "last_reviewed": "2026-04-16",
-  "notes": "Search-facing airport metadata plus primary wait-times source URL per airport. Scraper still owns headers, API keys, and parsers; URLs here are the first step toward de-duplicating config.",
-
   "metros": {
     "nyc": {
       "display_name": "New York",
@@ -16,19 +12,6 @@
         "new york metro",
         "ny"
       ]
-    },
-    "washington_dc": {
-      "display_name": "Washington, D.C.",
-      "area_detail": "DC & VA",
-      "country": "United States",
-      "airport_codes": ["DCA"],
-      "search_aliases": [
-        "washington dc",
-        "washington d.c.",
-        "dc",
-        "d.c.",
-        "dmv"
-      ]
     }
   },
 
@@ -36,7 +19,6 @@
     {
       "code": "LGA",
       "display_name": "LaGuardia Airport",
-      "short_name": "LaGuardia",
       "metro_key": "nyc",
       "city": "New York",
       "state": "NY",
@@ -48,13 +30,12 @@
         "new york laguardia",
         "nyc laguardia"
       ],
-      "wait_times_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/LGA",
-      "wait_times_source": "port_authority_azure_json"
+      "wait_times_url": "https://www.laguardiaairport.com/",
+      "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/LGA"
     },
     {
       "code": "JFK",
       "display_name": "John F. Kennedy International Airport",
-      "short_name": "Kennedy Airport",
       "metro_key": "nyc",
       "city": "New York",
       "state": "NY",
@@ -68,13 +49,12 @@
         "jfk airport",
         "new york jfk"
       ],
-      "wait_times_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/JFK",
-      "wait_times_source": "port_authority_azure_json"
+      "wait_times_url": "https://www.jfkairport.com/",
+      "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/JFK"
     },
     {
       "code": "EWR",
       "display_name": "Newark Liberty International Airport",
-      "short_name": "Newark Airport",
       "metro_key": "nyc",
       "city": "Newark",
       "state": "NJ",
@@ -87,13 +67,12 @@
         "new york newark",
         "nyc newark"
       ],
-      "wait_times_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR",
-      "wait_times_source": "port_authority_azure_json"
+      "wait_times_url": "https://www.newarkairport.com/",
+      "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR"
     },
     {
       "code": "LAX",
       "display_name": "Los Angeles International Airport",
-      "short_name": "LAX",
       "metro_key": null,
       "city": "Los Angeles",
       "state": "CA",
@@ -106,12 +85,11 @@
         "lax airport"
       ],
       "wait_times_url": "https://www.flylax.com/wait-times",
-      "wait_times_source": "flylax_html"
+      "api_url": null
     },
     {
       "code": "MIA",
       "display_name": "Miami International Airport",
-      "short_name": "Miami Airport",
       "metro_key": null,
       "city": "Miami",
       "state": "FL",
@@ -123,13 +101,11 @@
         "mia airport"
       ],
       "wait_times_url": "https://www.miami-airport.com/tsa-waittimes.asp",
-      "wait_times_source": "miami_html_then_embedded_json",
-      "wait_times_url_comment": "Scraper loads this HTML page, then follows an embedded script URL for the JSON payload."
+      "api_url": null
     },
     {
       "code": "SEA",
       "display_name": "Seattle-Tacoma International Airport",
-      "short_name": "Sea-Tac",
       "metro_key": null,
       "city": "Seattle",
       "state": "WA",
@@ -142,14 +118,13 @@
         "seattle airport",
         "seattle international"
       ],
-      "wait_times_url": "https://www.portseattle.org/api/cwt/wait-times",
-      "wait_times_source": "port_seattle_json"
+      "wait_times_url": null,
+      "api_url": "https://www.portseattle.org/api/cwt/wait-times"
     },
     {
       "code": "DCA",
       "display_name": "Ronald Reagan Washington National Airport",
-      "short_name": "Reagan National",
-      "metro_key": "washington_dc",
+      "metro_key": null,
       "city": "Arlington",
       "state": "VA",
       "country": "United States",
@@ -164,12 +139,11 @@
         "washington dca"
       ],
       "wait_times_url": "https://www.flyreagan.com/security-wait-times",
-      "wait_times_source": "mwaa_json"
+      "api_url": null
     },
     {
       "code": "ATL",
       "display_name": "Hartsfield-Jackson Atlanta International Airport",
-      "short_name": "Atlanta Airport",
       "metro_key": null,
       "city": "Atlanta",
       "state": "GA",
@@ -182,13 +156,11 @@
         "atlanta international"
       ],
       "wait_times_url": "https://www.atl.com/times/",
-      "wait_times_source": "atl_playwright_html",
-      "wait_times_url_comment": "Scraper uses Playwright to render this page before reading wait data."
+      "api_url": null
     },
     {
       "code": "DFW",
       "display_name": "Dallas Fort Worth International Airport",
-      "short_name": "DFW Airport",
       "metro_key": null,
       "city": "Dallas-Fort Worth",
       "state": "TX",
@@ -199,13 +171,12 @@
         "dallas airport",
         "fort worth airport"
       ],
-      "wait_times_url": "https://api.dfwairport.mobi/wait-times/checkpoint/DFW",
-      "wait_times_source": "dfw_mobi_json"
+      "wait_times_url": null,
+      "api_url": "https://api.dfwairport.mobi/wait-times/checkpoint/DFW"
     },
     {
       "code": "DEN",
       "display_name": "Denver International Airport",
-      "short_name": "Denver Airport",
       "metro_key": null,
       "city": "Denver",
       "state": "CO",
@@ -216,13 +187,12 @@
         "denver airport",
         "denver international"
       ],
-      "wait_times_url": "https://app.flyfruition.com/api/public/tsa",
-      "wait_times_source": "den_flyfruition_json"
+      "wait_times_url": null,
+      "api_url": "https://app.flyfruition.com/api/public/tsa"
     },
     {
       "code": "CLT",
       "display_name": "Charlotte Douglas International Airport",
-      "short_name": "Charlotte Airport",
       "metro_key": null,
       "city": "Charlotte",
       "state": "NC",
@@ -233,13 +203,12 @@
         "charlotte douglas",
         "douglas airport"
       ],
-      "wait_times_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT",
-      "wait_times_source": "clt_mobi_json"
+      "wait_times_url": null,
+      "api_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT"
     },
     {
       "code": "LAS",
       "display_name": "Harry Reid International Airport",
-      "short_name": "Las Vegas Airport",
       "metro_key": null,
       "city": "Las Vegas",
       "state": "NV",
@@ -252,12 +221,11 @@
         "mccarran airport"
       ],
       "wait_times_url": "https://www.harryreidairport.com/security-wait-times",
-      "wait_times_source": "harry_reid_html"
+      "api_url": null
     },
     {
       "code": "MCO",
       "display_name": "Orlando International Airport",
-      "short_name": "Orlando Airport",
       "metro_key": null,
       "city": "Orlando",
       "state": "FL",
@@ -268,13 +236,12 @@
         "orlando international",
         "oia"
       ],
-      "wait_times_url": "https://api.goaa.aero/wait-times/checkpoint/MCO",
-      "wait_times_source": "mco_mobi_json"
+      "wait_times_url": null,
+      "api_url": "https://api.goaa.aero/wait-times/checkpoint/MCO"
     },
     {
       "code": "PHX",
       "display_name": "Phoenix Sky Harbor International Airport",
-      "short_name": "Sky Harbor",
       "metro_key": null,
       "city": "Phoenix",
       "state": "AZ",
@@ -286,9 +253,8 @@
         "skyharbor",
         "phoenix sky harbor"
       ],
-      "wait_times_url": "https://api.phx.aero/avn-wait-times/raw",
-      "wait_times_source": "phx_avn_json",
-      "wait_times_url_comment": "Scraper discovers a Key query param from skyharbor.com HTML; this URL is the raw endpoint base."
+      "wait_times_url": null,
+      "api_url": "https://api.phx.aero/avn-wait-times/raw"
     }
   ]
 }
