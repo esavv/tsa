@@ -228,15 +228,15 @@
     });
   }
 
-  /** Gen / Pre only for dropdown chips (matches common tab readout). */
+  /** General / PreCheck only for dropdown chips. */
   function chipGenPreParts(queues) {
     var q = queues || {};
     var parts = [];
     if (q.general && q.general.minutes != null) {
-      parts.push({ abbrev: 'Gen', m: q.general.minutes });
+      parts.push({ label: 'General', m: q.general.minutes });
     }
     if (q.precheck && q.precheck.minutes != null) {
-      parts.push({ abbrev: 'Pre', m: q.precheck.minutes });
+      parts.push({ label: 'PreCheck', m: q.precheck.minutes });
     }
     return parts;
   }
@@ -267,7 +267,7 @@
         for (var p = 0; p < parts.length; p++) {
           waitsHtml +=
             '<span class="airport-search-chip__wait">' +
-            esc(parts[p].abbrev + ' ' + parts[p].m + 'm') +
+            esc(parts[p].label + ' ' + parts[p].m + 'm') +
             '</span>';
         }
       } else {
