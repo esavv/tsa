@@ -387,11 +387,6 @@
         max-width: none;
         min-width: 0;
       }
-      .tab-btn {
-        width: 13.75rem;
-        min-width: 13.75rem;
-        max-width: 13.75rem;
-      }
     }
     .tab-btn {
       box-sizing: border-box;
@@ -412,6 +407,14 @@
       min-width: 12rem;
       max-width: 12rem;
       flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+      /* Must follow base .tab-btn so widths apply; wider chips fill grid tracks (gap stays 0.4rem). */
+      .tab-row-scroll .tab-btn {
+        width: 13.75rem;
+        min-width: 13.75rem;
+        max-width: 13.75rem;
+      }
     }
     .tab-btn.active {
       background: #1f2937;
