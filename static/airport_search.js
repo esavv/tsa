@@ -361,10 +361,7 @@
           div.dataset.code = row.code;
 
           var loc = [row.city, row.state].filter(Boolean).join(', ');
-          var metaParts = [];
-          if (loc) metaParts.push(loc);
-          if (row.metro_label) metaParts.push(row.metro_label);
-          var meta = metaParts.join(' · ');
+          var meta = loc || '';
 
           div.innerHTML =
             '<div class="airport-search-row__main">' +
