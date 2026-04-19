@@ -1284,13 +1284,13 @@
       loadingEl.hidden = true;
     }
 
-    function renderChart(hours, loadingLabel) {
+    function renderChart(hours) {
       currentHours = Number(hours);
       if (historyFetchAbort) {
         historyFetchAbort.abort();
       }
       historyFetchAbort = new AbortController();
-      showChartLoading(loadingLabel || 'Loading history...');
+      showChartLoading('Loading...');
       hideCallout();
       clearFixedReadout();
       updateRangeButtons(hours);
@@ -1343,7 +1343,7 @@
       });
       syncUrl();
       tabRowMobileActiveIntoView(i);
-      renderChart(currentHours, 'Loading...');
+      renderChart(currentHours);
     }
 
     /** After layout, set every tab chip to the height of the tallest (e.g. 3+ queues → 2 grid rows). */
