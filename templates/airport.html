@@ -400,16 +400,23 @@
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
-    /* Chart hover / scrub readout: same grid + pill layout as terminal tab chips. */
+    /* Chart hover / scrub readout: label|value pairs; max-content cols (not 1fr) so readout
+       does not stretch to full width on mobile or shrink-wrap oddly on desktop abspos. */
     .chart-callout .chart-readout-grid,
     .chart-reading-fixed .chart-readout-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+      grid-template-columns: max-content auto max-content auto;
       column-gap: 0;
       row-gap: 0.12rem;
-      width: 100%;
       align-items: baseline;
       margin-top: 0.08rem;
+    }
+    .chart-callout .chart-readout-grid {
+      width: auto;
+    }
+    .chart-reading-fixed .chart-readout-grid {
+      width: max-content;
+      max-width: 100%;
     }
     .chart-callout .chart-readout-lbl:nth-child(4n + 1),
     .chart-callout .chart-readout-lbl:nth-child(4n + 3),
@@ -417,9 +424,11 @@
     .chart-reading-fixed .chart-readout-lbl:nth-child(4n + 3) {
       margin-right: 0.1rem;
     }
-    .chart-callout .chart-readout-val:nth-child(4n + 2),
-    .chart-reading-fixed .chart-readout-val:nth-child(4n + 2) {
+    .chart-callout .chart-readout-val:nth-child(4n + 2) {
       margin-right: 0.5rem;
+    }
+    .chart-reading-fixed .chart-readout-val:nth-child(4n + 2) {
+      margin-right: 0.28rem;
     }
     .chart-callout .chart-readout-lbl,
     .chart-reading-fixed .chart-readout-lbl {
@@ -493,6 +502,10 @@
       top: 8px;
       left: 0;
       transform: translateX(-50%);
+      /* Avoid shrink-to-fit using “remaining width to right edge” as max width (narrows near chart right). */
+      width: max-content;
+      max-width: calc(100% - 12px);
+      box-sizing: border-box;
       background: rgba(255, 255, 255, 0.88);
       color: #0f172a;
       border-radius: 10px;
@@ -682,14 +695,14 @@
         .replace(/"/g, '&quot;');
     }
 
-    /** X-axis / callout timestamp: no leading zero on single-digit hour. */
+    /**
+     * X-axis / callout timestamp: comma between date and time (not "at" on iOS),
+     * no leading zero on single-digit hour.
+     */
     function formatChartAxisLabel(dateObj) {
-      return dateObj.toLocaleString([], {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      });
+      const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return datePart + ', ' + timePart;
     }
 
     const QUEUE_FILL_BY_TYPE = {
@@ -870,8 +883,18 @@
       const stacked = order.length > 2;
       calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
       calloutEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
-      calloutEl.style.left = x + 'px';
       calloutEl.style.display = 'block';
+      calloutEl.style.left = x + 'px';
+      requestAnimationFrame(function () {
+        const pad = 6;
+        const parent = calloutEl.parentElement;
+        if (!parent) return;
+        const cw = parent.clientWidth;
+        const w = calloutEl.offsetWidth;
+        const half = w / 2;
+        const clamped = Math.max(pad + half, Math.min(x, cw - pad - half));
+        calloutEl.style.left = clamped + 'px';
+      });
     }
 
     function setFixedReadout(label, chartRef, idx) {
