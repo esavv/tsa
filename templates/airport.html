@@ -551,7 +551,7 @@
       border-color: #1f2937;
     }
     .chart-shell {
-      margin: 0.5rem 0 1rem;
+      margin: 0.5rem 0 0.35rem;
     }
     .chart-reading-fixed {
       display: none;
@@ -1273,13 +1273,13 @@
       loadingEl.hidden = true;
     }
 
-    function renderChart(hours) {
+    function renderChart(hours, loadingLabel) {
       currentHours = Number(hours);
       if (historyFetchAbort) {
         historyFetchAbort.abort();
       }
       historyFetchAbort = new AbortController();
-      showChartLoading('Loading history...');
+      showChartLoading(loadingLabel || 'Loading history...');
       hideCallout();
       clearFixedReadout();
       updateRangeButtons(hours);
@@ -1332,7 +1332,7 @@
       });
       syncUrl();
       tabRowMobileActiveIntoView(i);
-      renderChart(currentHours);
+      renderChart(currentHours, 'Loading...');
     }
 
     /** After layout, set every tab chip to the height of the tallest (e.g. 3+ queues → 2 grid rows). */
