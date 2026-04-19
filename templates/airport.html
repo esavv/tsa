@@ -253,11 +253,24 @@
       line-height: 1.3;
     }
     .airport-page-heading__locale {
-      display: block;
-      margin-top: 0.2rem;
       font-size: 0.78rem;
       line-height: 1.35;
       font-weight: 400;
+    }
+    .airport-locale-inline-row {
+      font-size: 0.78rem;
+      line-height: 1.35;
+      margin-top: 0.2rem;
+    }
+    .airport-locale-inline-row .airport-page-heading__locale {
+      display: block;
+    }
+    .airport-last-update-inline {
+      display: none;
+    }
+    /* Desktop: hide whole row when no city/state (last update stays below tabs). */
+    .airport-locale-inline-row--solo {
+      display: none;
     }
     #last-scraped-at {
       font-size: 0.78rem;
@@ -311,6 +324,32 @@
       }
       .airport-search-chip-more {
         text-align: left;
+      }
+      .airport-locale-inline-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin-top: 0.15rem;
+        margin-bottom: 0.35rem;
+      }
+      .airport-locale-inline-row--solo {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .airport-locale-inline-row .airport-page-heading__locale {
+        margin-top: 0;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .airport-last-update-inline {
+        display: block;
+        flex: 0 0 auto;
+        text-align: right;
+        white-space: nowrap;
+      }
+      #last-scraped-at {
+        display: none;
       }
       .tab-row-scroll {
         overflow-x: auto;
@@ -626,10 +665,15 @@
       <div class="airport-below-search">
         <h2 class="airport-page-heading" id="airport-page-title">
           {{ airport }} - {{ airport_display_name }}
-          {% if airport_locale_line %}
-            <span class="airport-page-heading__locale muted">{{ airport_locale_line }}</span>
-          {% endif %}
         </h2>
+        <div
+          class="airport-locale-inline-row muted {% if not airport_locale_line %}airport-locale-inline-row--solo{% endif %}"
+        >
+          {% if airport_locale_line %}
+            <span class="airport-page-heading__locale">{{ airport_locale_line }}</span>
+          {% endif %}
+          <span class="airport-last-update-inline" id="last-scraped-inline"></span>
+        </div>
         <div class="tab-row-scroll">
           <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
         </div>
@@ -781,6 +825,33 @@
     const bootstrapMsgEl = document.getElementById('chart-bootstrap-msg');
     const calloutEl = document.getElementById('chart-callout');
     const lastScrapedEl = document.getElementById('last-scraped-at');
+    const lastScrapedInlineEl = document.getElementById('last-scraped-inline');
+
+    function formatLastUpdateDesktop(d) {
+      return (
+        'Last update: ' +
+        d.toLocaleString([], {
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      );
+    }
+
+    function formatLastUpdateMobile(d) {
+      return (
+        'Last update: ' +
+        d.toLocaleString([], {
+          year: '2-digit',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      );
+    }
     const tabRowEl = document.getElementById('tab-row');
 
     const mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
@@ -1354,19 +1425,18 @@
       .then(r => r.json())
       .then(data => {
         const rows = (data.airports || {})[pageAirport];
+        const emptyLabel = 'Last update: —';
         if (data.scraped_at_utc) {
           const d = new Date(data.scraped_at_utc);
-          lastScrapedEl.textContent =
-            'Last updated: ' +
-            d.toLocaleString([], {
-              year: 'numeric',
-              month: 'numeric',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            });
+          lastScrapedEl.textContent = formatLastUpdateDesktop(d);
+          if (lastScrapedInlineEl) {
+            lastScrapedInlineEl.textContent = formatLastUpdateMobile(d);
+          }
         } else {
-          lastScrapedEl.textContent = 'Last updated: —';
+          lastScrapedEl.textContent = emptyLabel;
+          if (lastScrapedInlineEl) {
+            lastScrapedInlineEl.textContent = emptyLabel;
+          }
         }
         if (!rows || !rows.length) {
           bootstrapMsgEl.textContent = 'No wait time data for this airport yet.';
