@@ -275,15 +275,6 @@
       gap: 0.4rem;
       margin: 0.5rem 0 0.35rem;
     }
-    .tab-row-scroll-hint {
-      display: none;
-      margin: 0;
-      padding: 0;
-      font-size: 0.72rem;
-      color: #64748b;
-      text-align: center;
-      letter-spacing: 0.02em;
-    }
     @media (max-width: 768px) {
       .tab-row-scroll {
         overflow-x: auto;
@@ -293,8 +284,6 @@
         scrollbar-width: thin;
         margin: 0.5rem 0 0.25rem;
         padding-bottom: 2px;
-        box-shadow: inset -20px 0 18px -14px rgba(248, 250, 252, 0.95),
-          inset -28px 0 24px -18px rgba(15, 23, 42, 0.12);
       }
       .tab-row-scroll::-webkit-scrollbar {
         height: 5px;
@@ -306,17 +295,19 @@
       .tab-row-scroll::-webkit-scrollbar-track {
         background: transparent;
       }
+      /* Two rows; extra terminals flow into additional columns (horizontal scroll). */
       .tab-row-scroll .tab-row {
-        flex-wrap: nowrap;
+        display: grid;
+        grid-template-rows: auto auto;
+        grid-auto-flow: column;
+        grid-auto-columns: 12rem;
+        column-gap: 0.4rem;
+        row-gap: 0.4rem;
+        align-items: stretch;
         margin: 0;
         width: max-content;
         max-width: none;
-        min-width: min(100%, max-content);
-      }
-      .tab-row-scroll-hint {
-        display: block;
-        margin-top: -0.15rem;
-        margin-bottom: 0.2rem;
+        min-width: 0;
       }
     }
     .tab-btn {
@@ -568,7 +559,6 @@
         <div class="tab-row-scroll">
           <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
         </div>
-        <p class="tab-row-scroll-hint" aria-hidden="true">Swipe sideways for more terminals</p>
         <p class="muted" id="last-scraped-at"></p>
         <div class="range-group" id="range-group">
           <button type="button" class="range-btn" data-hours="6">6H</button>
