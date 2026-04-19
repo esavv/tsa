@@ -204,7 +204,12 @@
     });
   }
 
-  var MAX_TERMINAL_CHIPS = 3;
+  function maxTerminalChipsForViewport() {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(max-width: 768px)').matches ? 2 : 3;
+    }
+    return 3;
+  }
 
   function buildTerminalChipsHtml(code, latest, catalogRows) {
     var terminals = latest && latest.airports && latest.airports[code];
@@ -218,7 +223,7 @@
     }
     var apEntry = catalogEntryForCode(catalogRows || [], code);
     var sorted = sortTerminalRows(apEntry, terminals);
-    var show = sorted.slice(0, MAX_TERMINAL_CHIPS);
+    var show = sorted.slice(0, maxTerminalChipsForViewport());
     var more = sorted.length - show.length;
     var html = '<div class="airport-search-row__chips" role="presentation">';
     html += '<div class="airport-search-row__chip-run">';
@@ -299,6 +304,17 @@
     var open = false;
     var listId = list.id || 'airport-search-results';
     var matchOrderState = { prevSetKey: null, prevOrder: [] };
+
+    var mqSearchMobile = window.matchMedia('(max-width: 768px)');
+    function onSearchViewportChange() {
+      if (!open) return;
+      refreshList();
+    }
+    if (mqSearchMobile.addEventListener) {
+      mqSearchMobile.addEventListener('change', onSearchViewportChange);
+    } else if (mqSearchMobile.addListener) {
+      mqSearchMobile.addListener(onSearchViewportChange);
+    }
 
     input.disabled = false;
     input.removeAttribute('disabled');
