@@ -400,6 +400,54 @@
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
+    /* Chart hover / scrub readout: same grid + pill layout as terminal tab chips. */
+    .chart-callout .chart-readout-grid,
+    .chart-reading-fixed .chart-readout-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+      column-gap: 0;
+      row-gap: 0.12rem;
+      width: 100%;
+      align-items: baseline;
+      margin-top: 0.08rem;
+    }
+    .chart-callout .chart-readout-lbl:nth-child(4n + 1),
+    .chart-callout .chart-readout-lbl:nth-child(4n + 3),
+    .chart-reading-fixed .chart-readout-lbl:nth-child(4n + 1),
+    .chart-reading-fixed .chart-readout-lbl:nth-child(4n + 3) {
+      margin-right: 0.1rem;
+    }
+    .chart-callout .chart-readout-val:nth-child(4n + 2),
+    .chart-reading-fixed .chart-readout-val:nth-child(4n + 2) {
+      margin-right: 0.5rem;
+    }
+    .chart-callout .chart-readout-lbl,
+    .chart-reading-fixed .chart-readout-lbl {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+      color: #334155;
+    }
+    .chart-callout .chart-readout-val,
+    .chart-reading-fixed .chart-readout-val {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      text-align: right;
+      justify-self: end;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .chart-callout .chart-readout-grid {
+      font-size: 0.78rem;
+      line-height: 1.3;
+    }
+    .chart-reading-fixed .chart-readout-grid {
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
     .range-group {
       display: flex;
       gap: 0.35rem;
@@ -440,19 +488,6 @@
       margin-bottom: 0.15rem;
       white-space: nowrap;
     }
-    .chart-reading-fixed .line2 {
-      color: #334155;
-      font-size: 0.85rem;
-      line-height: 1.35;
-      white-space: nowrap;
-    }
-    .chart-reading-fixed .line3 {
-      color: #334155;
-      font-size: 0.85rem;
-      line-height: 1.35;
-      margin-top: 0.12rem;
-      white-space: nowrap;
-    }
     .chart-callout {
       position: absolute;
       top: 8px;
@@ -465,20 +500,19 @@
       font-size: 0.8rem;
       line-height: 1.3;
       pointer-events: none;
-      white-space: nowrap;
+      white-space: normal;
       display: none;
       z-index: 10;
       border: 1px solid #dbe2ea;
       box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
+      min-width: 11rem;
     }
     .chart-callout.chart-callout--stacked {
-      white-space: normal;
+      min-width: 13.5rem;
     }
-    .chart-callout .line1,
-    .chart-callout .line2,
-    .chart-callout .line3 {
+    .chart-callout .line1 {
       white-space: nowrap;
     }
     .chart-shell.touch-chart-ui .chart-callout {
@@ -487,15 +521,6 @@
     .chart-callout .line1 {
       font-weight: 600;
       margin-bottom: 0.1rem;
-    }
-    .chart-callout .line2 {
-      color: #334155;
-      font-size: 0.78rem;
-    }
-    .chart-callout .line3 {
-      color: #334155;
-      font-size: 0.78rem;
-      margin-top: 0.1rem;
     }
     .chart-container {
       position: relative;
@@ -649,6 +674,24 @@
       });
     }
 
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /** X-axis / callout timestamp: no leading zero on single-digit hour. */
+    function formatChartAxisLabel(dateObj) {
+      return dateObj.toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    }
+
     const QUEUE_FILL_BY_TYPE = {
       general: 'rgba(37,99,235,0.1)',
       precheck: 'rgba(22,163,74,0.1)',
@@ -761,26 +804,55 @@
       calloutEl.className = 'chart-callout';
     }
 
-    function formatReadoutLine(qts, byQt) {
-      return qts
-        .map(function (qt) {
-          const v = byQt[qt];
-          return queueReadoutLabel(qt) + ': ' + (v != null ? v + ' min' : '–');
-        })
-        .join(' · ');
+    /**
+     * Terminal-tab style grid: up to two queue columns per row, labels left / values right,
+     * wait minutes in colored pills. Touch UI uses compact "12m"; desktop uses "12 min".
+     */
+    function readoutQueuesHtml(byQt, order, compactMin) {
+      const ord = order || [];
+      if (!ord.length) return '';
+      let html = '<div class="chart-readout-grid">';
+      for (let start = 0; start < ord.length; start += 2) {
+        const pair = ord.slice(start, start + 2);
+        for (let p = 0; p < 2; p++) {
+          const qt = pair[p];
+          html += '<span class="chart-readout-lbl">';
+          if (qt != null) {
+            html += escapeHtml(queueReadoutLabel(qt));
+          } else {
+            html += '\u00a0';
+          }
+          html += '</span><span class="chart-readout-val">';
+          if (qt != null) {
+            const v = byQt[qt];
+            if (v != null) {
+              const pillClass = window.waitTimePillClass(v);
+              const suffix = compactMin ? 'm' : ' min';
+              html +=
+                '<span class="' +
+                pillClass +
+                '">' +
+                escapeHtml(String(v) + suffix) +
+                '</span>';
+            } else {
+              html += '–';
+            }
+          } else {
+            html += '\u00a0';
+          }
+          html += '</span>';
+        }
+      }
+      html += '</div>';
+      return html;
     }
 
     function readoutHtml(label, byQt, order) {
-      const ord = order || [];
-      let body = '';
-      if (ord.length <= 2) {
-        body = '<div class="line2">' + formatReadoutLine(ord, byQt) + '</div>';
-      } else {
-        body =
-          '<div class="line2">' + formatReadoutLine(ord.slice(0, 2), byQt) + '</div>' +
-          '<div class="line3">' + formatReadoutLine(ord.slice(2), byQt) + '</div>';
-      }
-      return '<div class="line1">' + label + '</div>' + body;
+      const compactMin = touchChartUi();
+      return (
+        '<div class="line1">' + escapeHtml(label) + '</div>' +
+        readoutQueuesHtml(byQt, order, compactMin)
+      );
     }
 
     function readoutValuesAtIndex(chartRef, idx) {
@@ -950,14 +1022,7 @@
       });
       for (let si = 0; si < sorted.length; si++) {
         const row = sorted[si];
-        labels.push(
-          new Date(row.t).toLocaleString([], {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        );
+        labels.push(formatChartAxisLabel(new Date(row.t)));
         rawTimes.push(row.t);
       }
 
