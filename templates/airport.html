@@ -804,11 +804,6 @@
       return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
     }
 
-    /** Tooltip: matches tab chip queues (compact "6m" style). */
-    function tabWaitsTitleFragment(row) {
-      return window.airportTabQueueWaitTitle(row.queues) || '';
-    }
-
     function syncUrl() {
       const u = new URL(window.location.origin + '/' + pageAirport);
       if (selectedTerminal) u.searchParams.set('terminal', selectedTerminal);
@@ -1372,8 +1367,6 @@
         btn.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
         btn.dataset.index = String(i);
         const label = terminalTabLabel(pageAirportEntry, row.terminal, row.gate);
-        const waitFrag = tabWaitsTitleFragment(row);
-        btn.title = waitFrag ? label + ' — ' + waitFrag : label;
         const span = document.createElement('span');
         span.className = 'tab-label-short';
         span.textContent = label;

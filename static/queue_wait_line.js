@@ -3,7 +3,7 @@
  *
  * chipQueueWaitLine — plain text (tools); chipQueueWaitLineHtml — search chips with colored minute pills.
  * airportTabQueueWaitGridRows — /airport tabs: structured rows of up to 2 {label, minutes} pairs
- *   (minutes rendered as "6m" in the template). airportTabQueueWaitTitle builds a plain-text tooltip.
+ *   (minutes rendered as "6m" in the template). airportTabQueueWaitTitle builds a plain-text wait summary.
  */
 (function (global) {
   var CHIP_QUEUE_PRIORITY = ['general', 'precheck', 'clear', 'priority'];
