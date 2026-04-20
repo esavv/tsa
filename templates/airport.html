@@ -96,6 +96,7 @@
       padding: 0.55rem 0.75rem 0.6rem;
       cursor: pointer;
       border-bottom: 1px solid #eef2f7;
+      background: #fff;
     }
     .airport-search-row:last-child {
       border-bottom: none;
@@ -327,6 +328,12 @@
       }
       .airport-search-chip-more {
         text-align: left;
+      }
+      .airport-search-row--unavailable .airport-search-row__chips.airport-search-row__chips--status {
+        margin-left: 0;
+        width: 100%;
+        flex: none;
+        justify-content: center;
       }
       .airport-locale-inline-row {
         display: flex;
@@ -649,17 +656,31 @@
     }
     .airport-search-row.airport-search-row--unavailable {
       font-style: italic;
-      background: #f3f4f6;
+      background: #e5e7eb;
       color: #475569;
       cursor: not-allowed;
     }
     .airport-search-row.airport-search-row--unavailable:hover,
     .airport-search-row.airport-search-row--unavailable.is-active {
-      background: #e2e8f0;
+      background: #d1d5db;
     }
     .airport-search-row--unavailable .airport-search-code,
     .airport-search-row--unavailable .airport-search-name {
       color: #475569;
+    }
+    .airport-search-row--unavailable .airport-search-row__chips.airport-search-row__chips--status {
+      flex: 1 1 0;
+      min-width: 0;
+      margin-left: 0.75rem;
+      margin-right: 0;
+      justify-content: center;
+      align-items: center;
+    }
+    .airport-search-row--unavailable .airport-search-row__chips--status .airport-search-row__chips-msg {
+      flex: 0 1 auto;
+      font-size: 0.9rem;
+      font-weight: 500;
+      text-align: center;
     }
   </style>
 {% endblock %}

@@ -300,7 +300,7 @@
       return (
         '<div class="airport-search-row__chips airport-search-row__chips--status muted" role="presentation">' +
         '<span class="airport-search-row__chips-msg">' +
-        esc('No public wait times') +
+        esc('No data available') +
         '</span><span class="airport-search-more-slot" aria-hidden="true"></span></div>'
       );
     }
