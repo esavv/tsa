@@ -372,6 +372,11 @@
     function render() {
       var ql = input.value.trim().toLowerCase();
       var ranked = rankRows(rows, metros, ql);
+      if (!ql) {
+        ranked = ranked.filter(function (s) {
+          return (s.row.status || 'active') === 'active';
+        });
+      }
       ranked = stabilizeMatchOrder(ranked, matchOrderState);
       var slice = ranked.slice(0, maxResults);
       if (activeIndex >= slice.length) {
