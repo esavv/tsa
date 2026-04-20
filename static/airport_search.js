@@ -614,6 +614,32 @@
       if (panel.contains(t) || input === t || input.contains(t)) return;
       setOpen(false);
     });
+
+    function searchShortcutIgnoresTarget(el) {
+      if (!el) return false;
+      if (el === input) return false;
+      if (el.closest) {
+        var ce = el.closest('[contenteditable="true"]');
+        if (ce) return true;
+      }
+      var tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      return false;
+    }
+
+    document.addEventListener(
+      'keydown',
+      function (e) {
+        if (e.defaultPrevented || e.repeat) return;
+        if (e.code !== 'Slash') return;
+        if (!e.metaKey && !e.altKey) return;
+        if (searchShortcutIgnoresTarget(e.target)) return;
+        e.preventDefault();
+        input.focus();
+        openPanel();
+      },
+      true
+    );
   }
 
   window.initTsaAirportSearch = initTsaAirportSearch;
