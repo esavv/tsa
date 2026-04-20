@@ -387,6 +387,7 @@
           div.dataset.code = row.code;
           if ((row.status || 'active') !== 'active') {
             div.classList.add('airport-search-row--unavailable');
+            div.setAttribute('aria-disabled', 'true');
           }
 
           var loc = [row.city, row.state].filter(Boolean).join(', ');
@@ -411,6 +412,7 @@
 
           div.addEventListener('mousedown', function (e) {
             e.preventDefault();
+            if ((row.status || 'active') !== 'active') return;
             navigateToAirport(row.code);
           });
           list.appendChild(div);
@@ -480,10 +482,22 @@
       } else if (e.key === 'Enter') {
         if (activeIndex >= 0) {
           var row = list.querySelectorAll('.airport-search-row')[activeIndex];
-          if (row && row.dataset.code) navigateToAirport(row.dataset.code);
+          if (
+            row &&
+            row.dataset.code &&
+            !row.classList.contains('airport-search-row--unavailable')
+          ) {
+            navigateToAirport(row.dataset.code);
+          }
         } else if (n === 1) {
           var only = list.querySelector('.airport-search-row');
-          if (only && only.dataset.code) navigateToAirport(only.dataset.code);
+          if (
+            only &&
+            only.dataset.code &&
+            !only.classList.contains('airport-search-row--unavailable')
+          ) {
+            navigateToAirport(only.dataset.code);
+          }
         }
       } else if (e.key === 'Escape') {
         setOpen(false);

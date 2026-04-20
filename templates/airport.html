@@ -647,17 +647,11 @@
     .chart-bootstrap-msg {
       margin: 0.35rem 0 0.5rem;
     }
-    .airport-layout--status-no-service .tab-row-scroll,
-    .airport-layout--status-no-service #range-group,
-    .airport-layout--status-no-service #chart-shell,
-    .airport-layout--status-no-service #last-scraped-at,
-    .airport-layout--status-no-service .airport-last-update-inline {
-      display: none !important;
-    }
     .airport-search-row.airport-search-row--unavailable {
       font-style: italic;
       background: #f3f4f6;
       color: #475569;
+      cursor: not-allowed;
     }
     .airport-search-row.airport-search-row--unavailable:hover,
     .airport-search-row.airport-search-row--unavailable.is-active {
@@ -670,7 +664,7 @@
   </style>
 {% endblock %}
 {% block body %}
-  <main class="airport-layout{% if airport_status != 'active' %} airport-layout--status-no-service{% endif %}">
+  <main class="airport-layout">
     <div class="airport-cluster">
       <h1>TSA Wait Times</h1>
       <p class="muted airport-subhead">Security line wait times at major US airports</p>
@@ -726,18 +720,7 @@
             <canvas id="chart"></canvas>
           </div>
         </div>
-        <p
-          id="chart-bootstrap-msg"
-          class="chart-bootstrap-msg muted"
-          {% if airport_status == 'active' %}hidden{% endif %}
-          aria-live="polite"
-        >
-          {% if airport_status == 'coming_soon' %}
-            We're working on adding live wait times for this airport. Check back soon.
-          {% elif airport_status == 'no_data' %}
-            This airport doesn't publish security checkpoint wait times online, so we can't show a live chart.
-          {% endif %}
-        </p>
+        <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
         <div
           id="airport-search-panel"
           class="airport-search-panel airport-search-panel--chart-overlay"
@@ -752,7 +735,6 @@
   <script src="{{ url_for('static', filename='queue_wait_line.js') }}"></script>
   <script>
     const pageAirport = {{ airport | tojson }};
-    const pageAirportStatus = {{ airport_status | tojson }};
     const pageAirportEntry = {{ airport_catalog_entry | tojson }};
     const initialTerminal = {{ initial_terminal | tojson }};
     const initialGate = {{ initial_gate | tojson }};
@@ -1460,10 +1442,6 @@
     fetch('/api/latest')
       .then(r => r.json())
       .then(data => {
-        if (pageAirportStatus !== 'active') {
-          hideChartLoading();
-          return;
-        }
         const rows = (data.airports || {})[pageAirport];
         const emptyLabel = 'Last update: —';
         if (data.scraped_at_utc) {
@@ -1500,10 +1478,6 @@
         renderChart(24);
       })
       .catch(e => {
-        if (pageAirportStatus !== 'active') {
-          hideChartLoading();
-          return;
-        }
         bootstrapMsgEl.textContent = 'Error: ' + e.message;
         bootstrapMsgEl.hidden = false;
         chartShell.style.display = 'none';
