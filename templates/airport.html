@@ -26,7 +26,7 @@
       margin-bottom: 0.75rem;
     }
     .airport-search-wrap {
-      margin: 0.75rem 0 1rem;
+      margin: 0.75rem 0 0.5rem;
     }
     .airport-search-field {
       position: relative;
@@ -64,7 +64,8 @@
       position: absolute;
       left: 0;
       right: 0;
-      top: calc(100% + 2px);
+      /* Only applies when the panel is anchored under the field (not chart-overlay). */
+      top: calc(100% + 4px);
       z-index: 40;
       background: #fff;
       border: 1px solid #d0d7e2;
@@ -94,11 +95,10 @@
     }
     .airport-search-no-results {
       box-sizing: border-box;
-      min-height: 4.25rem;
+      padding: 0.55rem 0.75rem 0.6rem;
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 0.55rem 0.75rem;
+      justify-content: flex-start;
       font-size: 0.9rem;
     }
     .airport-search-row {
@@ -307,7 +307,7 @@
         margin-bottom: 0.12rem;
       }
       .airport-search-wrap {
-        margin: 0.3rem 0 0.95rem;
+        margin: 0.3rem 0 0.48rem;
       }
       .airport-page-heading {
         margin-bottom: 0.15rem;
