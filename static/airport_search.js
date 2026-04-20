@@ -383,6 +383,16 @@
         activeIndex = slice.length > 0 ? slice.length - 1 : -1;
       }
       list.innerHTML = '';
+      if (slice.length === 0) {
+        activeIndex = -1;
+        var empty = document.createElement('div');
+        empty.className = 'airport-search-no-results';
+        empty.setAttribute('role', 'status');
+        empty.innerHTML = '<span class="muted">No results</span>';
+        list.appendChild(empty);
+        highlightActive();
+        return;
+      }
       for (var i = 0; i < slice.length; i++) {
         (function (row) {
           var div = document.createElement('div');
