@@ -43,6 +43,10 @@ def airport_catalog_entry_for_js(code: str) -> dict:
     """Catalog row for the current airport; terminal_tab merged with template defaults if partial."""
     raw = dict(catalog_airport_entry(code) or {})
     raw["code"] = code
+    status = raw.get("status") or "active"
+    if status not in ("active", "no_data", "coming_soon"):
+        status = "active"
+    raw["status"] = status
     tab = dict(raw.get("terminal_tab") or {})
     merged = {**_DEFAULT_TERMINAL_TAB, **tab}
     raw["terminal_tab"] = merged
@@ -68,6 +72,12 @@ AIRPORT_CODES = frozenset(
     }
 )
 
+CATALOG_CODES = frozenset(
+    str(a.get("code", "")).strip().upper()
+    for a in AIRPORT_CATALOG.get("airports", [])
+    if a.get("code")
+)
+
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
 
 
@@ -83,22 +93,26 @@ def index():
 @app.route("/<code>")
 def airport(code: str):
     c = (code or "").strip().upper()
-    if len(c) != 3 or not c.isalpha() or c not in AIRPORT_CODES:
+    if len(c) != 3 or not c.isalpha() or c not in CATALOG_CODES:
         abort(404)
     initial_terminal = request.args.get("terminal") or ""
     initial_gate = request.args.get("gate") or ""
-    entry = catalog_airport_entry(c)
-    airport_display_name = (entry or {}).get("display_name") or c
-    city = (entry or {}).get("city") or ""
-    state = (entry or {}).get("state") or ""
+    entry = catalog_airport_entry(c) or {}
+    airport_display_name = entry.get("display_name") or c
+    city = entry.get("city") or ""
+    state = entry.get("state") or ""
     locale_bits = [x for x in (city, state) if x]
     airport_locale_line = ", ".join(locale_bits) if locale_bits else None
+    airport_status = entry.get("status") or "active"
+    if airport_status not in ("active", "no_data", "coming_soon"):
+        airport_status = "active"
     return render_template(
         "airport.html",
         airport=c,
         airport_display_name=airport_display_name,
         airport_locale_line=airport_locale_line,
         airport_catalog_entry=airport_catalog_entry_for_js(c),
+        airport_status=airport_status,
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
     )
@@ -107,7 +121,7 @@ def airport(code: str):
 @app.route("/terminal/<airport>/<terminal>")
 def terminal_redirect(airport: str, terminal: str):
     ap = (airport or "").strip().upper()
-    if ap not in AIRPORT_CODES:
+    if ap not in CATALOG_CODES:
         abort(404)
     gate = request.args.get("gate") or ""
     q = urlencode({"terminal": terminal, "gate": gate})
