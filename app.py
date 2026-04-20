@@ -72,12 +72,6 @@ AIRPORT_CODES = frozenset(
     }
 )
 
-CATALOG_CODES = frozenset(
-    str(a.get("code", "")).strip().upper()
-    for a in AIRPORT_CATALOG.get("airports", [])
-    if a.get("code")
-)
-
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
 
 
@@ -93,26 +87,24 @@ def index():
 @app.route("/<code>")
 def airport(code: str):
     c = (code or "").strip().upper()
-    if len(c) != 3 or not c.isalpha() or c not in CATALOG_CODES:
+    if len(c) != 3 or not c.isalpha():
+        abort(404)
+    entry = catalog_airport_entry(c)
+    if not entry or (entry.get("status") or "active") != "active":
         abort(404)
     initial_terminal = request.args.get("terminal") or ""
     initial_gate = request.args.get("gate") or ""
-    entry = catalog_airport_entry(c) or {}
     airport_display_name = entry.get("display_name") or c
     city = entry.get("city") or ""
     state = entry.get("state") or ""
     locale_bits = [x for x in (city, state) if x]
     airport_locale_line = ", ".join(locale_bits) if locale_bits else None
-    airport_status = entry.get("status") or "active"
-    if airport_status not in ("active", "no_data", "coming_soon"):
-        airport_status = "active"
     return render_template(
         "airport.html",
         airport=c,
         airport_display_name=airport_display_name,
         airport_locale_line=airport_locale_line,
         airport_catalog_entry=airport_catalog_entry_for_js(c),
-        airport_status=airport_status,
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
     )
@@ -121,7 +113,8 @@ def airport(code: str):
 @app.route("/terminal/<airport>/<terminal>")
 def terminal_redirect(airport: str, terminal: str):
     ap = (airport or "").strip().upper()
-    if ap not in CATALOG_CODES:
+    ent = catalog_airport_entry(ap)
+    if not ent or (ent.get("status") or "active") != "active":
         abort(404)
     gate = request.args.get("gate") or ""
     q = urlencode({"terminal": terminal, "gate": gate})
