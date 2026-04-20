@@ -6,7 +6,7 @@
   var CATALOG_URL = '/api/catalog';
   var LATEST_URL = '/api/latest';
   var LATEST_TTL_MS = 60000;
-  var DEFAULT_MAX_RESULTS = 16;
+  var DEFAULT_MAX_RESULTS = 50;
 
   var catalogPromise = null;
   var latestJson = null;
