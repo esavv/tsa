@@ -662,20 +662,23 @@
     }
     .airport-search-row.airport-search-row--unavailable {
       font-style: italic;
-      background: #e5e7eb;
+      background: #f1f5f9;
       color: #475569;
       cursor: not-allowed;
     }
-    /* Grid so the status strip truly fills the space to the right of the left column (no margin-left:auto). */
+    /*
+     * Fixed left column share so "No data…" centers in the same place for every row (ORD vs SFO),
+     * instead of centering in a variable-width auto column that shifts with the airport name length.
+     */
     .airport-search-row--unavailable .airport-search-row__main {
       display: grid;
-      grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 46%) minmax(0, 1fr);
       align-items: center;
       column-gap: 0.75rem;
     }
     .airport-search-row.airport-search-row--unavailable:hover,
     .airport-search-row.airport-search-row--unavailable.is-active {
-      background: #d1d5db;
+      background: #e8edf3;
     }
     .airport-search-row--unavailable .airport-search-code,
     .airport-search-row--unavailable .airport-search-name {
