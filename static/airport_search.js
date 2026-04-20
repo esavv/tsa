@@ -386,6 +386,26 @@
     var matchOrderState = { prevSetKey: null, prevOrder: [] };
 
     var mqSearchMobile = window.matchMedia('(max-width: 768px)');
+    var mqReduceMotion =
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    var panelCloseEnd = null;
+    var panelCloseFallbackTimer = null;
+
+    function cancelPanelCloseAnimation() {
+      if (panelCloseEnd) {
+        panel.removeEventListener('transitionend', panelCloseEnd);
+        panelCloseEnd = null;
+      }
+      if (panelCloseFallbackTimer) {
+        clearTimeout(panelCloseFallbackTimer);
+        panelCloseFallbackTimer = null;
+      }
+    }
+
+    function finishPanelClose() {
+      cancelPanelCloseAnimation();
+      panel.hidden = true;
+    }
     function onSearchViewportChange() {
       if (!open) return;
       refreshList();
@@ -407,9 +427,49 @@
 
     function setOpen(v) {
       open = v;
-      panel.hidden = !v;
       input.setAttribute('aria-expanded', v ? 'true' : 'false');
       if (!v) activeIndex = -1;
+
+      var reduceMotion = mqReduceMotion && mqReduceMotion.matches;
+      if (reduceMotion) {
+        cancelPanelCloseAnimation();
+        if (v) {
+          panel.hidden = false;
+          panel.classList.add('airport-search-panel--open');
+        } else {
+          panel.classList.remove('airport-search-panel--open');
+          panel.hidden = true;
+        }
+        return;
+      }
+
+      if (v) {
+        cancelPanelCloseAnimation();
+        panel.hidden = false;
+        panel.classList.remove('airport-search-panel--open');
+        void panel.offsetWidth;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            panel.classList.add('airport-search-panel--open');
+          });
+        });
+        return;
+      }
+
+      if (panel.hidden) return;
+      if (panelCloseEnd) return;
+      if (!panel.classList.contains('airport-search-panel--open')) {
+        panel.hidden = true;
+        return;
+      }
+      panel.classList.remove('airport-search-panel--open');
+      panelCloseEnd = function (e) {
+        if (e.target !== panel) return;
+        if (e.propertyName !== 'clip-path') return;
+        finishPanelClose();
+      };
+      panel.addEventListener('transitionend', panelCloseEnd);
+      panelCloseFallbackTimer = setTimeout(finishPanelClose, 400);
     }
 
     function openPanel() {

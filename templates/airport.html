@@ -91,6 +91,21 @@
       z-index: 50;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
       overflow-y: auto;
+      /* Top-anchored reveal (no opacity); tune via --airport-search-panel-reveal-* */
+      --airport-search-panel-reveal-duration: 0.18s;
+      --airport-search-panel-reveal-ease: linear;
+      clip-path: inset(0 0 100% 0);
+      transition: clip-path var(--airport-search-panel-reveal-duration)
+        var(--airport-search-panel-reveal-ease);
+    }
+    .airport-below-search
+      > .airport-search-panel.airport-search-panel--chart-overlay.airport-search-panel--open {
+      clip-path: inset(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
+        transition: none;
+      }
     }
     .airport-search-results {
       padding: 0.25rem 0;
