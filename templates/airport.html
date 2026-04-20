@@ -26,7 +26,7 @@
       margin-bottom: 0.75rem;
     }
     .airport-search-wrap {
-      margin: 0.75rem 0 0.5rem;
+      margin: 0.75rem 0 1rem;
     }
     .airport-search-field {
       position: relative;
@@ -80,7 +80,9 @@
     .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
       left: 0;
       right: 0;
-      top: 0;
+      /* Pull up into the margin below the search field so the dropdown sits closer to the
+         input without changing .airport-search-wrap margins (which set space to the title). */
+      top: -0.5rem;
       bottom: auto;
       height: auto;
       max-height: 100%;
@@ -307,7 +309,7 @@
         margin-bottom: 0.12rem;
       }
       .airport-search-wrap {
-        margin: 0.3rem 0 0.48rem;
+        margin: 0.3rem 0 0.95rem;
       }
       .airport-page-heading {
         margin-bottom: 0.15rem;
