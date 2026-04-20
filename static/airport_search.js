@@ -1,5 +1,6 @@
 /**
- * Airport catalog search: substring match + tiered ranking (no fuzzy/typo handling).
+ * Airport catalog search: IATA code substring + tiered ranking on other fields
+ * (per-word prefix only; no mid-token substring). No fuzzy/typo handling.
  * Expects /api/catalog (metros + airports) and uses /api/latest for row wait summaries.
  */
 (function () {
@@ -36,13 +37,24 @@
     });
   }
 
+  /** Split for prefix matching (whitespace and common separators between tokens). */
+  function splitSearchWords(s) {
+    return String(s)
+      .toLowerCase()
+      .split(/[\s\-–—,/]+/)
+      .filter(function (w) {
+        return w.length > 0;
+      });
+  }
+
   /**
+   * IATA and similar codes: substring anywhere in the code string.
    * @param {string} hay
    * @param {string} ql normalized query
    * @param {number} tier lower = stronger field (code < display < …)
    * @returns {number} Infinity if no match
    */
-  function matchScore(hay, ql, tier) {
+  function matchScoreCode(hay, ql, tier) {
     if (!ql) return 0;
     if (hay == null || hay === '') return Infinity;
     var h = String(hay).toLowerCase();
@@ -51,6 +63,48 @@
     var i = h.indexOf(ql);
     if (i < 0) return Infinity;
     return tier + 20 + i;
+  }
+
+  /**
+   * Names, cities, aliases: each query word must prefix some hay word, in order
+   * (subsequence over token list). No substring matches inside a token.
+   * @returns {number} Infinity if no match
+   */
+  function matchScoreWordPrefix(hay, ql, tier) {
+    if (!ql) return 0;
+    if (hay == null || hay === '') return Infinity;
+    var h = String(hay).toLowerCase();
+    if (h === ql) return tier;
+    if (h.startsWith(ql)) return tier + 2;
+
+    var qWords = splitSearchWords(ql);
+    if (qWords.length === 0) return Infinity;
+    var hayWords = splitSearchWords(h);
+    if (hayWords.length === 0) return Infinity;
+
+    if (qWords.length === 1) {
+      var q1 = qWords[0];
+      var best = Infinity;
+      for (var wi = 0; wi < hayWords.length; wi++) {
+        var w = hayWords[wi];
+        if (w === q1) best = Math.min(best, tier + 15);
+        else if (w.startsWith(q1)) best = Math.min(best, tier + 25 + wi * 2);
+      }
+      return best;
+    }
+
+    var qi = 0;
+    var score = tier + 35;
+    for (var hi = 0; hi < hayWords.length && qi < qWords.length; hi++) {
+      var hw = hayWords[hi];
+      var qw = qWords[qi];
+      if (hw === qw || hw.startsWith(qw)) {
+        score += hi * 2 + qi * 3 + (hw === qw ? 0 : 1);
+        qi++;
+      }
+    }
+    if (qi < qWords.length) return Infinity;
+    return score;
   }
 
   function minScore(scores) {
@@ -69,29 +123,29 @@
   function airportScore(ap, metros, ql) {
     if (!ql) return 0;
     var scores = [];
-    scores.push(matchScore(ap.code, ql, 0));
-    scores.push(matchScore(ap.display_name, ql, 200));
-    if (ap.city) scores.push(matchScore(ap.city, ql, 400));
-    if (ap.state) scores.push(matchScore(ap.state, ql, 500));
-    if (ap.state_name) scores.push(matchScore(ap.state_name, ql, 500));
+    scores.push(matchScoreCode(ap.code, ql, 0));
+    scores.push(matchScoreWordPrefix(ap.display_name, ql, 200));
+    if (ap.city) scores.push(matchScoreWordPrefix(ap.city, ql, 400));
+    if (ap.state) scores.push(matchScoreWordPrefix(ap.state, ql, 500));
+    if (ap.state_name) scores.push(matchScoreWordPrefix(ap.state_name, ql, 500));
     if (ap.city && ap.state) {
-      scores.push(matchScore(ap.city + ' ' + ap.state, ql, 420));
-      scores.push(matchScore(ap.city + ', ' + ap.state, ql, 420));
+      scores.push(matchScoreWordPrefix(ap.city + ' ' + ap.state, ql, 420));
+      scores.push(matchScoreWordPrefix(ap.city + ', ' + ap.state, ql, 420));
     }
     if (ap.city && ap.state_name) {
-      scores.push(matchScore(ap.city + ' ' + ap.state_name, ql, 420));
-      scores.push(matchScore(ap.city + ', ' + ap.state_name, ql, 420));
+      scores.push(matchScoreWordPrefix(ap.city + ' ' + ap.state_name, ql, 420));
+      scores.push(matchScoreWordPrefix(ap.city + ', ' + ap.state_name, ql, 420));
     }
     var aliases = ap.aliases || [];
     for (var a = 0; a < aliases.length; a++) {
-      scores.push(matchScore(aliases[a], ql, 600));
+      scores.push(matchScoreWordPrefix(aliases[a], ql, 600));
     }
     if (ap.metro_key && metros[ap.metro_key]) {
       var m = metros[ap.metro_key];
-      scores.push(matchScore(m.display_name, ql, 800));
+      scores.push(matchScoreWordPrefix(m.display_name, ql, 800));
       var ma = m.search_aliases || [];
       for (var b = 0; b < ma.length; b++) {
-        scores.push(matchScore(ma[b], ql, 800));
+        scores.push(matchScoreWordPrefix(ma[b], ql, 800));
       }
     }
     return minScore(scores);
