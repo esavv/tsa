@@ -114,6 +114,10 @@
           terminalTab[tk] = tt[tk];
         }
       }
+      var st = ap.status || 'active';
+      if (st !== 'active' && st !== 'no_data' && st !== 'coming_soon') {
+        st = 'active';
+      }
       out.push({
         code: ap.code,
         display_name: ap.display_name,
@@ -124,6 +128,7 @@
         metro_label: metroLabel,
         aliases: ap.aliases || [],
         terminal_tab: terminalTab,
+        status: st,
       });
     }
     out.sort(function (a, b) {
@@ -281,6 +286,27 @@
       .replace(/"/g, '&quot;');
   }
 
+  function searchChipsHtmlForRow(row, latest, catalogRows) {
+    var st = row.status || 'active';
+    if (st === 'coming_soon') {
+      return (
+        '<div class="airport-search-row__chips airport-search-row__chips--status muted" role="presentation">' +
+        '<span class="airport-search-row__chips-msg">' +
+        esc('Coming soon') +
+        '</span><span class="airport-search-more-slot" aria-hidden="true"></span></div>'
+      );
+    }
+    if (st === 'no_data') {
+      return (
+        '<div class="airport-search-row__chips airport-search-row__chips--status muted" role="presentation">' +
+        '<span class="airport-search-row__chips-msg">' +
+        esc('No public wait times') +
+        '</span><span class="airport-search-more-slot" aria-hidden="true"></span></div>'
+      );
+    }
+    return buildTerminalChipsHtml(row.code, latest, catalogRows);
+  }
+
   function navigateToAirport(code) {
     window.location.href = '/' + encodeURIComponent(code);
   }
@@ -359,6 +385,9 @@
           div.setAttribute('role', 'option');
           div.id = listId + '-opt-' + i;
           div.dataset.code = row.code;
+          if ((row.status || 'active') !== 'active') {
+            div.classList.add('airport-search-row--unavailable');
+          }
 
           var loc = [row.city, row.state].filter(Boolean).join(', ');
           var meta = loc || '';
@@ -377,7 +406,7 @@
               ? '<div class="airport-search-row__meta muted">' + esc(meta) + '</div>'
               : '') +
             '</div>' +
-            buildTerminalChipsHtml(row.code, latestJson, rows) +
+            searchChipsHtmlForRow(row, latestJson, rows) +
             '</div>';
 
           div.addEventListener('mousedown', function (e) {
