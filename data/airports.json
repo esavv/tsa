@@ -41,6 +41,25 @@
       "status": "active"
     },
     {
+      "code": "BOS",
+      "status": "no_data",
+      "display_name": "Boston Logan International Airport",
+      "metro_key": null,
+      "city": "Boston",
+      "state": "MA",
+      "state_name": "Massachusetts",
+      "terminal_tab": null,
+      "aliases": [
+        "bos",
+        "logan",
+        "logan airport",
+        "boston airport",
+        "boston logan"
+      ],
+      "wait_times_url": null,
+      "api_url": null
+    },
+    {
       "code": "CLT",
       "display_name": "Charlotte Douglas International Airport",
       "metro_key": null,
@@ -154,6 +173,24 @@
       "wait_times_url": "https://www.newarkairport.com/",
       "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR",
       "status": "active"
+    },
+    {
+      "code": "FLL",
+      "status": "no_data",
+      "display_name": "Fort Lauderdale-Hollywood International Airport",
+      "metro_key": null,
+      "city": "Fort Lauderdale",
+      "state": "FL",
+      "state_name": "Florida",
+      "terminal_tab": null,
+      "aliases": [
+        "fll",
+        "fort lauderdale airport",
+        "fort lauderdale hollywood",
+        "hollywood florida airport"
+      ],
+      "wait_times_url": null,
+      "api_url": null
     },
     {
       "code": "JFK",
