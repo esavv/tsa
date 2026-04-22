@@ -38,11 +38,11 @@
       ],
       "wait_times_url": "https://www.atl.com/times/",
       "api_url": null,
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "BOS",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "Boston Logan International Airport",
       "metro_key": null,
       "city": "Boston",
@@ -79,7 +79,7 @@
       ],
       "wait_times_url": "https://www.cltairport.com/airport-info/security/",
       "api_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT",
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "DCA",
@@ -107,7 +107,7 @@
       ],
       "wait_times_url": "https://www.flyreagan.com/security-wait-times",
       "api_url": null,
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "DEN",
@@ -128,7 +128,7 @@
       ],
       "wait_times_url": "https://www.flydenver.com/security/",
       "api_url": "https://app.flyfruition.com/api/public/tsa",
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "DFW",
@@ -149,7 +149,7 @@
       ],
       "wait_times_url": "https://www.dfwairport.com/security/",
       "api_url": "https://api.dfwairport.mobi/wait-times/checkpoint/DFW",
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "EWR",
@@ -176,7 +176,7 @@
     },
     {
       "code": "FLL",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "Fort Lauderdale-Hollywood International Airport",
       "metro_key": null,
       "city": "Fort Lauderdale",
@@ -236,7 +236,7 @@
       ],
       "wait_times_url": "https://www.harryreidairport.com/security-wait-times",
       "api_url": null,
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "LAX",
@@ -258,7 +258,7 @@
       ],
       "wait_times_url": "https://www.flylax.com/wait-times",
       "api_url": null,
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "LGA",
@@ -301,7 +301,7 @@
       ],
       "wait_times_url": "https://flymco.com/security/",
       "api_url": "https://api.goaa.aero/wait-times/checkpoint/MCO",
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "MIA",
@@ -322,11 +322,11 @@
       ],
       "wait_times_url": "https://www.miami-airport.com/tsa-waittimes.asp",
       "api_url": null,
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "ORD",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "Chicago O'Hare International Airport",
       "metro_key": null,
       "city": "Chicago",
@@ -365,7 +365,7 @@
       ],
       "wait_times_url": "https://www.skyharbor.com/",
       "api_url": "https://api.phx.aero/avn-wait-times/raw",
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "SEA",
@@ -388,11 +388,11 @@
       ],
       "wait_times_url": "https://www.portseattle.org/page/live-estimated-checkpoint-wait-times",
       "api_url": "https://www.portseattle.org/api/cwt/wait-times",
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "SFO",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "San Francisco International Airport",
       "metro_key": null,
       "city": "San Francisco",

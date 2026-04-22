@@ -5,8 +5,6 @@ import os
 import sqlite3
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-from urllib.parse import urlencode
-
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +30,17 @@ def catalog_airport_entry(code: str) -> Optional[dict]:
     return None
 
 
+def airport_catalog_status(code: str) -> str:
+    ent = catalog_airport_entry(code)
+    if not ent:
+        return "active"
+    return ent.get("status") or "active"
+
+
+def is_hidden_airport(code: str) -> bool:
+    return airport_catalog_status(code) == "hidden"
+
+
 _DEFAULT_TERMINAL_TAB = {
     "ignore_gate": False,
     "without_gate": "Terminal {terminal}",
@@ -44,7 +53,7 @@ def airport_catalog_entry_for_js(code: str) -> dict:
     raw = dict(catalog_airport_entry(code) or {})
     raw["code"] = code
     status = raw.get("status") or "active"
-    if status not in ("active", "no_data", "coming_soon"):
+    if status not in ("active", "no_data", "coming_soon", "hidden"):
         status = "active"
     raw["status"] = status
     tab = dict(raw.get("terminal_tab") or {})
@@ -110,21 +119,16 @@ def airport(code: str):
     )
 
 
-@app.route("/terminal/<airport>/<terminal>")
-def terminal_redirect(airport: str, terminal: str):
-    ap = (airport or "").strip().upper()
-    ent = catalog_airport_entry(ap)
-    if not ent or (ent.get("status") or "active") != "active":
-        abort(404)
-    gate = request.args.get("gate") or ""
-    q = urlencode({"terminal": terminal, "gate": gate})
-    return redirect(f"/{ap}?{q}", code=301)
-
-
 @app.route("/api/catalog")
 def api_catalog():
     """Airport + metro metadata for client-side search (see data/airports.json)."""
-    return jsonify(AIRPORT_CATALOG)
+    payload = dict(AIRPORT_CATALOG)
+    payload["airports"] = [
+        ap
+        for ap in AIRPORT_CATALOG.get("airports", [])
+        if not is_hidden_airport(ap.get("code") or "")
+    ]
+    return jsonify(payload)
 
 
 @app.route("/api/latest")
@@ -202,6 +206,10 @@ def api_latest():
             for (t, g), d in sorted(terms.items(), key=lambda item: (item[0][0], item[0][1]))
         ]
 
+    result = {
+        k: v for k, v in result.items() if not is_hidden_airport(k)
+    }
+
     return jsonify(scraped_at_utc=scraped_at_utc, airports=result)
 
 
@@ -212,6 +220,10 @@ def api_history():
     terminal = request.args.get("terminal")
     if not airport or not terminal:
         return jsonify(error="airport and terminal required"), 400
+
+    ap = (airport or "").strip().upper()
+    if len(ap) == 3 and ap.isalpha() and is_hidden_airport(ap):
+        abort(404)
 
     gate = request.args.get("gate") or ""
 
@@ -233,7 +245,7 @@ def api_history():
         ORDER BY scraped_at_utc DESC
         LIMIT 1
         """,
-        (airport, terminal, gate),
+        (ap, terminal, gate),
     )
     latest_row = cur.fetchone()
     latest_scraped_at_utc = latest_row[0] if latest_row else None
@@ -245,7 +257,7 @@ def api_history():
         WHERE airport = ? AND terminal = ? AND gate = ? AND scraped_at_utc >= ?
         ORDER BY scraped_at_utc
         """,
-        (airport, terminal, gate, since),
+        (ap, terminal, gate, since),
     )
     rows = cur.fetchall()
     conn.close()
