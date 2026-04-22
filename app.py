@@ -1,12 +1,76 @@
 #!/usr/bin/env python3
 """Simple webapp: latest wait times + 24h terminal history charts."""
+import json
 import os
 import sqlite3
+from typing import Optional
 from datetime import datetime, timezone, timedelta
-from flask import Flask, render_template, jsonify, request
+from urllib.parse import urlencode
+
+from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("TSA_DB_PATH", os.path.join(APP_DIR, "tsa.db"))
+CATALOG_PATH = os.path.join(APP_DIR, "data", "airports.json")
+
+
+def load_airport_catalog():
+    with open(CATALOG_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+try:
+    AIRPORT_CATALOG = load_airport_catalog()
+except (OSError, json.JSONDecodeError):
+    AIRPORT_CATALOG = {"metros": {}, "airports": []}
+
+
+def catalog_airport_entry(code: str) -> Optional[dict]:
+    for ap in AIRPORT_CATALOG.get("airports", []):
+        if ap.get("code") == code:
+            return ap
+    return None
+
+
+_DEFAULT_TERMINAL_TAB = {
+    "ignore_gate": False,
+    "without_gate": "Terminal {terminal}",
+    "with_gate": "Terminal {terminal}: Gates {gate}",
+}
+
+
+def airport_catalog_entry_for_js(code: str) -> dict:
+    """Catalog row for the current airport; terminal_tab merged with template defaults if partial."""
+    raw = dict(catalog_airport_entry(code) or {})
+    raw["code"] = code
+    status = raw.get("status") or "active"
+    if status not in ("active", "no_data", "coming_soon"):
+        status = "active"
+    raw["status"] = status
+    tab = dict(raw.get("terminal_tab") or {})
+    merged = {**_DEFAULT_TERMINAL_TAB, **tab}
+    raw["terminal_tab"] = merged
+    return raw
+
+# Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
+AIRPORT_CODES = frozenset(
+    {
+        "LGA",
+        "JFK",
+        "EWR",
+        "LAX",
+        "MIA",
+        "SEA",
+        "DCA",
+        "ATL",
+        "DFW",
+        "DEN",
+        "CLT",
+        "LAS",
+        "MCO",
+        "PHX",
+    }
+)
 
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
 
@@ -17,18 +81,55 @@ def get_db():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return redirect(url_for("airport", code="JFK"), code=302)
+
+
+@app.route("/<code>")
+def airport(code: str):
+    c = (code or "").strip().upper()
+    if len(c) != 3 or not c.isalpha():
+        abort(404)
+    entry = catalog_airport_entry(c)
+    if not entry or (entry.get("status") or "active") != "active":
+        abort(404)
+    initial_terminal = request.args.get("terminal") or ""
+    initial_gate = request.args.get("gate") or ""
+    airport_display_name = entry.get("display_name") or c
+    city = entry.get("city") or ""
+    state = entry.get("state") or ""
+    locale_bits = [x for x in (city, state) if x]
+    airport_locale_line = ", ".join(locale_bits) if locale_bits else None
+    return render_template(
+        "airport.html",
+        airport=c,
+        airport_display_name=airport_display_name,
+        airport_locale_line=airport_locale_line,
+        airport_catalog_entry=airport_catalog_entry_for_js(c),
+        initial_terminal=initial_terminal,
+        initial_gate=initial_gate,
+    )
 
 
 @app.route("/terminal/<airport>/<terminal>")
-def terminal_detail(airport: str, terminal: str):
+def terminal_redirect(airport: str, terminal: str):
+    ap = (airport or "").strip().upper()
+    ent = catalog_airport_entry(ap)
+    if not ent or (ent.get("status") or "active") != "active":
+        abort(404)
     gate = request.args.get("gate") or ""
-    return render_template("terminal.html", airport=airport, terminal=terminal, gate=gate)
+    q = urlencode({"terminal": terminal, "gate": gate})
+    return redirect(f"/{ap}?{q}", code=301)
+
+
+@app.route("/api/catalog")
+def api_catalog():
+    """Airport + metro metadata for client-side search (see data/airports.json)."""
+    return jsonify(AIRPORT_CATALOG)
 
 
 @app.route("/api/latest")
 def api_latest():
-    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue."""
+    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue_type."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -50,21 +151,18 @@ def api_latest():
         (scraped_at_utc,),
     )
     rows = cur.fetchall()
-    airports = {}
+    airports: dict[str, dict[tuple[str, str], dict]] = {}
     for airport, terminal, gate, queue_type, wait_minutes in rows:
         if airport not in airports:
             airports[airport] = {}
         g = gate or ""
         key = (terminal, g)
         if key not in airports[airport]:
-            airports[airport][key] = {
-                "general": None,
-                "precheck": None,
-                "spark_general": [],
-                "spark_precheck": [],
-            }
-        slot = "general" if queue_type == "general" else "precheck"
-        airports[airport][key][slot] = wait_minutes
+            airports[airport][key] = {"queues": {}}
+        slot = airports[airport][key]["queues"]
+        if queue_type not in slot:
+            slot[queue_type] = {"minutes": None, "spark": []}
+        slot[queue_type]["minutes"] = wait_minutes
 
     since_6h = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
@@ -86,8 +184,10 @@ def api_latest():
         key = (terminal, g)
         if airport not in airports or key not in airports[airport]:
             continue
-        series_key = "spark_general" if queue_type == "general" else "spark_precheck"
-        airports[airport][key][series_key].append(
+        queues = airports[airport][key]["queues"]
+        if queue_type not in queues:
+            queues[queue_type] = {"minutes": None, "spark": []}
+        queues[queue_type]["spark"].append(
             {"t": scraped_at_utc, "minutes": wait_minutes}
         )
 
@@ -97,10 +197,7 @@ def api_latest():
             {
                 "terminal": t,
                 "gate": g,
-                "general": d["general"],
-                "precheck": d["precheck"],
-                "spark_general": d["spark_general"],
-                "spark_precheck": d["spark_precheck"],
+                "queues": d["queues"],
             }
             for (t, g), d in sorted(terms.items(), key=lambda item: (item[0][0], item[0][1]))
         ]
@@ -110,7 +207,7 @@ def api_latest():
 
 @app.route("/api/history")
 def api_history():
-    """History for one airport + terminal (+ optional gate). Query: airport, terminal, hours, gate."""
+    """History for one airport + terminal (+ optional gate). Returns queues keyed by queue_type."""
     airport = request.args.get("airport")
     terminal = request.args.get("terminal")
     if not airport or not terminal:
@@ -153,18 +250,15 @@ def api_history():
     rows = cur.fetchall()
     conn.close()
 
-    general = []
-    precheck = []
+    queues: dict[str, list[dict]] = {}
     for scraped_at_utc, queue_type, wait_minutes in rows:
         point = {"t": scraped_at_utc, "minutes": wait_minutes}
-        if queue_type == "general":
-            general.append(point)
-        else:
-            precheck.append(point)
+        if queue_type not in queues:
+            queues[queue_type] = []
+        queues[queue_type].append(point)
 
     return jsonify(
-        general=general,
-        precheck=precheck,
+        queues=queues,
         latest_scraped_at_utc=latest_scraped_at_utc,
     )
 

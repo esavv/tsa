@@ -1,0 +1,1543 @@
+{% extends "base.html" %}
+{% block title %}TSA Wait Times for US Airports{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    main.airport-layout {
+      width: 100%;
+    }
+    .airport-cluster {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .airport-layout,
+    .chart-shell,
+    .chart-container {
+      width: 100%;
+      max-width: 100%;
+    }
+    .airport-cluster > h1 {
+      margin-bottom: 0.25rem;
+      line-height: 1.15;
+    }
+    .airport-subhead {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+    }
+    .airport-search-wrap {
+      margin: 0.75rem 0 1rem;
+    }
+    .airport-search-field {
+      position: relative;
+      max-width: min(30rem, 100%);
+    }
+    .airport-search__icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 1.125rem;
+      height: 1.125rem;
+      color: #64748b;
+      pointer-events: none;
+    }
+    .airport-search__icon svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .airport-search {
+      width: 100%;
+      max-width: 100%;
+      padding: 0.45rem 0.65rem 0.45rem 2.45rem;
+      font-size: 0.95rem;
+      border: 1px solid #ccc;
+      border-radius: 9999px;
+      background: #f9fafb;
+      color: #0f172a;
+    }
+    .airport-search::placeholder {
+      color: #64748b;
+    }
+    .airport-search-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 40;
+      background: #fff;
+      border: 1px solid #d0d7e2;
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      max-height: min(340px, 55vh);
+      overflow-y: auto;
+    }
+    .airport-below-search {
+      position: relative;
+    }
+    .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: auto;
+      height: auto;
+      max-height: 100%;
+      margin: 0;
+      border-radius: 10px;
+      z-index: 50;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+      overflow-y: auto;
+    }
+    .airport-search-results {
+      padding: 0.25rem 0;
+    }
+    .airport-search-row {
+      padding: 0.55rem 0.75rem 0.6rem;
+      cursor: pointer;
+      border-bottom: 1px solid #eef2f7;
+      background: #fff;
+    }
+    .airport-search-row:last-child {
+      border-bottom: none;
+    }
+    .airport-search-row:hover,
+    .airport-search-row.is-active {
+      background: #e2e8f0;
+    }
+    .airport-search-row__top {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .airport-search-code {
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.04em;
+      color: #0f172a;
+      flex-shrink: 0;
+    }
+    .airport-search-name {
+      font-size: 0.9rem;
+      color: #1e293b;
+      line-height: 1.3;
+    }
+    .airport-search-row__meta {
+      font-size: 0.78rem;
+      margin-top: 0.2rem;
+      line-height: 1.35;
+    }
+    .airport-search-row__main {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0.55rem 1rem;
+      width: 100%;
+    }
+    .airport-search-row__left {
+      flex: 1 1 12rem;
+      min-width: 0;
+    }
+    .airport-search-row__chips {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 0.15rem;
+      flex: 0 1 auto;
+      margin-left: auto;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .airport-search-row__chip-run {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: stretch;
+      justify-content: flex-end;
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+    .airport-search-more-slot {
+      box-sizing: border-box;
+      flex: 0 0 1.75rem;
+      width: 1.75rem;
+      min-width: 1.75rem;
+      max-width: 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      align-self: stretch;
+    }
+    .airport-search-row__chips--empty {
+      align-items: center;
+      flex-wrap: nowrap;
+      width: 100%;
+      max-width: 100%;
+    }
+    .airport-search-row__chips-msg {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 0.78rem;
+      font-weight: 400;
+      text-align: left;
+    }
+    .airport-search-chip {
+      box-sizing: border-box;
+      width: 10rem;
+      min-width: 10rem;
+      max-width: 10rem;
+      flex-shrink: 0;
+      border: 1px solid #d0d7e2;
+      border-radius: 10px;
+      background: #fff;
+      padding: 0.28rem 0.48rem 0.32rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+    .airport-search-chip__label {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #334155;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .airport-search-chip__waits {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      font-size: 0.65rem;
+      line-height: 1.25;
+      font-weight: 400;
+      color: #64748b;
+    }
+    .airport-search-chip__wait-line {
+      display: block;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .airport-search-chip__wait--empty {
+      color: #94a3b8;
+    }
+    .airport-search-chip-more {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      line-height: 1.2;
+      pointer-events: none;
+    }
+    .airport-page-heading {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1e293b;
+      line-height: 1.3;
+    }
+    .airport-page-heading__locale {
+      font-size: 0.78rem;
+      line-height: 1.35;
+      font-weight: 400;
+    }
+    .airport-locale-inline-row {
+      font-size: 0.78rem;
+      line-height: 1.35;
+      margin-top: 0.2rem;
+    }
+    .airport-locale-inline-row .airport-page-heading__locale {
+      display: block;
+    }
+    .airport-last-update-inline {
+      display: none;
+    }
+    /* Desktop: hide whole row when no city/state (last update stays below tabs). */
+    .airport-locale-inline-row--solo {
+      display: none;
+    }
+    #last-scraped-at {
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+    .tab-row-scroll {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .tab-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 0.4rem;
+      margin: 0.5rem 0 0.35rem;
+    }
+    @media (max-width: 768px) {
+      .airport-subhead {
+        display: none;
+      }
+      .airport-cluster > h1 {
+        font-size: 1.35rem;
+        margin-bottom: 0.12rem;
+      }
+      .airport-search-wrap {
+        margin: 0.3rem 0 0.95rem;
+      }
+      .airport-page-heading {
+        margin-bottom: 0.15rem;
+      }
+      .airport-search-row__main {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.45rem;
+      }
+      .airport-search-row__left {
+        flex: none;
+        width: 100%;
+      }
+      .airport-search-row__chips {
+        margin-left: 0;
+        align-self: stretch;
+        justify-content: flex-start;
+        width: 100%;
+        max-width: 100%;
+        gap: 0.5rem;
+      }
+      .airport-search-row__chip-run {
+        justify-content: flex-start;
+      }
+      .airport-search-more-slot {
+        justify-content: flex-start;
+      }
+      .airport-search-chip-more {
+        text-align: left;
+      }
+      .airport-search-row--unavailable .airport-search-row__main {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .airport-search-row--unavailable .airport-search-row__chips.airport-search-row__chips--status {
+        margin-left: 0;
+        width: 100%;
+        flex: none;
+        justify-content: center;
+        align-self: stretch;
+      }
+      .airport-locale-inline-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin-top: 0;
+        margin-bottom: 0.35rem;
+      }
+      .airport-locale-inline-row--solo {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .airport-locale-inline-row .airport-page-heading__locale {
+        margin-top: 0;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .airport-last-update-inline {
+        display: block;
+        flex: 0 0 auto;
+        text-align: right;
+        white-space: nowrap;
+      }
+      #last-scraped-at {
+        display: none;
+      }
+      .tab-row-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+        margin: 0.5rem 0 0.25rem;
+        padding-bottom: 2px;
+      }
+      .tab-row-scroll::-webkit-scrollbar {
+        height: 5px;
+      }
+      .tab-row-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+      }
+      .tab-row-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      /* Two rows; extra terminals flow into additional columns (horizontal scroll). */
+      .tab-row-scroll .tab-row {
+        display: grid;
+        grid-template-rows: auto auto;
+        grid-auto-flow: column;
+        grid-auto-columns: 12.5rem;
+        column-gap: 0.4rem;
+        row-gap: 0.4rem;
+        align-items: stretch;
+        margin: 0;
+        width: max-content;
+        max-width: none;
+        min-width: 0;
+      }
+    }
+    .tab-btn {
+      box-sizing: border-box;
+      border: 1px solid #d0d7e2;
+      border-radius: 12px;
+      background: #fff;
+      color: #334155;
+      font-size: 0.8rem;
+      padding: 0.45rem 0.55rem 0.5rem;
+      cursor: pointer;
+      text-align: left;
+      line-height: 1.25;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.2rem;
+      width: 12rem;
+      min-width: 12rem;
+      max-width: 12rem;
+      flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+      /* Must follow base .tab-btn so widths apply; wider chips fill grid tracks (gap stays 0.4rem). */
+      .tab-row-scroll .tab-btn {
+        width: 12.5rem;
+        min-width: 12.5rem;
+        max-width: 12.5rem;
+      }
+    }
+    .tab-btn.active {
+      background: #1f2937;
+      color: #fff;
+      border-color: #1f2937;
+    }
+    .tab-btn .tab-label-short {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .tab-btn .tab-waits {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      font-size: 0.72rem;
+      line-height: 1.3;
+      font-weight: 400;
+      color: #64748b;
+    }
+    .tab-btn.active .tab-waits {
+      color: rgba(226, 232, 240, 0.95);
+    }
+    /* One grid for all queue rows so time columns line up (label | val | label | val). */
+    .tab-btn .tab-wait-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+      column-gap: 0;
+      row-gap: 0.12rem;
+      width: 100%;
+      align-items: baseline;
+    }
+    /* Tight label → time; keep wider space between first time and second label (pair gap). */
+    .tab-btn .tab-wait-lbl:nth-child(4n + 1),
+    .tab-btn .tab-wait-lbl:nth-child(4n + 3) {
+      margin-right: 0.1rem;
+    }
+    .tab-btn .tab-wait-val:nth-child(4n + 2) {
+      margin-right: 0.5rem;
+    }
+    .tab-btn .tab-wait-lbl {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .tab-btn .tab-wait-val {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      text-align: right;
+      justify-self: end;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Chart hover / scrub readout: label|value pairs; max-content cols (not 1fr) so readout
+       does not stretch to full width on mobile or shrink-wrap oddly on desktop abspos. */
+    .chart-callout .chart-readout-grid,
+    .chart-reading-fixed .chart-readout-grid {
+      display: grid;
+      grid-template-columns: max-content auto max-content auto;
+      column-gap: 0;
+      row-gap: 0.12rem;
+      align-items: baseline;
+      margin-top: 0.08rem;
+    }
+    .chart-callout .chart-readout-grid {
+      width: auto;
+    }
+    .chart-reading-fixed .chart-readout-grid {
+      width: max-content;
+      max-width: 100%;
+    }
+    .chart-callout .chart-readout-lbl:nth-child(4n + 1),
+    .chart-callout .chart-readout-lbl:nth-child(4n + 3),
+    .chart-reading-fixed .chart-readout-lbl:nth-child(4n + 1),
+    .chart-reading-fixed .chart-readout-lbl:nth-child(4n + 3) {
+      margin-right: 0.1rem;
+    }
+    .chart-callout .chart-readout-val:nth-child(4n + 2) {
+      margin-right: 0.5rem;
+    }
+    .chart-reading-fixed .chart-readout-val:nth-child(4n + 2) {
+      margin-right: 0.28rem;
+    }
+    .chart-callout .chart-readout-lbl,
+    .chart-reading-fixed .chart-readout-lbl {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+      color: #334155;
+    }
+    .chart-callout .chart-readout-val,
+    .chart-reading-fixed .chart-readout-val {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      text-align: right;
+      justify-self: end;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .chart-callout .chart-readout-grid {
+      font-size: 0.78rem;
+      line-height: 1.3;
+    }
+    .chart-reading-fixed .chart-readout-grid {
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    .range-group {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-bottom: 0.5rem;
+    }
+    .range-btn {
+      border: 1px solid #d0d7e2;
+      border-radius: 999px;
+      background: #fff;
+      color: #334155;
+      font-size: 0.8rem;
+      padding: 0.25rem 0.6rem;
+      cursor: pointer;
+    }
+    .range-btn.active {
+      background: #1f2937;
+      color: #fff;
+      border-color: #1f2937;
+    }
+    .chart-shell {
+      margin: 0.5rem 0 0.35rem;
+    }
+    .chart-reading-fixed {
+      display: none;
+      text-align: left;
+      margin-bottom: 0.5rem;
+      min-height: 2.8rem;
+    }
+    .chart-shell.touch-chart-ui .chart-reading-fixed {
+      display: block;
+    }
+    .chart-reading-fixed .line1 {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 0.95rem;
+      margin-bottom: 0.15rem;
+      white-space: nowrap;
+    }
+    .chart-callout {
+      position: absolute;
+      top: 8px;
+      left: 0;
+      transform: translateX(-50%);
+      /* Avoid shrink-to-fit using “remaining width to right edge” as max width (narrows near chart right). */
+      width: max-content;
+      max-width: calc(100% - 12px);
+      box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.88);
+      color: #0f172a;
+      border-radius: 10px;
+      padding: 0.45rem 0.7rem;
+      font-size: 0.8rem;
+      line-height: 1.3;
+      pointer-events: none;
+      white-space: normal;
+      display: none;
+      z-index: 10;
+      border: 1px solid #dbe2ea;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      min-width: 11rem;
+    }
+    .chart-callout.chart-callout--stacked {
+      min-width: 13.5rem;
+    }
+    .chart-callout .line1 {
+      white-space: nowrap;
+    }
+    .chart-shell.touch-chart-ui .chart-callout {
+      display: none !important;
+    }
+    .chart-callout .line1 {
+      font-weight: 600;
+      margin-bottom: 0.1rem;
+    }
+    .chart-container {
+      position: relative;
+      height: 390px;
+    }
+    @media (min-width: 1200px) {
+      .chart-container {
+        height: 460px;
+      }
+    }
+    .chart-loading-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0.75rem;
+      background: rgba(248, 250, 252, 0.88);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      border-radius: 4px;
+    }
+    .chart-loading-overlay:not([hidden]) {
+      display: flex;
+    }
+    .chart-bootstrap-msg {
+      margin: 0.35rem 0 0.5rem;
+    }
+    .airport-search-row.airport-search-row--unavailable {
+      font-style: italic;
+      /* Slightly lighter than #e5e7eb (previous “good” gray), darker than #f1f5f9 */
+      background: #e9ebef;
+      color: #475569;
+      cursor: not-allowed;
+    }
+    /*
+     * Fixed left column share so "No data…" centers in the same place for every row (ORD vs SFO),
+     * instead of centering in a variable-width auto column that shifts with the airport name length.
+     */
+    .airport-search-row--unavailable .airport-search-row__main {
+      display: grid;
+      grid-template-columns: minmax(0, 46%) minmax(0, 1fr);
+      align-items: center;
+      column-gap: 0.75rem;
+    }
+    .airport-search-row.airport-search-row--unavailable:hover,
+    .airport-search-row.airport-search-row--unavailable.is-active {
+      background: #dde1e9;
+    }
+    .airport-search-row--unavailable .airport-search-code,
+    .airport-search-row--unavailable .airport-search-name {
+      color: #475569;
+    }
+    .airport-search-row--unavailable .airport-search-row__chips.airport-search-row__chips--status {
+      flex: none;
+      min-width: 0;
+      width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      justify-content: center;
+      align-items: center;
+      align-self: stretch;
+    }
+    .airport-search-row--unavailable .airport-search-row__chips--status .airport-search-row__chips-msg {
+      flex: 0 1 auto;
+      font-size: 0.88rem;
+      font-weight: 400;
+      font-style: normal;
+      text-align: center;
+    }
+  </style>
+{% endblock %}
+{% block body %}
+  <main class="airport-layout">
+    <div class="airport-cluster">
+      <h1>TSA Wait Times</h1>
+      <p class="muted airport-subhead">Security line wait times at major US airports</p>
+      <div class="airport-search-wrap">
+        <div class="airport-search-field">
+          <span class="airport-search__icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+          </span>
+          <input
+            type="search"
+            class="airport-search"
+            id="airport-search"
+            disabled
+            placeholder="Search airports"
+            aria-label="Search airports"
+            aria-expanded="false"
+          />
+        </div>
+      </div>
+      <div class="airport-below-search">
+        <h2 class="airport-page-heading" id="airport-page-title">
+          {{ airport }} - {{ airport_display_name }}
+        </h2>
+        <div
+          class="airport-locale-inline-row muted {% if not airport_locale_line %}airport-locale-inline-row--solo{% endif %}"
+        >
+          {% if airport_locale_line %}
+            <span class="airport-page-heading__locale">{{ airport_locale_line }}</span>
+          {% endif %}
+          <span class="airport-last-update-inline" id="last-scraped-inline"></span>
+        </div>
+        <div class="tab-row-scroll">
+          <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
+        </div>
+        <p class="muted" id="last-scraped-at"></p>
+        <div class="range-group" id="range-group">
+          <button type="button" class="range-btn" data-hours="6">6H</button>
+          <button type="button" class="range-btn" data-hours="12">12H</button>
+          <button type="button" class="range-btn active" data-hours="24">24H</button>
+          <button type="button" class="range-btn" data-hours="72">3D</button>
+          <button type="button" class="range-btn" data-hours="168">7D</button>
+        </div>
+        <div id="chart-shell" class="chart-shell">
+          <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
+          <div class="chart-container">
+            <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
+              Loading…
+            </div>
+            <div id="chart-callout" class="chart-callout"></div>
+            <canvas id="chart"></canvas>
+          </div>
+        </div>
+        <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
+        <div
+          id="airport-search-panel"
+          class="airport-search-panel airport-search-panel--chart-overlay"
+          hidden
+        >
+          <div id="airport-search-results" class="airport-search-results"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
+  <script src="{{ url_for('static', filename='queue_wait_line.js') }}"></script>
+  <script>
+    const pageAirport = {{ airport | tojson }};
+    const pageAirportEntry = {{ airport_catalog_entry | tojson }};
+    const initialTerminal = {{ initial_terminal | tojson }};
+    const initialGate = {{ initial_gate | tojson }};
+
+    let selectedTerminal = '';
+    let selectedGate = '';
+    let terminalRows = [];
+
+    const QUEUE_TAB_ORDER = ['general', 'precheck', 'priority', 'clear'];
+
+    function sortQueueTypesFromKeys(types) {
+      const set = new Set(types);
+      const out = [];
+      for (const q of QUEUE_TAB_ORDER) {
+        if (set.has(q)) out.push(q);
+      }
+      const rest = [...set].filter(function (q) {
+        return QUEUE_TAB_ORDER.indexOf(q) === -1;
+      }).sort();
+      return out.concat(rest);
+    }
+
+    const CHART_LINE_COLORS = [
+      '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
+      '#db2777', '#0d9488', '#7c3aed',
+    ];
+
+    function queueChartDatasetLabel(qt) {
+      const labels = {
+        general: 'General',
+        precheck: 'TSA PreCheck',
+        priority: 'Priority',
+        clear: 'Clear',
+      };
+      if (labels[qt]) return labels[qt];
+      return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    }
+
+    /** Hover / fixed readout: same phrasing as the old two-line readout (PreCheck, not TSA PreCheck). */
+    function queueReadoutLabel(qt) {
+      const labels = {
+        general: 'General',
+        precheck: 'PreCheck',
+        priority: 'Priority',
+        clear: 'Clear',
+      };
+      if (labels[qt]) return labels[qt];
+      return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
+        return c.toUpperCase();
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * X-axis / callout timestamp: comma between date and time (not "at" on iOS),
+     * no leading zero on single-digit hour.
+     */
+    function formatChartAxisLabel(dateObj) {
+      const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return datePart + ', ' + timePart;
+    }
+
+    const QUEUE_FILL_BY_TYPE = {
+      general: 'rgba(37,99,235,0.1)',
+      precheck: 'rgba(22,163,74,0.1)',
+      priority: 'rgba(202,138,4,0.12)',
+      clear: 'rgba(147,51,234,0.12)',
+    };
+
+    function queueFillColor(qt) {
+      return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
+    }
+
+    function syncUrl() {
+      const u = new URL(window.location.origin + '/' + pageAirport);
+      if (selectedTerminal) u.searchParams.set('terminal', selectedTerminal);
+      const eg = effectiveGateForTab(pageAirportEntry, selectedGate);
+      if (eg) u.searchParams.set('gate', eg);
+      history.replaceState({}, '', u.pathname + u.search);
+    }
+
+    function rowMatchesInitial(row) {
+      if (row.terminal !== initialTerminal) return false;
+      if (pageAirportEntry.terminal_tab && pageAirportEntry.terminal_tab.ignore_gate === true) return true;
+      return String(row.gate || '') === String(initialGate || '');
+    }
+
+    const chartCanvas = document.getElementById('chart');
+    const chartShell = document.getElementById('chart-shell');
+    const readingFixedEl = document.getElementById('chart-reading-fixed');
+    let chart = null;
+    let chartTouchAbort = null;
+    let currentHours = 24;
+    let lastHistoryPayload = null;
+    let lastHistoryRequestHours = null;
+    let historyFetchAbort = null;
+    const loadingEl = document.getElementById('chart-loading');
+    const bootstrapMsgEl = document.getElementById('chart-bootstrap-msg');
+    const calloutEl = document.getElementById('chart-callout');
+    const lastScrapedEl = document.getElementById('last-scraped-at');
+    const lastScrapedInlineEl = document.getElementById('last-scraped-inline');
+
+    function formatLastUpdateDesktop(d) {
+      return (
+        'Last update: ' +
+        d.toLocaleString([], {
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      );
+    }
+
+    function formatLastUpdateMobile(d) {
+      return (
+        'Last update: ' +
+        d.toLocaleString([], {
+          year: '2-digit',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      );
+    }
+    const tabRowEl = document.getElementById('tab-row');
+
+    const mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
+    function touchChartUi() {
+      return mqTouch.matches;
+    }
+    function syncTouchChartShell() {
+      chartShell.classList.toggle('touch-chart-ui', touchChartUi());
+    }
+    syncTouchChartShell();
+    mqTouch.addEventListener('change', () => {
+      syncTouchChartShell();
+      if (lastHistoryPayload != null && lastHistoryRequestHours != null) {
+        buildChartFromHistory(lastHistoryPayload, lastHistoryRequestHours);
+      }
+    });
+
+    const readoutCrosshairPlugin = {
+      id: 'readoutCrosshair',
+      afterDatasetsDraw(chartRef) {
+        const idx = chartRef.$readoutIndex;
+        if (idx == null || idx < 0) return;
+        let x = null;
+        const { ctx, chartArea } = chartRef;
+        const n = chartRef.data.datasets.length;
+        for (let di = 0; di < n; di++) {
+          const meta = chartRef.getDatasetMeta(di);
+          const pt = meta.data[idx];
+          if (pt && !pt.skip) {
+            x = pt.x;
+            break;
+          }
+        }
+        if (x == null) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        function dot(px, py, fill) {
+          ctx.fillStyle = fill;
+          ctx.beginPath();
+          ctx.arc(px, py, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        for (let di = 0; di < n; di++) {
+          const meta = chartRef.getDatasetMeta(di);
+          const pt = meta.data[idx];
+          if (!pt || pt.skip) continue;
+          const fill = chartRef.data.datasets[di].borderColor || '#334155';
+          dot(pt.x, pt.y, fill);
+        }
+        ctx.restore();
+      }
+    };
+    Chart.register(readoutCrosshairPlugin);
+
+    function hideCallout() {
+      calloutEl.style.display = 'none';
+      calloutEl.className = 'chart-callout';
+    }
+
+    /**
+     * Terminal-tab style grid: up to two queue columns per row, labels left / values right,
+     * wait minutes in colored pills. Touch UI uses compact "12m"; desktop uses "12 min".
+     */
+    function readoutQueuesHtml(byQt, order, compactMin) {
+      const ord = order || [];
+      if (!ord.length) return '';
+      let html = '<div class="chart-readout-grid">';
+      for (let start = 0; start < ord.length; start += 2) {
+        const pair = ord.slice(start, start + 2);
+        for (let p = 0; p < 2; p++) {
+          const qt = pair[p];
+          html += '<span class="chart-readout-lbl">';
+          if (qt != null) {
+            html += escapeHtml(queueReadoutLabel(qt));
+          } else {
+            html += '\u00a0';
+          }
+          html += '</span><span class="chart-readout-val">';
+          if (qt != null) {
+            const v = byQt[qt];
+            if (v != null) {
+              const pillClass = window.waitTimePillClass(v);
+              const suffix = compactMin ? 'm' : ' min';
+              html +=
+                '<span class="' +
+                pillClass +
+                '">' +
+                escapeHtml(String(v) + suffix) +
+                '</span>';
+            } else {
+              html += '–';
+            }
+          } else {
+            html += '\u00a0';
+          }
+          html += '</span>';
+        }
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function readoutHtml(label, byQt, order) {
+      const compactMin = touchChartUi();
+      return (
+        '<div class="line1">' + escapeHtml(label) + '</div>' +
+        readoutQueuesHtml(byQt, order, compactMin)
+      );
+    }
+
+    function readoutValuesAtIndex(chartRef, idx) {
+      const byQt = {};
+      for (let di = 0; di < chartRef.data.datasets.length; di++) {
+        const ds = chartRef.data.datasets[di];
+        const k = ds.queueTypeKey;
+        if (k) byQt[k] = ds.data[idx];
+      }
+      return byQt;
+    }
+
+    function showCallout(x, label, chartRef, idx) {
+      const order = chartRef.$queueTypeOrder || [];
+      const stacked = order.length > 2;
+      calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
+      calloutEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
+      calloutEl.style.display = 'block';
+      calloutEl.style.left = x + 'px';
+      requestAnimationFrame(function () {
+        const pad = 6;
+        const parent = calloutEl.parentElement;
+        if (!parent) return;
+        const cw = parent.clientWidth;
+        const w = calloutEl.offsetWidth;
+        const half = w / 2;
+        const clamped = Math.max(pad + half, Math.min(x, cw - pad - half));
+        calloutEl.style.left = clamped + 'px';
+      });
+    }
+
+    function setFixedReadout(label, chartRef, idx) {
+      const order = chartRef.$queueTypeOrder || [];
+      const stacked = order.length > 2;
+      readingFixedEl.className = 'chart-reading-fixed' + (stacked ? ' chart-reading-fixed--stacked' : '');
+      readingFixedEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
+    }
+
+    function clearFixedReadout() {
+      readingFixedEl.innerHTML = '';
+      readingFixedEl.className = 'chart-reading-fixed';
+    }
+
+    function xToClosestIndex(chartRef, pixelX) {
+      const n = chartRef.data.labels.length;
+      if (!n) return null;
+      let best = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < n; i++) {
+        const x = chartRef.scales.x.getPixelForTick(i);
+        const d = Math.abs(pixelX - x);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    function applyReadoutAtIndex(chartRef, idx) {
+      if (idx == null || idx < 0) return;
+      const label = chartRef.data.labels[idx];
+      chartRef.$readoutIndex = idx;
+      if (touchChartUi()) {
+        hideCallout();
+        setFixedReadout(label, chartRef, idx);
+        chartRef.update('none');
+      } else {
+        let x = chartRef.scales.x.getPixelForTick(idx);
+        for (let di = 0; di < chartRef.data.datasets.length; di++) {
+          const el = chartRef.getDatasetMeta(di).data[idx];
+          if (el && !el.skip) {
+            x = el.x;
+            break;
+          }
+        }
+        showCallout(x, label, chartRef, idx);
+        chartRef.update('none');
+      }
+    }
+
+    function detachChartTouchHandlers() {
+      if (chartTouchAbort) {
+        chartTouchAbort.abort();
+        chartTouchAbort = null;
+      }
+    }
+
+    function attachChartTouchScrub(chartRef) {
+      detachChartTouchHandlers();
+      if (!touchChartUi()) return;
+      const canvas = chartRef.canvas;
+      const ac = new AbortController();
+      chartTouchAbort = ac;
+      const onTouch = (e) => {
+        if (!e.touches || !e.touches.length) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = e.touches[0].clientX - rect.left;
+        const idx = xToClosestIndex(chartRef, x);
+        if (idx != null) applyReadoutAtIndex(chartRef, idx);
+      };
+      canvas.addEventListener('touchstart', onTouch, { passive: false, signal: ac.signal });
+      canvas.addEventListener('touchmove', onTouch, { passive: false, signal: ac.signal });
+    }
+
+    function updateRangeButtons(hours) {
+      document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.hours === String(hours));
+      });
+    }
+
+    function shouldShowTick(dateObj, hours) {
+      const minute = dateObj.getMinutes();
+      const hour = dateObj.getHours();
+      if (touchChartUi()) {
+        if (hours === 6) return minute === 0;
+        if (hours === 12) return minute === 0 && hour % 2 === 0;
+        if (hours === 24) return minute === 0 && hour % 3 === 0;
+        if (hours === 72) return minute === 0 && (hour === 0 || hour === 12);
+        if (hours === 168) return minute === 0 && hour === 0;
+        return false;
+      }
+      if (hours === 6) return minute === 0 || minute === 30;
+      if (hours === 12 || hours === 24) return minute === 0;
+      if (hours === 72) return minute === 0 && (hour % 6 === 0);
+      if (hours === 168) return minute === 0 && (hour % 12 === 0);
+      return false;
+    }
+
+    function formatTick(dateObj, hours) {
+      const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      if (hours === 72 || hours === 168) {
+        const timeShort = dateObj.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+        return datePart + ' ' + timeShort;
+      }
+      const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      if (hours === 6 || hours === 12 || hours === 24) {
+        if (dateObj.getHours() === 0 && dateObj.getMinutes() === 0) {
+          return datePart + ' ' + timePart;
+        }
+        return timePart;
+      }
+      return datePart + ' ' + timePart;
+    }
+
+    function buildChartFromHistory(data, hours) {
+      currentHours = Number(hours);
+      hideCallout();
+      clearFixedReadout();
+      if (chart) {
+        detachChartTouchHandlers();
+        chart.destroy();
+        chart = null;
+      }
+
+      const labels = [];
+      const rawTimes = [];
+      const queues = data.queues || {};
+      const queueTypes = sortQueueTypesFromKeys(
+        Object.keys(queues).filter(function (qt) {
+          return (queues[qt] || []).length > 0;
+        })
+      );
+
+      const byTime = {};
+      for (let qi = 0; qi < queueTypes.length; qi++) {
+        const qt = queueTypes[qi];
+        for (const p of queues[qt] || []) {
+          if (!byTime[p.t]) byTime[p.t] = { t: p.t };
+          byTime[p.t][qt] = p.minutes;
+        }
+      }
+
+      const sorted = Object.values(byTime).sort(function (a, b) {
+        return a.t.localeCompare(b.t);
+      });
+      for (let si = 0; si < sorted.length; si++) {
+        const row = sorted[si];
+        labels.push(formatChartAxisLabel(new Date(row.t)));
+        rawTimes.push(row.t);
+      }
+
+      const useAreaFill = queueTypes.length <= 2;
+      const datasets = queueTypes.map(function (qt, i) {
+        return {
+          label: queueChartDatasetLabel(qt),
+          queueTypeKey: qt,
+          data: sorted.map(function (row) {
+            return row[qt] != null ? row[qt] : null;
+          }),
+          borderColor: CHART_LINE_COLORS[i % CHART_LINE_COLORS.length],
+          borderWidth: 2,
+          backgroundColor: useAreaFill ? queueFillColor(qt) : 'transparent',
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          fill: useAreaFill,
+          tension: 0.2,
+        };
+      });
+
+      if (!datasets.length) {
+        hideCallout();
+        clearFixedReadout();
+        hideChartLoading();
+        return;
+      }
+
+      const ctx = chartCanvas.getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets,
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              align: 'end',
+              labels: {
+                usePointStyle: true,
+                pointStyle: 'line',
+                boxWidth: 36,
+                boxHeight: 8,
+                font: { size: 10 },
+              },
+            },
+            tooltip: { enabled: false }
+          },
+          onHover: (event, _elements, chartRef) => {
+            if (touchChartUi()) return;
+            const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
+            if (!points.length) {
+              chartRef.$readoutIndex = null;
+              hideCallout();
+              chartRef.update('none');
+              return;
+            }
+            const idx = points[0].index;
+            const label = chartRef.data.labels[idx];
+            const x = points[0].element.x;
+            chartRef.$readoutIndex = idx;
+            showCallout(x, label, chartRef, idx);
+            chartRef.update('none');
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: !touchChartUi(), text: 'Minutes' }
+            },
+            x: {
+              grid: { display: false, drawBorder: false },
+              ticks: {
+                autoSkip: false,
+                minRotation: 45,
+                maxRotation: 45,
+                callback: function(_value, index) {
+                  const iso = rawTimes[index];
+                  if (!iso) return '';
+                  const dt = new Date(iso);
+                  if (!shouldShowTick(dt, currentHours)) return '';
+                  return formatTick(dt, currentHours);
+                }
+              }
+            }
+          }
+        }
+      });
+      chart.$queueTypeOrder = queueTypes;
+
+      if (labels.length) {
+        const last = labels.length - 1;
+        if (touchChartUi()) {
+          chart.$readoutIndex = last;
+          setFixedReadout(labels[last], chart, last);
+          chart.update('none');
+          attachChartTouchScrub(chart);
+        } else {
+          chart.$readoutIndex = null;
+          hideCallout();
+          chart.update('none');
+        }
+      } else {
+        hideCallout();
+        clearFixedReadout();
+      }
+      hideChartLoading();
+    }
+
+    function showChartLoading(message) {
+      loadingEl.hidden = false;
+      loadingEl.textContent = message;
+    }
+
+    function hideChartLoading() {
+      loadingEl.hidden = true;
+    }
+
+    function renderChart(hours) {
+      currentHours = Number(hours);
+      if (historyFetchAbort) {
+        historyFetchAbort.abort();
+      }
+      historyFetchAbort = new AbortController();
+      showChartLoading('Loading...');
+      hideCallout();
+      clearFixedReadout();
+      updateRangeButtons(hours);
+
+      let url = '/api/history?airport=' + encodeURIComponent(pageAirport)
+        + '&terminal=' + encodeURIComponent(selectedTerminal)
+        + '&hours=' + encodeURIComponent(hours);
+      if (selectedGate) url += '&gate=' + encodeURIComponent(selectedGate);
+
+      fetch(url, { signal: historyFetchAbort.signal })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          lastHistoryPayload = data;
+          lastHistoryRequestHours = Number(hours);
+          buildChartFromHistory(data, hours);
+        })
+        .catch(e => {
+          if (e.name === 'AbortError') return;
+          showChartLoading('Error: ' + e.message);
+          lastHistoryPayload = null;
+          lastHistoryRequestHours = null;
+          hideCallout();
+          clearFixedReadout();
+          detachChartTouchHandlers();
+          if (chart) {
+            chart.destroy();
+            chart = null;
+          }
+        });
+    }
+
+    function tabRowMobileActiveIntoView(activeIndex) {
+      if (!window.matchMedia('(max-width: 768px)').matches) return;
+      const btns = tabRowEl.querySelectorAll('.tab-btn');
+      const el = btns[activeIndex];
+      if (el) {
+        el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function selectTabByIndex(i) {
+      if (i < 0 || i >= terminalRows.length) return;
+      const row = terminalRows[i];
+      selectedTerminal = row.terminal;
+      selectedGate = row.gate || '';
+      tabRowEl.querySelectorAll('.tab-btn').forEach((btn, j) => {
+        btn.classList.toggle('active', j === i);
+        btn.setAttribute('aria-selected', j === i ? 'true' : 'false');
+      });
+      syncUrl();
+      tabRowMobileActiveIntoView(i);
+      renderChart(currentHours);
+    }
+
+    /** After layout, set every tab chip to the height of the tallest (e.g. 3+ queues → 2 grid rows). */
+    function equalizeTabChipHeights() {
+      const buttons = tabRowEl.querySelectorAll('.tab-btn');
+      if (!buttons.length) return;
+      for (let i = 0; i < buttons.length; i++) {
+        buttons[i].style.minHeight = '';
+      }
+      let maxH = 0;
+      for (let j = 0; j < buttons.length; j++) {
+        maxH = Math.max(maxH, buttons[j].offsetHeight);
+      }
+      for (let k = 0; k < buttons.length; k++) {
+        buttons[k].style.minHeight = maxH + 'px';
+      }
+    }
+
+    function buildTabs(rows, activeIndex) {
+      tabRowEl.innerHTML = '';
+      rows.forEach((row, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tab-btn' + (i === activeIndex ? ' active' : '');
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
+        btn.dataset.index = String(i);
+        const label = terminalTabLabel(pageAirportEntry, row.terminal, row.gate);
+        const span = document.createElement('span');
+        span.className = 'tab-label-short';
+        span.textContent = label;
+        btn.appendChild(span);
+        const wrap = document.createElement('div');
+        wrap.className = 'tab-waits';
+        wrap.setAttribute('aria-hidden', 'true');
+        const gridRows = window.airportTabQueueWaitGridRows(row.queues);
+        if (!gridRows.length) {
+          wrap.textContent = '—';
+        } else {
+          const grid = document.createElement('div');
+          grid.className = 'tab-wait-grid';
+          gridRows.forEach(function (pairs) {
+            for (let p = 0; p < 2; p++) {
+              const seg = pairs[p];
+              const lbl = document.createElement('span');
+              lbl.className = 'tab-wait-lbl';
+              const val = document.createElement('span');
+              val.className = 'tab-wait-val';
+              if (seg) {
+                lbl.textContent = seg.label;
+                const pill = document.createElement('span');
+                pill.className = window.waitTimePillClass(seg.minutes);
+                pill.textContent = String(seg.minutes) + 'm';
+                val.appendChild(pill);
+              } else {
+                lbl.textContent = '\u00a0';
+                val.textContent = '\u00a0';
+              }
+              grid.appendChild(lbl);
+              grid.appendChild(val);
+            }
+          });
+          wrap.appendChild(grid);
+        }
+        btn.appendChild(wrap);
+        btn.addEventListener('click', () => selectTabByIndex(Number(btn.dataset.index)));
+        tabRowEl.appendChild(btn);
+      });
+      requestAnimationFrame(function () {
+        equalizeTabChipHeights();
+        tabRowMobileActiveIntoView(activeIndex);
+      });
+    }
+
+    chartCanvas.addEventListener('mouseleave', () => {
+      hideCallout();
+      if (chart) {
+        chart.$readoutIndex = null;
+        chart.update('none');
+      }
+    });
+
+    document.querySelectorAll('.range-btn').forEach(btn => {
+      btn.addEventListener('click', () => renderChart(btn.dataset.hours));
+    });
+
+    fetch('/api/latest')
+      .then(r => r.json())
+      .then(data => {
+        const rows = (data.airports || {})[pageAirport];
+        const emptyLabel = 'Last update: —';
+        if (data.scraped_at_utc) {
+          const d = new Date(data.scraped_at_utc);
+          lastScrapedEl.textContent = formatLastUpdateDesktop(d);
+          if (lastScrapedInlineEl) {
+            lastScrapedInlineEl.textContent = formatLastUpdateMobile(d);
+          }
+        } else {
+          lastScrapedEl.textContent = emptyLabel;
+          if (lastScrapedInlineEl) {
+            lastScrapedInlineEl.textContent = emptyLabel;
+          }
+        }
+        if (!rows || !rows.length) {
+          bootstrapMsgEl.textContent = 'No wait time data for this airport yet.';
+          bootstrapMsgEl.hidden = false;
+          chartShell.style.display = 'none';
+          hideChartLoading();
+          return;
+        }
+        bootstrapMsgEl.hidden = true;
+        chartShell.style.display = '';
+        terminalRows = rows;
+        let pick = 0;
+        if (initialTerminal) {
+          const found = rows.findIndex(rowMatchesInitial);
+          if (found >= 0) pick = found;
+        }
+        buildTabs(rows, pick);
+        selectedTerminal = rows[pick].terminal;
+        selectedGate = rows[pick].gate || '';
+        syncUrl();
+        renderChart(24);
+      })
+      .catch(e => {
+        bootstrapMsgEl.textContent = 'Error: ' + e.message;
+        bootstrapMsgEl.hidden = false;
+        chartShell.style.display = 'none';
+        hideChartLoading();
+      });
+  </script>
+  <script src="{{ url_for('static', filename='airport_search.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof initTsaAirportSearch !== 'function') return;
+      var inp = document.getElementById('airport-search');
+      var panel = document.getElementById('airport-search-panel');
+      var list = document.getElementById('airport-search-results');
+      if (!inp || !panel || !list) return;
+      initTsaAirportSearch({
+        input: inp,
+        panel: panel,
+        list: list,
+      });
+    });
+  </script>
+{% endblock %}

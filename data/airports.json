@@ -1,0 +1,413 @@
+{
+  "metros": {
+    "nyc": {
+      "display_name": "New York",
+      "airport_codes": [
+        "LGA",
+        "JFK",
+        "EWR"
+      ],
+      "search_aliases": [
+        "nyc",
+        "new york",
+        "new york city",
+        "new york metro",
+        "ny"
+      ]
+    }
+  },
+  "airports": [
+    {
+      "code": "ATL",
+      "display_name": "Hartsfield-Jackson Atlanta International Airport",
+      "metro_key": null,
+      "city": "Atlanta",
+      "state": "GA",
+      "state_name": "Georgia",
+      "terminal_tab": {
+        "gate_transform": "titlecase_words",
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: {gate}"
+      },
+      "aliases": [
+        "atl",
+        "atlanta airport",
+        "hartsfield",
+        "hartsfield jackson",
+        "atlanta international"
+      ],
+      "wait_times_url": "https://www.atl.com/times/",
+      "api_url": null,
+      "status": "active"
+    },
+    {
+      "code": "BOS",
+      "status": "no_data",
+      "display_name": "Boston Logan International Airport",
+      "metro_key": null,
+      "city": "Boston",
+      "state": "MA",
+      "state_name": "Massachusetts",
+      "terminal_tab": null,
+      "aliases": [
+        "bos",
+        "logan",
+        "logan airport",
+        "boston airport",
+        "boston logan"
+      ],
+      "wait_times_url": null,
+      "api_url": null
+    },
+    {
+      "code": "CLT",
+      "display_name": "Charlotte Douglas International Airport",
+      "metro_key": null,
+      "city": "Charlotte",
+      "state": "NC",
+      "state_name": "North Carolina",
+      "terminal_tab": {
+        "ignore_gate": true,
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}"
+      },
+      "aliases": [
+        "clt",
+        "charlotte airport",
+        "charlotte douglas",
+        "douglas airport"
+      ],
+      "wait_times_url": "https://www.cltairport.com/airport-info/security/",
+      "api_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT",
+      "status": "active"
+    },
+    {
+      "code": "DCA",
+      "display_name": "Ronald Reagan Washington National Airport",
+      "metro_key": null,
+      "city": "Washington",
+      "state": "DC",
+      "state_name": "District of Columbia",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "dca",
+        "reagan",
+        "reagan national",
+        "reagan airport",
+        "national airport",
+        "washington national",
+        "dc airport",
+        "washington dca",
+        "arlington",
+        "va",
+        "virginia"
+      ],
+      "wait_times_url": "https://www.flyreagan.com/security-wait-times",
+      "api_url": null,
+      "status": "active"
+    },
+    {
+      "code": "DEN",
+      "display_name": "Denver International Airport",
+      "metro_key": null,
+      "city": "Denver",
+      "state": "CO",
+      "state_name": "Colorado",
+      "terminal_tab": {
+        "without_gate": "{terminal} Terminal",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "den",
+        "dia",
+        "denver airport",
+        "denver international"
+      ],
+      "wait_times_url": "https://www.flydenver.com/security/",
+      "api_url": "https://app.flyfruition.com/api/public/tsa",
+      "status": "active"
+    },
+    {
+      "code": "DFW",
+      "display_name": "Dallas Fort Worth International Airport",
+      "metro_key": null,
+      "city": "Dallas-Fort Worth",
+      "state": "TX",
+      "state_name": "Texas",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gate {gate}"
+      },
+      "aliases": [
+        "dfw",
+        "dallas fort worth",
+        "dallas airport",
+        "fort worth airport"
+      ],
+      "wait_times_url": "https://www.dfwairport.com/security/",
+      "api_url": "https://api.dfwairport.mobi/wait-times/checkpoint/DFW",
+      "status": "active"
+    },
+    {
+      "code": "EWR",
+      "display_name": "Newark Liberty International Airport",
+      "metro_key": "nyc",
+      "city": "Newark",
+      "state": "NJ",
+      "state_name": "New Jersey",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "ewr",
+        "newark",
+        "newark airport",
+        "newark liberty",
+        "new york newark",
+        "nyc newark"
+      ],
+      "wait_times_url": "https://www.newarkairport.com/",
+      "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR",
+      "status": "active"
+    },
+    {
+      "code": "FLL",
+      "status": "no_data",
+      "display_name": "Fort Lauderdale-Hollywood International Airport",
+      "metro_key": null,
+      "city": "Fort Lauderdale",
+      "state": "FL",
+      "state_name": "Florida",
+      "terminal_tab": null,
+      "aliases": [
+        "fll",
+        "fort lauderdale airport",
+        "fort lauderdale hollywood",
+        "hollywood florida airport"
+      ],
+      "wait_times_url": null,
+      "api_url": null
+    },
+    {
+      "code": "JFK",
+      "display_name": "John F. Kennedy International Airport",
+      "metro_key": "nyc",
+      "city": "New York",
+      "state": "NY",
+      "state_name": "New York",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "jfk",
+        "john f kennedy",
+        "john f. kennedy",
+        "kennedy",
+        "kennedy airport",
+        "jfk airport",
+        "new york jfk"
+      ],
+      "wait_times_url": "https://www.jfkairport.com/",
+      "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/JFK",
+      "status": "active"
+    },
+    {
+      "code": "LAS",
+      "display_name": "Harry Reid International Airport",
+      "metro_key": null,
+      "city": "Las Vegas",
+      "state": "NV",
+      "state_name": "Nevada",
+      "terminal_tab": {
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: {gate}"
+      },
+      "aliases": [
+        "las",
+        "las vegas airport",
+        "harry reid",
+        "mccarran",
+        "mccarran airport"
+      ],
+      "wait_times_url": "https://www.harryreidairport.com/security-wait-times",
+      "api_url": null,
+      "status": "active"
+    },
+    {
+      "code": "LAX",
+      "display_name": "Los Angeles International Airport",
+      "metro_key": null,
+      "city": "Los Angeles",
+      "state": "CA",
+      "state_name": "California",
+      "terminal_tab": {
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "lax",
+        "los angeles international",
+        "los angeles airport",
+        "la airport",
+        "lax airport"
+      ],
+      "wait_times_url": "https://www.flylax.com/wait-times",
+      "api_url": null,
+      "status": "active"
+    },
+    {
+      "code": "LGA",
+      "display_name": "LaGuardia Airport",
+      "metro_key": "nyc",
+      "city": "New York",
+      "state": "NY",
+      "state_name": "New York",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "lga",
+        "laguardia",
+        "la guardia",
+        "new york laguardia",
+        "nyc laguardia"
+      ],
+      "wait_times_url": "https://www.laguardiaairport.com/",
+      "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/LGA",
+      "status": "active"
+    },
+    {
+      "code": "MCO",
+      "display_name": "Orlando International Airport",
+      "metro_key": null,
+      "city": "Orlando",
+      "state": "FL",
+      "state_name": "Florida",
+      "terminal_tab": {
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "mco",
+        "orlando airport",
+        "orlando international",
+        "oia"
+      ],
+      "wait_times_url": "https://flymco.com/security/",
+      "api_url": "https://api.goaa.aero/wait-times/checkpoint/MCO",
+      "status": "active"
+    },
+    {
+      "code": "MIA",
+      "display_name": "Miami International Airport",
+      "metro_key": null,
+      "city": "Miami",
+      "state": "FL",
+      "state_name": "Florida",
+      "terminal_tab": {
+        "without_gate": "Checkpoint {terminal}",
+        "with_gate": "Checkpoint {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "mia",
+        "miami international",
+        "miami airport",
+        "mia airport"
+      ],
+      "wait_times_url": "https://www.miami-airport.com/tsa-waittimes.asp",
+      "api_url": null,
+      "status": "active"
+    },
+    {
+      "code": "ORD",
+      "status": "no_data",
+      "display_name": "Chicago O'Hare International Airport",
+      "metro_key": null,
+      "city": "Chicago",
+      "state": "IL",
+      "state_name": "Illinois",
+      "terminal_tab": null,
+      "aliases": [
+        "ord",
+        "ohare",
+        "o'hare",
+        "chicago o'hare",
+        "chicago airport",
+        "ohare airport",
+        "chicago international"
+      ],
+      "wait_times_url": null,
+      "api_url": null
+    },
+    {
+      "code": "PHX",
+      "display_name": "Phoenix Sky Harbor International Airport",
+      "metro_key": null,
+      "city": "Phoenix",
+      "state": "AZ",
+      "state_name": "Arizona",
+      "terminal_tab": {
+        "without_gate": "{terminal}",
+        "with_gate": "{terminal}: {gate}"
+      },
+      "aliases": [
+        "phx",
+        "phoenix airport",
+        "sky harbor",
+        "skyharbor",
+        "phoenix sky harbor"
+      ],
+      "wait_times_url": "https://www.skyharbor.com/",
+      "api_url": "https://api.phx.aero/avn-wait-times/raw",
+      "status": "active"
+    },
+    {
+      "code": "SEA",
+      "display_name": "Seattle-Tacoma International Airport",
+      "metro_key": null,
+      "city": "Seattle",
+      "state": "WA",
+      "state_name": "Washington",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: Gates {gate}"
+      },
+      "aliases": [
+        "sea",
+        "seatac",
+        "sea-tac",
+        "seattle tacoma",
+        "seattle airport",
+        "seattle international"
+      ],
+      "wait_times_url": "https://www.portseattle.org/page/live-estimated-checkpoint-wait-times",
+      "api_url": "https://www.portseattle.org/api/cwt/wait-times",
+      "status": "active"
+    },
+    {
+      "code": "SFO",
+      "status": "no_data",
+      "display_name": "San Francisco International Airport",
+      "metro_key": null,
+      "city": "San Francisco",
+      "state": "CA",
+      "state_name": "California",
+      "terminal_tab": null,
+      "aliases": [
+        "sfo",
+        "san francisco airport",
+        "san francisco international",
+        "sf airport",
+        "san francisco"
+      ],
+      "wait_times_url": null,
+      "api_url": null
+    }
+  ]
+}

@@ -7,7 +7,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
   <style>
     * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; }
+    body { font-family: system-ui, sans-serif; max-width: 980px; margin: 0 auto; padding: 1rem; }
     h1 { margin-top: 0; }
     a { color: #0066cc; }
     a:hover { text-decoration: underline; }
@@ -15,6 +15,27 @@
     th, td { border: 1px solid #ccc; padding: 0.4rem 0.75rem; text-align: left; }
     th { background: #f5f5f5; }
     .muted { color: #666; font-size: 0.9rem; }
+    /* Shared: terminal chip minute pills (search + /airport tabs). Queue labels stay unstyled. */
+    .wait-time-pill {
+      display: inline-block;
+      border-radius: 5px;
+      padding: 0.07em 0.38em 0.09em;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+    }
+    .wait-time-pill--low {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .wait-time-pill--mid {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+    .wait-time-pill--high {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
     .terminal-link { font-weight: 500; }
     .back { margin-bottom: 1rem; }
     .airport-section { margin-bottom: 2rem; }
@@ -33,7 +54,7 @@
 </head>
 <body>
   {% block body %}{% endblock %}
-  <footer style="margin-top: 2rem; padding: 1rem 0; text-align: center; color: #888; font-size: 0.85rem;">
+  <footer style="margin-top: 1rem; padding: 1rem 0; text-align: center; color: #888; font-size: 0.85rem;">
     Feedback? Email <a href="mailto:info@tsa-times.com" style="color: #0066cc;">info@tsa-times.com</a>
   </footer>
 </body>
