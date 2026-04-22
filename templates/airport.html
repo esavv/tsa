@@ -51,7 +51,8 @@
       width: 100%;
       max-width: 100%;
       padding: 0.45rem 0.65rem 0.45rem 2.45rem;
-      font-size: 0.95rem;
+      /* min 16px: iOS Safari zooms focused inputs when font-size is under 16px */
+      font-size: max(16px, 0.95rem);
       border: 1px solid #ccc;
       border-radius: 9999px;
       background: #f9fafb;
