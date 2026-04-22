@@ -5,8 +5,6 @@ import os
 import sqlite3
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-from urllib.parse import urlencode
-
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -119,17 +117,6 @@ def airport(code: str):
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
     )
-
-
-@app.route("/terminal/<airport>/<terminal>")
-def terminal_redirect(airport: str, terminal: str):
-    ap = (airport or "").strip().upper()
-    ent = catalog_airport_entry(ap)
-    if not ent or (ent.get("status") or "active") != "active":
-        abort(404)
-    gate = request.args.get("gate") or ""
-    q = urlencode({"terminal": terminal, "gate": gate})
-    return redirect(f"/{ap}?{q}", code=301)
 
 
 @app.route("/api/catalog")
