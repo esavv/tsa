@@ -2,6 +2,8 @@
 {% block title %}TSA Wait Times for US Airports{% endblock %}
 {% block head %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
   <style>
     main.airport-layout {
       width: 100%;
@@ -530,6 +532,14 @@
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
+    .tab-btn .tab-wait-val--dash {
+      color: #94a3b8;
+      font-weight: 500;
+      font-variant-numeric: normal;
+    }
+    .tab-btn.active .tab-wait-val--dash {
+      color: rgba(226, 232, 240, 0.75);
+    }
     /* Chart hover / scrub readout: label|value pairs; max-content cols (not 1fr) so readout
        does not stretch to full width on mobile or shrink-wrap oddly on desktop abspos. */
     .chart-callout .chart-readout-grid,
@@ -836,6 +846,12 @@
       '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
       '#db2777', '#0d9488', '#7c3aed',
     ];
+    /** Align chart window with scrape cadence (same as collector interval). */
+    const SCRAPE_STEP_MS = 15 * 60 * 1000;
+    /** Do not draw line/fill across gaps longer than this (closed checkpoints, etc.). */
+    const GAP_BREAK_MS = 45 * 60 * 1000;
+    /** Global latest `scraped_at_utc` from initial `/api/latest` only (chart right edge). */
+    let pageGlobalLatestScrapedMs = null;
 
     function queueChartDatasetLabel(qt) {
       const labels = {
@@ -969,18 +985,13 @@
       afterDatasetsDraw(chartRef) {
         const idx = chartRef.$readoutIndex;
         if (idx == null || idx < 0) return;
-        let x = null;
+        const xs = chartRef.$mergedTimesMs;
+        const xScale = chartRef.scales.x;
+        if (!xs || idx >= xs.length || !xScale) return;
+        const x = xScale.getPixelForValue(xs[idx]);
+        if (x == null || !isFinite(x)) return;
         const { ctx, chartArea } = chartRef;
         const n = chartRef.data.datasets.length;
-        for (let di = 0; di < n; di++) {
-          const meta = chartRef.getDatasetMeta(di);
-          const pt = meta.data[idx];
-          if (pt && !pt.skip) {
-            x = pt.x;
-            break;
-          }
-        }
-        if (x == null) return;
         ctx.save();
         ctx.beginPath();
         ctx.setLineDash([3, 4]);
@@ -1068,11 +1079,14 @@
     }
 
     function readoutValuesAtIndex(chartRef, idx) {
+      const row = chartRef.$mergedRows && chartRef.$mergedRows[idx];
+      const order = chartRef.$queueTypeOrder || [];
       const byQt = {};
-      for (let di = 0; di < chartRef.data.datasets.length; di++) {
-        const ds = chartRef.data.datasets[di];
-        const k = ds.queueTypeKey;
-        if (k) byQt[k] = ds.data[idx];
+      if (!row) return byQt;
+      for (let oi = 0; oi < order.length; oi++) {
+        const qt = order[oi];
+        const v = row[qt];
+        byQt[qt] = v != null ? v : null;
       }
       return byQt;
     }
@@ -1108,39 +1122,18 @@
       readingFixedEl.className = 'chart-reading-fixed';
     }
 
-    function xToClosestIndex(chartRef, pixelX) {
-      const n = chartRef.data.labels.length;
-      if (!n) return null;
-      let best = 0;
-      let bestDist = Infinity;
-      for (let i = 0; i < n; i++) {
-        const x = chartRef.scales.x.getPixelForTick(i);
-        const d = Math.abs(pixelX - x);
-        if (d < bestDist) {
-          bestDist = d;
-          best = i;
-        }
-      }
-      return best;
-    }
-
     function applyReadoutAtIndex(chartRef, idx) {
       if (idx == null || idx < 0) return;
-      const label = chartRef.data.labels[idx];
+      const xs = chartRef.$mergedTimesMs;
+      if (!xs || idx >= xs.length) return;
+      const label = formatChartAxisLabel(new Date(xs[idx]));
       chartRef.$readoutIndex = idx;
       if (touchChartUi()) {
         hideCallout();
         setFixedReadout(label, chartRef, idx);
         chartRef.update('none');
       } else {
-        let x = chartRef.scales.x.getPixelForTick(idx);
-        for (let di = 0; di < chartRef.data.datasets.length; di++) {
-          const el = chartRef.getDatasetMeta(di).data[idx];
-          if (el && !el.skip) {
-            x = el.x;
-            break;
-          }
-        }
+        const x = chartRef.scales.x.getPixelForValue(xs[idx]);
         showCallout(x, label, chartRef, idx);
         chartRef.update('none');
       }
@@ -1164,7 +1157,7 @@
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const x = e.touches[0].clientX - rect.left;
-        const idx = xToClosestIndex(chartRef, x);
+        const idx = pixelToReadoutIndex(chartRef, x);
         if (idx != null) applyReadoutAtIndex(chartRef, idx);
       };
       canvas.addEventListener('touchstart', onTouch, { passive: false, signal: ac.signal });
@@ -1211,6 +1204,58 @@
       return datePart + ' ' + timePart;
     }
 
+    /** Chart x-axis domain: [tMin, tMax] with tMax = global latest scrape (from /api/latest). */
+    function chartWindowBoundsMs(hours, fallbackTMaxMs) {
+      let tMax = pageGlobalLatestScrapedMs;
+      if (tMax == null && fallbackTMaxMs != null) tMax = fallbackTMaxMs;
+      if (tMax == null) return null;
+      const periodMs = Number(hours) * 3600000;
+      const tMin = tMax - periodMs + SCRAPE_STEP_MS;
+      return { tMin, tMax };
+    }
+
+    function buildChartTickValues(tMin, tMax, hours) {
+      const step = 15 * 60 * 1000;
+      const out = [];
+      let t = Math.floor(tMin / step) * step;
+      for (; t <= tMax; t += step) {
+        if (t < tMin) continue;
+        const d = new Date(t);
+        if (shouldShowTick(d, hours)) out.push(t);
+      }
+      return out;
+    }
+
+    function nearestTimeIndex(sortedMs, targetMs) {
+      if (!sortedMs || !sortedMs.length) return null;
+      let bestIdx = 0;
+      let bestD = Infinity;
+      for (let i = 0; i < sortedMs.length; i++) {
+        const d = Math.abs(sortedMs[i] - targetMs);
+        if (d < bestD) {
+          bestD = d;
+          bestIdx = i;
+        }
+      }
+      return bestIdx;
+    }
+
+    function canvasXToChartTimeMs(chartRef, canvasX) {
+      const xScale = chartRef.scales.x;
+      if (!xScale) return null;
+      return xScale.getValueForPixel(canvasX);
+    }
+
+    function pixelToReadoutIndex(chartRef, canvasX) {
+      const xs = chartRef.$mergedTimesMs;
+      if (!xs || !xs.length) return null;
+      const bw = chartRef.$chartWindowMs;
+      let tMs = canvasXToChartTimeMs(chartRef, canvasX);
+      if (tMs == null || !isFinite(tMs)) return null;
+      if (bw) tMs = Math.max(bw.tMin, Math.min(bw.tMax, tMs));
+      return nearestTimeIndex(xs, tMs);
+    }
+
     function buildChartFromHistory(data, hours) {
       currentHours = Number(hours);
       hideCallout();
@@ -1221,8 +1266,6 @@
         chart = null;
       }
 
-      const labels = [];
-      const rawTimes = [];
       const queues = data.queues || {};
       const queueTypes = sortQueueTypesFromKeys(
         Object.keys(queues).filter(function (qt) {
@@ -1230,60 +1273,98 @@
         })
       );
 
+      let maxDataMs = null;
       const byTime = {};
       for (let qi = 0; qi < queueTypes.length; qi++) {
         const qt = queueTypes[qi];
         for (const p of queues[qt] || []) {
-          if (!byTime[p.t]) byTime[p.t] = { t: p.t };
+          const tms = Date.parse(p.t);
+          if (!isFinite(tms)) continue;
+          if (maxDataMs == null || tms > maxDataMs) maxDataMs = tms;
+          if (!byTime[p.t]) byTime[p.t] = { t: p.t, tMs: tms };
           byTime[p.t][qt] = p.minutes;
         }
       }
 
-      const sorted = Object.values(byTime).sort(function (a, b) {
-        return a.t.localeCompare(b.t);
-      });
-      for (let si = 0; si < sorted.length; si++) {
-        const row = sorted[si];
-        labels.push(formatChartAxisLabel(new Date(row.t)));
-        rawTimes.push(row.t);
+      const bounds = chartWindowBoundsMs(hours, maxDataMs);
+      if (!bounds) {
+        hideCallout();
+        clearFixedReadout();
+        hideChartLoading();
+        return;
       }
+      const { tMin, tMax } = bounds;
 
-      const useAreaFill = queueTypes.length <= 2;
-      const datasets = queueTypes.map(function (qt, i) {
-        return {
-          label: queueChartDatasetLabel(qt),
-          queueTypeKey: qt,
-          data: sorted.map(function (row) {
-            return row[qt] != null ? row[qt] : null;
-          }),
-          borderColor: CHART_LINE_COLORS[i % CHART_LINE_COLORS.length],
-          borderWidth: 2,
-          backgroundColor: useAreaFill ? queueFillColor(qt) : 'transparent',
-          pointRadius: 0,
-          pointHoverRadius: 5,
-          fill: useAreaFill,
-          tension: 0.2,
-        };
+      const mergedRows = Object.values(byTime)
+        .filter(function (row) {
+          return row.tMs >= tMin && row.tMs <= tMax;
+        })
+        .sort(function (a, b) {
+          return a.tMs - b.tMs;
+        });
+
+      const mergedTimesMs = mergedRows.map(function (r) {
+        return r.tMs;
       });
 
-      if (!datasets.length) {
+      if (!queueTypes.length) {
         hideCallout();
         clearFixedReadout();
         hideChartLoading();
         return;
       }
 
+      const hoursNum = Number(hours);
+      const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
+      const useAreaFill = queueTypes.length <= 2;
+      const datasets = queueTypes.map(function (qt, i) {
+        const lineColor = CHART_LINE_COLORS[i % CHART_LINE_COLORS.length];
+        const fillCol = useAreaFill ? queueFillColor(qt) : 'transparent';
+        const seg = {
+          borderColor: function (ctx) {
+            const x0 = ctx.p0.parsed.x;
+            const x1 = ctx.p1.parsed.x;
+            if (x0 == null || x1 == null) return lineColor;
+            return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
+          },
+        };
+        if (useAreaFill) {
+          seg.backgroundColor = function (ctx) {
+            const x0 = ctx.p0.parsed.x;
+            const x1 = ctx.p1.parsed.x;
+            if (x0 == null || x1 == null) return fillCol;
+            return x1 - x0 > GAP_BREAK_MS ? 'transparent' : fillCol;
+          };
+        }
+        return {
+          label: queueChartDatasetLabel(qt),
+          queueTypeKey: qt,
+          parsing: false,
+          data: mergedRows.map(function (row) {
+            return { x: row.tMs, y: row[qt] != null ? row[qt] : null };
+          }),
+          borderColor: lineColor,
+          borderWidth: 2,
+          backgroundColor: useAreaFill ? fillCol : 'transparent',
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          fill: useAreaFill,
+          tension: 0.2,
+          spanGaps: false,
+          segment: seg,
+        };
+      });
+
       const ctx = chartCanvas.getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels,
           datasets,
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
+          interaction: { mode: 'nearest', axis: 'x', intersect: false },
           plugins: {
             legend: {
               display: true,
@@ -1301,19 +1382,20 @@
           },
           onHover: (event, _elements, chartRef) => {
             if (touchChartUi()) return;
-            const points = chartRef.getElementsAtEventForMode(event, 'index', { intersect: false }, false);
-            if (!points.length) {
-              chartRef.$readoutIndex = null;
-              hideCallout();
-              chartRef.update('none');
+            const area = chartRef.chartArea;
+            if (!area || event.x == null) return;
+            if (event.x < area.left || event.x > area.right) {
+              if (chartRef.$readoutIndex != null) {
+                chartRef.$readoutIndex = null;
+                hideCallout();
+                chartRef.update('none');
+              }
               return;
             }
-            const idx = points[0].index;
-            const label = chartRef.data.labels[idx];
-            const x = points[0].element.x;
-            chartRef.$readoutIndex = idx;
-            showCallout(x, label, chartRef, idx);
-            chartRef.update('none');
+            const idx = pixelToReadoutIndex(chartRef, event.x);
+            if (idx == null) return;
+            if (idx === chartRef.$readoutIndex) return;
+            applyReadoutAtIndex(chartRef, idx);
           },
           scales: {
             y: {
@@ -1321,30 +1403,59 @@
               title: { display: !touchChartUi(), text: 'Minutes' }
             },
             x: {
+              type: 'time',
+              min: tMin,
+              max: tMax,
               grid: { display: false, drawBorder: false },
+              // Must be on the scale, not under ticks — Chart only calls options.afterBuildTicks.
+              afterBuildTicks: function (axis) {
+                const bw = chartBuild.bounds;
+                const hr = chartBuild.hoursNum;
+                axis.ticks = buildChartTickValues(bw.tMin, bw.tMax, hr).map(function (ms) {
+                  return { value: ms };
+                });
+              },
               ticks: {
                 autoSkip: false,
                 minRotation: 45,
                 maxRotation: 45,
-                callback: function(_value, index) {
-                  const iso = rawTimes[index];
-                  if (!iso) return '';
-                  const dt = new Date(iso);
-                  if (!shouldShowTick(dt, currentHours)) return '';
-                  return formatTick(dt, currentHours);
-                }
-              }
-            }
-          }
-        }
+                callback: function (value, index, ticks) {
+                  const tick = ticks[index];
+                  const ms = tick != null && tick.value != null ? tick.value : value;
+                  if (ms == null || ms === '') return '';
+                  const dt = new Date(ms);
+                  return formatTick(dt, chartBuild.hoursNum);
+                },
+              },
+            },
+          },
+        },
       });
       chart.$queueTypeOrder = queueTypes;
+      chart.$mergedRows = mergedRows;
+      chart.$mergedTimesMs = mergedTimesMs;
+      chart.$chartWindowMs = bounds;
+      chart.$chartHours = hoursNum;
 
-      if (labels.length) {
-        const last = labels.length - 1;
+      if (mergedTimesMs.length) {
+        let last = mergedTimesMs.length - 1;
+        for (let ri = mergedRows.length - 1; ri >= 0; ri--) {
+          const row = mergedRows[ri];
+          let any = false;
+          for (let qi = 0; qi < queueTypes.length; qi++) {
+            if (row[queueTypes[qi]] != null) {
+              any = true;
+              break;
+            }
+          }
+          if (any) {
+            last = ri;
+            break;
+          }
+        }
         if (touchChartUi()) {
           chart.$readoutIndex = last;
-          setFixedReadout(labels[last], chart, last);
+          setFixedReadout(formatChartAxisLabel(new Date(mergedTimesMs[last])), chart, last);
           chart.update('none');
           attachChartTouchScrub(chart);
         } else {
@@ -1355,6 +1466,8 @@
       } else {
         hideCallout();
         clearFixedReadout();
+        chart.$readoutIndex = null;
+        chart.update('none');
       }
       hideChartLoading();
     }
@@ -1478,10 +1591,15 @@
               val.className = 'tab-wait-val';
               if (seg) {
                 lbl.textContent = seg.label;
-                const pill = document.createElement('span');
-                pill.className = window.waitTimePillClass(seg.minutes);
-                pill.textContent = String(seg.minutes) + 'm';
-                val.appendChild(pill);
+                if (seg.minutes == null) {
+                  val.textContent = '—';
+                  val.classList.add('tab-wait-val--dash');
+                } else {
+                  const pill = document.createElement('span');
+                  pill.className = window.waitTimePillClass(seg.minutes);
+                  pill.textContent = String(seg.minutes) + 'm';
+                  val.appendChild(pill);
+                }
               } else {
                 lbl.textContent = '\u00a0';
                 val.textContent = '\u00a0';
@@ -1517,6 +1635,7 @@
     fetch('/api/latest')
       .then(r => r.json())
       .then(data => {
+        pageGlobalLatestScrapedMs = data.scraped_at_utc ? Date.parse(data.scraped_at_utc) : null;
         const rows = (data.airports || {})[pageAirport];
         const emptyLabel = 'Last update: —';
         if (data.scraped_at_utc) {

@@ -3,6 +3,8 @@
 import json
 import os
 import sqlite3
+import threading
+import time
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
@@ -131,9 +133,13 @@ def api_catalog():
     return jsonify(payload)
 
 
-@app.route("/api/latest")
-def api_latest():
-    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue_type."""
+_LATEST_CACHE_TTL_SEC = 30.0
+_latest_cache_lock = threading.Lock()
+_latest_cache: dict = {"mono_at": 0.0, "payload": None}
+
+
+def _compute_api_latest_payload() -> dict:
+    """Build the JSON-serializable body for ``GET /api/latest`` (no HTTP)."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -142,21 +148,40 @@ def api_latest():
     row = cur.fetchone()
     if not row:
         conn.close()
-        return jsonify(scraped_at_utc=None, airports={})
+        return {"scraped_at_utc": None, "airports": {}}
 
     scraped_at_utc = row[0]
+    since_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
     cur.execute(
         """
         SELECT airport, terminal, gate, queue_type, wait_minutes
         FROM wait_times
         WHERE scraped_at_utc = ?
-        ORDER BY airport, terminal, gate, queue_type
         """,
         (scraped_at_utc,),
     )
-    rows = cur.fetchall()
+    latest_map: dict[tuple[str, str, str, str], int | None] = {}
+    for airport, terminal, gate, queue_type, wait_minutes in cur.fetchall():
+        g = gate or ""
+        latest_map[(airport, terminal, g, queue_type)] = wait_minutes
+
+    cur.execute(
+        """
+        SELECT DISTINCT airport, terminal, gate, queue_type
+        FROM wait_times
+        WHERE scraped_at_utc >= ?
+        ORDER BY airport, terminal, gate, queue_type
+        """,
+        (since_24h,),
+    )
+    recent_keys = cur.fetchall()
+    conn.close()
+
     airports: dict[str, dict[tuple[str, str], dict]] = {}
-    for airport, terminal, gate, queue_type, wait_minutes in rows:
+    for airport, terminal, gate, queue_type in recent_keys:
         if airport not in airports:
             airports[airport] = {}
         g = gate or ""
@@ -164,36 +189,9 @@ def api_latest():
         if key not in airports[airport]:
             airports[airport][key] = {"queues": {}}
         slot = airports[airport][key]["queues"]
-        if queue_type not in slot:
-            slot[queue_type] = {"minutes": None, "spark": []}
-        slot[queue_type]["minutes"] = wait_minutes
-
-    since_6h = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
-    cur.execute(
-        """
-        SELECT airport, terminal, gate, queue_type, scraped_at_utc, wait_minutes
-        FROM wait_times
-        WHERE scraped_at_utc >= ?
-        ORDER BY scraped_at_utc
-        """,
-        (since_6h,),
-    )
-    history_rows = cur.fetchall()
-    conn.close()
-
-    for airport, terminal, gate, queue_type, scraped_at_utc, wait_minutes in history_rows:
-        g = gate or ""
-        key = (terminal, g)
-        if airport not in airports or key not in airports[airport]:
-            continue
-        queues = airports[airport][key]["queues"]
-        if queue_type not in queues:
-            queues[queue_type] = {"minutes": None, "spark": []}
-        queues[queue_type]["spark"].append(
-            {"t": scraped_at_utc, "minutes": wait_minutes}
-        )
+        slot[queue_type] = {
+            "minutes": latest_map.get((airport, terminal, g, queue_type))
+        }
 
     result = {}
     for airport, terms in airports.items():
@@ -210,7 +208,37 @@ def api_latest():
         k: v for k, v in result.items() if not is_hidden_airport(k)
     }
 
-    return jsonify(scraped_at_utc=scraped_at_utc, airports=result)
+    return {"scraped_at_utc": scraped_at_utc, "airports": result}
+
+
+@app.route("/api/latest")
+def api_latest():
+    """Wait times at the newest global scrape, keyed by activity in the last 24 hours.
+
+    ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
+    ``airports`` includes each airport / terminal / gate / queue_type that appears
+    in the last 24 hours. ``minutes`` is the raw point wait at ``scraped_at_utc`` when
+    stored, otherwise ``null`` (range-only rows or missing checkpoint at that scrape).
+
+    Responses are ``Cache-Control: public, max-age=30`` and recomputed at most
+    once per process every 30 seconds (in-memory), so bursts of traffic mostly
+    hit RAM rather than SQLite.
+    """
+    with _latest_cache_lock:
+        now = time.monotonic()
+        if (
+            _latest_cache["payload"] is not None
+            and (now - _latest_cache["mono_at"]) < _LATEST_CACHE_TTL_SEC
+        ):
+            payload = _latest_cache["payload"]
+        else:
+            payload = _compute_api_latest_payload()
+            _latest_cache["payload"] = payload
+            _latest_cache["mono_at"] = now
+
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "public, max-age=30"
+    return resp
 
 
 @app.route("/api/history")
@@ -232,11 +260,22 @@ def api_history():
     if hours not in allowed_hours:
         return jsonify(error="hours must be one of 6, 12, 24, 72, 168"), 400
 
-    since = (datetime.now(timezone.utc) - timedelta(hours=int(hours))).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
     conn = get_db()
     cur = conn.cursor()
+    cur.execute(
+        "SELECT scraped_at_utc FROM wait_times ORDER BY scraped_at_utc DESC LIMIT 1"
+    )
+    global_latest_row = cur.fetchone()
+    if not global_latest_row:
+        conn.close()
+        return jsonify(queues={}, latest_scraped_at_utc=None)
+
+    global_latest_iso = global_latest_row[0]
+    gl = global_latest_iso[:-1] + "+00:00" if global_latest_iso.endswith("Z") else global_latest_iso
+    global_latest_dt = datetime.fromisoformat(gl)
+    since_dt = global_latest_dt - timedelta(hours=int(hours))
+    since = since_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     cur.execute(
         """
         SELECT scraped_at_utc
