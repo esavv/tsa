@@ -25,7 +25,7 @@ SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
 DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
 ATL_TIMES_URL = "https://www.atl.com/times/"
 ATL_LEGACY_DOM_SELECTOR = "#nesclasser2 .declasser3 button span"
-ATL_LAYOUT_READY_MS = 120_000
+ATL_LAYOUT_READY_MS = 45_000
 ATL_LEGACY_FALLBACK_MS = 20_000
 ATL_NEW_SCAN_JS = r"""() => {
     const norm = (el) => (typeof el === "string" ? el : (el.textContent || ""))
