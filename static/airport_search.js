@@ -182,6 +182,10 @@
         metro_label: metroLabel,
         aliases: ap.aliases || [],
         terminal_tab: terminalTab,
+        wait_times_ui: ap.wait_times_ui || {
+          chip: 'absolute',
+          chart_series: ['absolute'],
+        },
         status: st,
       });
     }
@@ -250,7 +254,11 @@
     for (var i = 0; i < list.length; i++) {
       if (list[i].code === code) return list[i];
     }
-    return { code: code, terminal_tab: {} };
+    return {
+      code: code,
+      terminal_tab: {},
+      wait_times_ui: { chip: 'absolute', chart_series: ['absolute'] },
+    };
   }
 
   function sortTerminalRows(catalogEntry, terminalRows) {

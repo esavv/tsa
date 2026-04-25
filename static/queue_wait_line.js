@@ -55,8 +55,10 @@
     if (chip === 'range') {
       if (lo == null && hi != null) return { text: '<' + hi + 'm', pillMetric: hi };
       if (hi == null && lo != null) return { text: '>' + lo + 'm', pillMetric: lo };
-      if (lo != null && hi != null) return { text: String(lo) + '–' + String(hi) + 'm', pillMetric: hi };
-      return { text: '—', pillMetric: null };
+      if (lo != null && hi != null) {
+        return { text: String(lo) + '-' + String(hi) + 'm', pillMetric: hi };
+      }
+      return { text: '-', pillMetric: null };
     }
     /* absolute */
     if (mn == null) return { text: '—', pillMetric: null };
@@ -116,7 +118,7 @@
       var valueHtml;
       if (disp.pillMetric == null) {
         valueHtml =
-          '<span class="airport-search-chip__wait--empty">' + esc('—') + '</span>';
+          '<span class="airport-search-chip__wait--empty">' + esc(disp.text) + '</span>';
       } else {
         valueHtml =
           '<span class="' +

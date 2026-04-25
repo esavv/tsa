@@ -1111,29 +1111,110 @@
       calloutEl.className = 'chart-callout';
     }
 
+    function readoutFiniteNum(x) {
+      return x != null && isFinite(Number(x));
+    }
+
     /**
-     * Chart readout: one label/value row per plotted series (matches ``chart_series``).
+     * One readout value for a range pair (same semantics as range chips; ASCII hyphen in band).
      */
-    function readoutSeriesHtml(seriesDefs, values, compactMin) {
+    function formatReadoutRangeValue(lo, hi, compactMin) {
+      const suf = compactMin ? 'm' : ' min';
+      if (readoutFiniteNum(lo) && readoutFiniteNum(hi)) {
+        const loN = Math.round(Number(lo));
+        const hiN = Math.round(Number(hi));
+        return { text: String(loN) + '-' + String(hiN) + suf, pillMetric: hiN };
+      }
+      if (readoutFiniteNum(lo) && !readoutFiniteNum(hi)) {
+        const loN = Math.round(Number(lo));
+        return { text: '>' + String(loN) + suf, pillMetric: loN };
+      }
+      if (!readoutFiniteNum(lo) && readoutFiniteNum(hi)) {
+        const hiN = Math.round(Number(hi));
+        return { text: '<' + String(hiN) + suf, pillMetric: hiN };
+      }
+      return { text: '-', pillMetric: null };
+    }
+
+    /** Row count for layout (range = one row despite two plotted series). */
+    function chartReadoutRowCount(seriesDefs) {
       const defs = seriesDefs || [];
-      const vals = values || [];
-      if (!defs.length) return '';
-      let html = '<div class="chart-readout-grid chart-readout-grid--series">';
+      let n = 0;
       for (let i = 0; i < defs.length; i++) {
-        const v = vals[i];
-        html += '<span class="chart-readout-lbl">' + escapeHtml(defs[i].readoutLbl) + '</span>';
-        html += '<span class="chart-readout-val">';
-        if (v == null || !isFinite(Number(v))) {
-          html += '–';
+        const d = defs[i];
+        const next = defs[i + 1];
+        if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
+          n++;
+          i++;
         } else {
-          const pillClass = window.waitTimePillClass(v);
-          const suffix = compactMin ? 'm' : ' min';
-          html +=
-            '<span class="' +
-            pillClass +
-            '">' +
-            escapeHtml(String(v) + suffix) +
-            '</span>';
+          n++;
+        }
+      }
+      return n;
+    }
+
+    /**
+     * Collapse rmin+rmax into one ``(range)`` row; absolute/min/max stay one row each.
+     */
+    function buildReadoutRows(seriesDefs, seriesValues) {
+      const defs = seriesDefs || [];
+      const vals = seriesValues || [];
+      const rows = [];
+      for (let i = 0; i < defs.length; i++) {
+        const d = defs[i];
+        const next = defs[i + 1];
+        if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
+          rows.push({
+            readoutLbl: queueReadoutLabel(d.qt) + ' (range)',
+            kind: 'range',
+            lo: vals[i],
+            hi: vals[i + 1],
+          });
+          i++;
+        } else {
+          rows.push({
+            readoutLbl: d.readoutLbl,
+            kind: 'single',
+            v: vals[i],
+          });
+        }
+      }
+      return rows;
+    }
+
+    function readoutRowsHtml(rows, compactMin) {
+      if (!rows.length) return '';
+      let html = '<div class="chart-readout-grid chart-readout-grid--series">';
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        html += '<span class="chart-readout-lbl">' + escapeHtml(r.readoutLbl) + '</span>';
+        html += '<span class="chart-readout-val">';
+        if (r.kind === 'range') {
+          const slot = formatReadoutRangeValue(r.lo, r.hi, compactMin);
+          if (slot.pillMetric == null) {
+            html += escapeHtml(slot.text);
+          } else {
+            html +=
+              '<span class="' +
+              window.waitTimePillClass(slot.pillMetric) +
+              '">' +
+              escapeHtml(slot.text) +
+              '</span>';
+          }
+        } else {
+          const v = r.v;
+          if (v == null || !isFinite(Number(v))) {
+            html += '-';
+          } else {
+            const pillClass = window.waitTimePillClass(v);
+            const suffix = compactMin ? 'm' : ' min';
+            html +=
+              '<span class="' +
+              pillClass +
+              '">' +
+              escapeHtml(String(v) + suffix) +
+              '</span>';
+          }
         }
         html += '</span>';
       }
@@ -1145,9 +1226,10 @@
       const compactMin = touchChartUi();
       const defs = chartRef.$seriesDefs || [];
       const vals = readoutValuesAtIndex(chartRef, idx);
+      const rows = buildReadoutRows(defs, vals);
       return (
         '<div class="line1">' + escapeHtml(label) + '</div>' +
-        readoutSeriesHtml(defs, vals, compactMin)
+        readoutRowsHtml(rows, compactMin)
       );
     }
 
@@ -1159,7 +1241,7 @@
 
     function showCallout(x, label, chartRef, idx) {
       const defs = chartRef.$seriesDefs || [];
-      const stacked = defs.length > 2;
+      const stacked = chartReadoutRowCount(defs) > 2;
       calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
       calloutEl.innerHTML = readoutHtml(label, chartRef, idx);
       calloutEl.style.display = 'block';
@@ -1178,7 +1260,7 @@
 
     function setFixedReadout(label, chartRef, idx) {
       const defs = chartRef.$seriesDefs || [];
-      const stacked = defs.length > 2;
+      const stacked = chartReadoutRowCount(defs) > 2;
       readingFixedEl.className = 'chart-reading-fixed' + (stacked ? ' chart-reading-fixed--stacked' : '');
       readingFixedEl.innerHTML = readoutHtml(label, chartRef, idx);
     }
