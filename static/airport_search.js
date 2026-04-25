@@ -302,11 +302,14 @@
       var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc, chipMode);
       var waitsHtml = '';
       if (waitLineHtml) {
-        waitsHtml =
-          '<span class="airport-search-chip__wait-line">' + waitLineHtml + '</span>';
+        waitsHtml = waitLineHtml;
       } else {
         waitsHtml =
-          '<span class="airport-search-chip__wait airport-search-chip__wait--empty">—</span>';
+          '<div class="airport-search-chip__wait-rows">' +
+          '<span class="airport-search-chip__wait-row">' +
+          '<span class="airport-search-chip__wait--empty">—</span></span>' +
+          '<span class="airport-search-chip__wait-row airport-search-chip__wait-row--placeholder" aria-hidden="true">\u00a0</span>' +
+          '</div>';
       }
       html +=
         '<div class="airport-search-chip">' +

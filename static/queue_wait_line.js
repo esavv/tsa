@@ -107,20 +107,16 @@
   }
 
   /**
-   * Search chip wait line: labels plain, each wait segment in a colored pill. `esc` required for HTML safety.
+   * Search chip waits: up to two queue types as stacked rows (no middot); second row
+   * is a height placeholder when only one queue. `esc` required for HTML safety.
    */
   function chipQueueWaitLineHtml(queues, esc, chipMode) {
     var chip = chipMode || 'absolute';
     var picked = chipQueueFirstTwoSlots(queues);
     if (!picked.length) return '';
-    var parts = [];
-    for (var j = 0; j < picked.length; j++) {
-      if (j > 0) {
-        parts.push(
-          '<span class="airport-search-chip__wait-sep" aria-hidden="true"> · </span>'
-        );
-      }
-      var disp = formatWaitChipSlot(chip, picked[j].slot);
+
+    function rowHtml(qt, slot) {
+      var disp = formatWaitChipSlot(chip, slot);
       var valueHtml;
       if (disp.pillMetric == null) {
         valueHtml =
@@ -133,9 +129,22 @@
           esc(disp.text) +
           '</span>';
       }
-      parts.push(esc(chipQueueTypeLabel(picked[j].qt)) + ' ' + valueHtml);
+      return (
+        '<span class="airport-search-chip__wait-row">' +
+        esc(chipQueueTypeLabel(qt)) +
+        ' ' +
+        valueHtml +
+        '</span>'
+      );
     }
-    return parts.join('');
+
+    var row1 = rowHtml(picked[0].qt, picked[0].slot);
+    var row2 =
+      picked.length >= 2
+        ? rowHtml(picked[1].qt, picked[1].slot)
+        : '<span class="airport-search-chip__wait-row airport-search-chip__wait-row--placeholder" aria-hidden="true">\u00a0</span>';
+
+    return '<div class="airport-search-chip__wait-rows">' + row1 + row2 + '</div>';
   }
 
   /**
