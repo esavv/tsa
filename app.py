@@ -3,6 +3,8 @@
 import json
 import os
 import sqlite3
+import threading
+import time
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
@@ -131,15 +133,13 @@ def api_catalog():
     return jsonify(payload)
 
 
-@app.route("/api/latest")
-def api_latest():
-    """Wait times at the newest global scrape, keyed by activity in the last 24 hours.
+_LATEST_CACHE_TTL_SEC = 30.0
+_latest_cache_lock = threading.Lock()
+_latest_cache: dict = {"mono_at": 0.0, "payload": None}
 
-    ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
-    ``airports`` includes each airport / terminal / gate / queue_type that appears
-    in the last 24 hours. ``minutes`` is the value at ``scraped_at_utc`` when a row
-    exists there, otherwise ``null`` (e.g. checkpoint quiet at that scrape).
-    """
+
+def _compute_api_latest_payload() -> dict:
+    """Build the JSON-serializable body for ``GET /api/latest`` (no HTTP)."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -148,7 +148,7 @@ def api_latest():
     row = cur.fetchone()
     if not row:
         conn.close()
-        return jsonify(scraped_at_utc=None, airports={})
+        return {"scraped_at_utc": None, "airports": {}}
 
     scraped_at_utc = row[0]
     since_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
@@ -208,7 +208,37 @@ def api_latest():
         k: v for k, v in result.items() if not is_hidden_airport(k)
     }
 
-    return jsonify(scraped_at_utc=scraped_at_utc, airports=result)
+    return {"scraped_at_utc": scraped_at_utc, "airports": result}
+
+
+@app.route("/api/latest")
+def api_latest():
+    """Wait times at the newest global scrape, keyed by activity in the last 24 hours.
+
+    ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
+    ``airports`` includes each airport / terminal / gate / queue_type that appears
+    in the last 24 hours. ``minutes`` is the value at ``scraped_at_utc`` when a row
+    exists there, otherwise ``null`` (e.g. checkpoint quiet at that scrape).
+
+    Responses are ``Cache-Control: public, max-age=30`` and recomputed at most
+    once per process every 30 seconds (in-memory), so bursts of traffic mostly
+    hit RAM rather than SQLite.
+    """
+    with _latest_cache_lock:
+        now = time.monotonic()
+        if (
+            _latest_cache["payload"] is not None
+            and (now - _latest_cache["mono_at"]) < _LATEST_CACHE_TTL_SEC
+        ):
+            payload = _latest_cache["payload"]
+        else:
+            payload = _compute_api_latest_payload()
+            _latest_cache["payload"] = payload
+            _latest_cache["mono_at"] = now
+
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "public, max-age=30"
+    return resp
 
 
 @app.route("/api/history")
