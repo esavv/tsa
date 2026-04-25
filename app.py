@@ -104,13 +104,13 @@ AIRPORT_CODES = frozenset(
         "MIA",
         "SEA",
         "DCA",
-        "ATL",
         "DFW",
         "DEN",
         "CLT",
         "LAS",
         "MCO",
         "PHX",
+        "ATL",
     }
 )
 
