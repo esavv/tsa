@@ -24,6 +24,116 @@ MIA_WAIT_TIMES_PAGE_URL = "https://www.miami-airport.com/tsa-waittimes.asp"
 SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
 DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
 ATL_TIMES_URL = "https://www.atl.com/times/"
+ATL_LEGACY_DOM_SELECTOR = "#nesclasser2 .declasser3 button span"
+ATL_LAYOUT_READY_MS = 120_000
+ATL_LEGACY_FALLBACK_MS = 20_000
+ATL_NEW_SCAN_JS = r"""() => {
+    const norm = (el) => (typeof el === "string" ? el : (el.textContent || ""))
+        .replace(/\s+/g, " ")
+        .trim();
+    const apo = (s) => s.replace(/[\u2018\u2019`]/g, "'");
+    const realmFromH1 = (tRaw) => {
+        const t = apo(tRaw).toUpperCase();
+        if (t === "DOMESTIC") return "Domestic";
+        if (t === "INT'L" || t.includes("INT'L")) return "International";
+        if (t.startsWith("INT")) return "International";
+        if (t.includes("INTERNATIONAL")) return "International";
+        return "";
+    };
+    const findWait = (h3) => {
+        const n = (x) => (x.textContent || "").replace(/\s+/g, " ").trim();
+        let el = h3.nextElementSibling;
+        for (let i = 0; i < 12 && el; i++, el = el.nextElementSibling) {
+            if (el.tagName === "H1" || el.tagName === "H2") break;
+            const t = n(el);
+            if (/^\d+$/.test(t)) return t;
+            const btn = el.querySelector("button");
+            if (btn) {
+                const bt = n(btn);
+                if (/^\d+$/.test(bt)) return bt;
+            }
+            for (const ch of el.children) {
+                const ct = n(ch);
+                if (/^\d+$/.test(ct)) return ct;
+            }
+        }
+        const p = h3.parentElement;
+        if (p && p.parentElement) {
+            const row = p.parentElement;
+            for (const cell of row.children) {
+                if (cell.contains(h3)) continue;
+                const t = n(cell);
+                if (/^\d+$/.test(t)) return t;
+                const b = cell.querySelector("button");
+                if (b && /^\d+$/.test(n(b))) return n(b);
+            }
+        }
+        return "";
+    };
+    const root = document.querySelector("main") || document.querySelector("#content")
+        || document.body;
+    let realm = "";
+    let seenTsa = false;
+    const results = [];
+    for (const el of root.querySelectorAll("h1, h2, h3")) {
+        if (el.tagName === "H1") {
+            const t = norm(el);
+            if (t.includes("TSA Security")) {
+                seenTsa = true;
+                realm = "";
+                continue;
+            }
+            if (!seenTsa) continue;
+            const r = realmFromH1(t);
+            if (r) {
+                realm = r;
+                continue;
+            }
+            if (t === "ALERTS" || t.includes("Copyright")) realm = "";
+            continue;
+        }
+        if (!seenTsa || !realm || el.tagName !== "H2") continue;
+        const h2 = el;
+        let h3 = h2.nextElementSibling;
+        while (h3 && h3.tagName !== "H3") {
+            if (h3.tagName === "H1" || h3.tagName === "H2") break;
+            h3 = h3.nextElementSibling;
+        }
+        if (!h3 || h3.tagName !== "H3") continue;
+        const waitText = findWait(h3);
+        if (!waitText) continue;
+        results.push({
+            realm,
+            checkpoint: norm(h2),
+            sub: norm(h3),
+            waitText,
+        });
+    }
+    return results;
+}"""
+ATL_LEGACY_SCAN_JS = r"""() => {
+    const results = [];
+    function scan(section, realm) {
+        if (!section) return;
+        for (const row of section.querySelectorAll(":scope > .row")) {
+            const h2 = row.querySelector("h2");
+            const span = row.querySelector(".declasser3 button span");
+            if (!h2 || !span) continue;
+            const h3 = row.querySelector("h3");
+            results.push({
+                realm,
+                checkpoint: h2.textContent.trim(),
+                sub: h3 ? h3.textContent.trim() : "",
+                waitText: span.textContent.trim(),
+            });
+        }
+    }
+    const root = document.querySelector("#nesclasser2");
+    if (!root) return [];
+    scan(root.querySelector(".col-lg-4.nesclasser2"), "Domestic");
+    scan(root.querySelector(".col-lg-5.nesclasser1"), "International");
+    return results;
+}"""
 DFW_WAIT_TIMES_URL = "https://api.dfwairport.mobi/wait-times/checkpoint/DFW"
 DFW_MOBILE_API_KEY = "87856E0636AA4BF282150FCBE1AD63DE"
 DFW_MOBILE_API_VERSION = "170"
@@ -874,60 +984,7 @@ def fetch_las_airport() -> list[dict]:
     return rows
 
 
-def fetch_atl_airport() -> list[dict]:
-    """Load ATL /times/ in a real browser (Cloudflare); parse checkpoint rows from the DOM."""
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 900},
-            locale="en-US",
-        )
-        page = context.new_page()
-        try:
-            page.goto(ATL_TIMES_URL, wait_until="domcontentloaded", timeout=120_000)
-            page.wait_for_selector(
-                "#nesclasser2 .declasser3 button span",
-                timeout=120_000,
-            )
-            page.wait_for_timeout(1500)
-            raw = page.evaluate(
-                """() => {
-                    const results = [];
-                    function scan(section, realm) {
-                        if (!section) return;
-                        for (const row of section.querySelectorAll(":scope > .row")) {
-                            const h2 = row.querySelector("h2");
-                            const span = row.querySelector(".declasser3 button span");
-                            if (!h2 || !span) continue;
-                            const h3 = row.querySelector("h3");
-                            results.push({
-                                realm,
-                                checkpoint: h2.textContent.trim(),
-                                sub: h3 ? h3.textContent.trim() : "",
-                                waitText: span.textContent.trim()
-                            });
-                        }
-                    }
-                    const root = document.querySelector("#nesclasser2");
-                    if (!root) return [];
-                    scan(root.querySelector(".col-lg-4.nesclasser2"), "Domestic");
-                    scan(root.querySelector(".col-lg-5.nesclasser1"), "International");
-                    return results;
-                }"""
-            )
-        finally:
-            context.close()
-            browser.close()
-
+def _atl_scan_items_to_rows(raw: list) -> list[dict]:
     rows: list[dict] = []
     for item in raw:
         wait_text = (item.get("waitText") or "").strip()
@@ -951,6 +1008,55 @@ def fetch_atl_airport() -> list[dict]:
                 "point_id": None,
             }
         )
+    return rows
+
+
+def fetch_atl_airport() -> list[dict]:
+    """Load ATL /times/ in a real browser (Cloudflare); parse checkpoint rows from the DOM."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1280, "height": 900},
+            locale="en-US",
+        )
+        page = context.new_page()
+        try:
+            page.goto(ATL_TIMES_URL, wait_until="domcontentloaded", timeout=120_000)
+            page.wait_for_function(
+                """() => {
+                    if (document.querySelector("#nesclasser2")) return true;
+                    return [...document.querySelectorAll("h1")].some((h) =>
+                        (h.innerText || "").includes("TSA Security"));
+                }""",
+                timeout=ATL_LAYOUT_READY_MS,
+            )
+            page.wait_for_timeout(1500)
+            raw_new = page.evaluate(ATL_NEW_SCAN_JS)
+            rows = _atl_scan_items_to_rows(raw_new)
+            if not rows:
+                try:
+                    page.wait_for_selector(
+                        ATL_LEGACY_DOM_SELECTOR,
+                        timeout=ATL_LEGACY_FALLBACK_MS,
+                    )
+                except Exception:
+                    pass
+                page.wait_for_timeout(500)
+                raw_legacy = page.evaluate(ATL_LEGACY_SCAN_JS)
+                rows = _atl_scan_items_to_rows(raw_legacy)
+        finally:
+            context.close()
+            browser.close()
+
     if not rows:
         raise ValueError("ATL page loaded but no checkpoint rows were found")
     return rows
