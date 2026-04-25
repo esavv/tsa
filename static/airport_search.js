@@ -305,10 +305,12 @@
         waitsHtml = waitLineHtml;
       } else {
         waitsHtml =
-          '<div class="airport-search-chip__wait-rows">' +
-          '<span class="airport-search-chip__wait-row">' +
+          '<div class="airport-search-chip__wait-grid">' +
+          '<span class="airport-search-chip__wait-lbl" aria-hidden="true">\u00a0</span>' +
+          '<span class="airport-search-chip__wait-val">' +
           '<span class="airport-search-chip__wait--empty">—</span></span>' +
-          '<span class="airport-search-chip__wait-row airport-search-chip__wait-row--placeholder" aria-hidden="true">\u00a0</span>' +
+          '<span class="airport-search-chip__wait-lbl airport-search-chip__wait-lbl--placeholder" aria-hidden="true">\u00a0</span>' +
+          '<span class="airport-search-chip__wait-val airport-search-chip__wait-val--placeholder" aria-hidden="true">\u00a0</span>' +
           '</div>';
       }
       html +=

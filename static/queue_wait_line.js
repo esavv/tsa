@@ -107,15 +107,15 @@
   }
 
   /**
-   * Search chip waits: up to two queue types as stacked rows (no middot); second row
-   * is a height placeholder when only one queue. `esc` required for HTML safety.
+   * Search chip waits: up to two queue types in a label|value grid (like airport tab chips);
+   * second row is invisible placeholders when only one queue. `esc` required for HTML safety.
    */
   function chipQueueWaitLineHtml(queues, esc, chipMode) {
     var chip = chipMode || 'absolute';
     var picked = chipQueueFirstTwoSlots(queues);
     if (!picked.length) return '';
 
-    function rowHtml(qt, slot) {
+    function pairCells(qt, slot) {
       var disp = formatWaitChipSlot(chip, slot);
       var valueHtml;
       if (disp.pillMetric == null) {
@@ -130,21 +130,25 @@
           '</span>';
       }
       return (
-        '<span class="airport-search-chip__wait-row">' +
+        '<span class="airport-search-chip__wait-lbl">' +
         esc(chipQueueTypeLabel(qt)) +
-        ' ' +
+        '</span>' +
+        '<span class="airport-search-chip__wait-val">' +
         valueHtml +
         '</span>'
       );
     }
 
-    var row1 = rowHtml(picked[0].qt, picked[0].slot);
-    var row2 =
-      picked.length >= 2
-        ? rowHtml(picked[1].qt, picked[1].slot)
-        : '<span class="airport-search-chip__wait-row airport-search-chip__wait-row--placeholder" aria-hidden="true">\u00a0</span>';
+    var cells = pairCells(picked[0].qt, picked[0].slot);
+    if (picked.length >= 2) {
+      cells += pairCells(picked[1].qt, picked[1].slot);
+    } else {
+      cells +=
+        '<span class="airport-search-chip__wait-lbl airport-search-chip__wait-lbl--placeholder" aria-hidden="true">\u00a0</span>' +
+        '<span class="airport-search-chip__wait-val airport-search-chip__wait-val--placeholder" aria-hidden="true">\u00a0</span>';
+    }
 
-    return '<div class="airport-search-chip__wait-rows">' + row1 + row2 + '</div>';
+    return '<div class="airport-search-chip__wait-grid">' + cells + '</div>';
   }
 
   /**
