@@ -230,11 +230,22 @@ def api_history():
     if hours not in allowed_hours:
         return jsonify(error="hours must be one of 6, 12, 24, 72, 168"), 400
 
-    since = (datetime.now(timezone.utc) - timedelta(hours=int(hours))).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
     conn = get_db()
     cur = conn.cursor()
+    cur.execute(
+        "SELECT scraped_at_utc FROM wait_times ORDER BY scraped_at_utc DESC LIMIT 1"
+    )
+    global_latest_row = cur.fetchone()
+    if not global_latest_row:
+        conn.close()
+        return jsonify(queues={}, latest_scraped_at_utc=None)
+
+    global_latest_iso = global_latest_row[0]
+    gl = global_latest_iso[:-1] + "+00:00" if global_latest_iso.endswith("Z") else global_latest_iso
+    global_latest_dt = datetime.fromisoformat(gl)
+    since_dt = global_latest_dt - timedelta(hours=int(hours))
+    since = since_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     cur.execute(
         """
         SELECT scraped_at_utc
