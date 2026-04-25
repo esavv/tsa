@@ -28,7 +28,7 @@ def migrate_wait_times_add_gate(conn: sqlite3.Connection) -> None:
             terminal TEXT NOT NULL,
             gate TEXT NOT NULL DEFAULT '',
             queue_type TEXT NOT NULL,
-            wait_minutes INTEGER NOT NULL,
+            wait_minutes INTEGER,
             wait_min_minutes INTEGER,
             wait_max_minutes INTEGER,
             source_updated_at TEXT,
@@ -65,6 +65,51 @@ def migrate_wait_times_add_range_columns(conn: sqlite3.Connection) -> None:
         cur.execute("ALTER TABLE wait_times ADD COLUMN wait_max_minutes INTEGER")
 
 
+def migrate_wait_times_nullable_wait_minutes(conn: sqlite3.Connection) -> None:
+    """Rebuild wait_times if wait_minutes is still NOT NULL (SQLite cannot drop NOT NULL in place)."""
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'")
+    if not cur.fetchone():
+        return
+    cur.execute("PRAGMA table_info(wait_times)")
+    rows = cur.fetchall()
+    wait_col = next((r for r in rows if r[1] == "wait_minutes"), None)
+    if wait_col is None:
+        return
+    if int(wait_col[3]) == 0:
+        return
+    cur.executescript(
+        """
+        CREATE TABLE wait_times_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scraped_at_utc TEXT NOT NULL,
+            airport TEXT NOT NULL,
+            terminal TEXT NOT NULL,
+            gate TEXT NOT NULL DEFAULT '',
+            queue_type TEXT NOT NULL,
+            wait_minutes INTEGER,
+            wait_min_minutes INTEGER,
+            wait_max_minutes INTEGER,
+            source_updated_at TEXT,
+            point_id INTEGER,
+            UNIQUE(scraped_at_utc, airport, terminal, queue_type, gate)
+        );
+        INSERT INTO wait_times_new (
+            id, scraped_at_utc, airport, terminal, gate, queue_type,
+            wait_minutes, wait_min_minutes, wait_max_minutes, source_updated_at, point_id
+        )
+        SELECT
+            id, scraped_at_utc, airport, terminal, gate, queue_type,
+            wait_minutes, wait_min_minutes, wait_max_minutes, source_updated_at, point_id
+        FROM wait_times;
+        DROP TABLE wait_times;
+        ALTER TABLE wait_times_new RENAME TO wait_times;
+        CREATE INDEX IF NOT EXISTS idx_wait_times_scraped ON wait_times(scraped_at_utc);
+        CREATE INDEX IF NOT EXISTS idx_wait_times_airport_terminal ON wait_times(airport, terminal);
+        """
+    )
+
+
 def init_db(db_path: str | None = None) -> str:
     db_path = db_path or os.environ.get("TSA_DB_PATH", DEFAULT_DB_PATH)
     with open(SCHEMA_PATH) as f:
@@ -73,6 +118,7 @@ def init_db(db_path: str | None = None) -> str:
     migrate_wait_times_add_gate(conn)
     conn.executescript(schema_sql)
     migrate_wait_times_add_range_columns(conn)
+    migrate_wait_times_nullable_wait_minutes(conn)
     conn.commit()
     conn.close()
     return db_path

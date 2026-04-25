@@ -163,7 +163,7 @@ def _compute_api_latest_payload() -> dict:
         """,
         (scraped_at_utc,),
     )
-    latest_map: dict[tuple[str, str, str, str], int] = {}
+    latest_map: dict[tuple[str, str, str, str], int | None] = {}
     for airport, terminal, gate, queue_type, wait_minutes in cur.fetchall():
         g = gate or ""
         latest_map[(airport, terminal, g, queue_type)] = wait_minutes
@@ -217,8 +217,8 @@ def api_latest():
 
     ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
     ``airports`` includes each airport / terminal / gate / queue_type that appears
-    in the last 24 hours. ``minutes`` is the value at ``scraped_at_utc`` when a row
-    exists there, otherwise ``null`` (e.g. checkpoint quiet at that scrape).
+    in the last 24 hours. ``minutes`` is the raw point wait at ``scraped_at_utc`` when
+    stored, otherwise ``null`` (range-only rows or missing checkpoint at that scrape).
 
     Responses are ``Cache-Control: public, max-age=30`` and recomputed at most
     once per process every 30 seconds (in-memory), so bursts of traffic mostly

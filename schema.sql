@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS wait_times (
     terminal TEXT NOT NULL,
     gate TEXT NOT NULL DEFAULT '',
     queue_type TEXT NOT NULL,
-    wait_minutes INTEGER NOT NULL,
+    wait_minutes INTEGER,
     wait_min_minutes INTEGER,
     wait_max_minutes INTEGER,
     source_updated_at TEXT,

@@ -144,27 +144,36 @@ def parse_wait_minutes(value: str) -> int:
     return 0
 
 
-def parse_wait_minutes_with_range(value: str) -> tuple[int, int | None, int | None]:
-    """Same point estimate as parse_wait_minutes; when the text is a numeric range, also return endpoints."""
-    lowered = value.lower()
+def parse_wait_text_to_fields(value: str) -> tuple[int | None, int | None, int | None]:
+    """(wait_minutes, wait_min_minutes, wait_max_minutes). Point only for a lone integer; bands never fill point.
+
+    ``<n`` → (None, 0, n); ``>n`` → (None, n, None); ``a-b`` → (None, a, b); closed/unavailable → (0, None, None).
+    """
+    lowered = (value or "").lower().strip()
+    if not lowered:
+        return None, None, None
     if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
         return 0, None, None
 
-    less_than = re.search(r"<\s*(\d+)", lowered)
-    if less_than:
-        return max(int(less_than.group(1)) - 1, 0), None, None
+    gt_match = re.search(r">\s*(\d+)", lowered)
+    if gt_match:
+        return None, int(gt_match.group(1)), None
+
+    lt_match = re.search(r"<\s*(\d+)", lowered)
+    if lt_match:
+        return None, 0, int(lt_match.group(1))
 
     range_match = re.search(r"(\d+)\s*[-–]\s*(\d+)", lowered)
     if range_match:
         start = int(range_match.group(1))
         end = int(range_match.group(2))
-        return round((start + end) / 2), start, end
+        return None, start, end
 
     integer_match = re.search(r"(\d+)", lowered)
     if integer_match:
         return int(integer_match.group(1)), None, None
 
-    return 0, None, None
+    return None, None, None
 
 
 def parse_den_wait_minutes(value: str) -> int:
@@ -188,28 +197,61 @@ def parse_den_wait_minutes(value: str) -> int:
     return 0
 
 
-def parse_den_wait_with_range(value: str) -> tuple[int, int | None, int | None]:
-    """DEN: point wait matches parse_den_wait_minutes; ranges set min/max to the band (wait = high end)."""
-    lowered = value.lower()
+def parse_den_wait_to_fields(value: str) -> tuple[int | None, int | None, int | None]:
+    """DEN FlyFruition strings → (point, min, max). Same rules as parse_wait_text_to_fields (no synthetic point for ranges)."""
+    lowered = (value or "").lower().strip()
+    if not lowered:
+        return None, None, None
     if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
         return 0, None, None
 
-    less_than = re.search(r"<\s*(\d+)", lowered)
-    if less_than:
-        return max(int(less_than.group(1)) - 1, 0), None, None
+    gt_match = re.search(r">\s*(\d+)", lowered)
+    if gt_match:
+        return None, int(gt_match.group(1)), None
+
+    lt_match = re.search(r"<\s*(\d+)", lowered)
+    if lt_match:
+        return None, 0, int(lt_match.group(1))
 
     range_match = re.search(r"(\d+)\s*[-–]\s*(\d+)", lowered)
     if range_match:
         lo = int(range_match.group(1))
         hi = int(range_match.group(2))
-        return hi, lo, hi
+        return None, lo, hi
 
     integer_match = re.search(r"(\d+)", lowered)
     if integer_match:
-        n = int(integer_match.group(1))
-        return n, None, None
+        return int(integer_match.group(1)), None, None
 
-    return 0, None, None
+    return None, None, None
+
+
+def _phx_mia_wait_fields(point: dict) -> tuple[int | None, int | None, int | None]:
+    """MIA / PHX Avinor-style payloads: raw point from projected seconds; min/max from minute fields (partial OK)."""
+    wait_m: int | None = None
+    pws = point.get("projectedWaitTime")
+    if pws is not None:
+        try:
+            wait_m = max(0, round(float(pws) / 60))
+        except (TypeError, ValueError):
+            wait_m = None
+
+    min_m: int | None = None
+    max_m: int | None = None
+    mi, ma = point.get("projectedMinWaitMinutes"), point.get("projectedMaxWaitMinutes")
+    if mi is not None:
+        try:
+            min_m = int(mi)
+        except (TypeError, ValueError):
+            pass
+    if ma is not None:
+        try:
+            max_m = int(ma)
+        except (TypeError, ValueError):
+            pass
+    if min_m is None and max_m is not None:
+        min_m = 0
+    return wait_m, min_m, max_m
 
 
 def omit_nyc_wait_point(point: dict) -> bool:
@@ -239,13 +281,22 @@ def fetch_nyc_airport(airport: str) -> list[dict]:
     for point in points:
         if omit_nyc_wait_point(point):
             continue
+        raw_tm = point.get("timeInMinutes")
+        if raw_tm is None:
+            continue
+        try:
+            wm = int(raw_tm)
+        except (TypeError, ValueError):
+            continue
         rows.append(
             {
                 "airport": airport,
                 "terminal": point.get("terminal", ""),
                 "gate": normalize_nyc_gate(point.get("gate")),
                 "queue_type": "general" if point.get("queueType") == "Reg" else "precheck",
-                "wait_minutes": int(point.get("timeInMinutes", 0)),
+                "wait_minutes": wm,
+                "wait_min_minutes": None,
+                "wait_max_minutes": None,
                 "source_updated_at": point.get("updateTime") or None,
                 "point_id": point.get("pointID"),
             }
@@ -274,7 +325,9 @@ def fetch_lax_airport() -> list[dict]:
         terminal = normalize_terminal(cells[0])
         lane = clean_html_text(cells[1])
         wait_text = clean_html_text(cells[2])
-        w, lo, hi = parse_wait_minutes_with_range(wait_text)
+        w, lo, hi = parse_wait_text_to_fields(wait_text)
+        if w is None and lo is None and hi is None:
+            continue
         rows.append(
             {
                 "airport": "LAX",
@@ -324,23 +377,9 @@ def fetch_mia_airport() -> list[dict]:
         if not queue_name or " " not in queue_name:
             continue
         terminal, lane = queue_name.split(" ", 1)
-        projected_wait_seconds = point.get("projectedWaitTime")
-        min_wait_m: int | None = None
-        max_wait_m: int | None = None
-        if projected_wait_seconds is not None:
-            wait_minutes = round(float(projected_wait_seconds) / 60)
-            mi = point.get("projectedMinWaitMinutes")
-            ma = point.get("projectedMaxWaitMinutes")
-            if mi is not None and ma is not None:
-                try:
-                    min_wait_m, max_wait_m = int(mi), int(ma)
-                except (TypeError, ValueError):
-                    pass
-        else:
-            min_wait = int(point.get("projectedMinWaitMinutes", 0))
-            max_wait = int(point.get("projectedMaxWaitMinutes", 0))
-            wait_minutes = round((min_wait + max_wait) / 2)
-            min_wait_m, max_wait_m = min_wait, max_wait
+        wait_minutes, min_wait_m, max_wait_m = _phx_mia_wait_fields(point)
+        if wait_minutes is None and min_wait_m is None and max_wait_m is None:
+            continue
 
         rows.append(
             {
@@ -348,7 +387,7 @@ def fetch_mia_airport() -> list[dict]:
                 "terminal": normalize_terminal(terminal),
                 "gate": "",
                 "queue_type": normalize_queue_type(lane),
-                "wait_minutes": int(wait_minutes),
+                "wait_minutes": wait_minutes,
                 "wait_min_minutes": min_wait_m,
                 "wait_max_minutes": max_wait_m,
                 "source_updated_at": point.get("time") or None,
@@ -397,35 +436,37 @@ def fetch_dca_airport() -> list[dict]:
     for checkpoint in checkpoints.values():
         terminal = normalize_terminal(checkpoint.get("location", ""))
         if checkpoint.get("isDisabled") != 1:
-            w, lo, hi = parse_wait_minutes_with_range(str(checkpoint.get("waittime", "0")))
-            rows.append(
-                {
-                    "airport": "DCA",
-                    "terminal": terminal,
-                    "gate": "",
-                    "queue_type": "general",
-                    "wait_minutes": w,
-                    "wait_min_minutes": lo,
-                    "wait_max_minutes": hi,
-                    "source_updated_at": None,
-                    "point_id": None,
-                }
-            )
+            w, lo, hi = parse_wait_text_to_fields(str(checkpoint.get("waittime", "0")))
+            if w is not None or lo is not None or hi is not None:
+                rows.append(
+                    {
+                        "airport": "DCA",
+                        "terminal": terminal,
+                        "gate": "",
+                        "queue_type": "general",
+                        "wait_minutes": w,
+                        "wait_min_minutes": lo,
+                        "wait_max_minutes": hi,
+                        "source_updated_at": None,
+                        "point_id": None,
+                    }
+                )
         if checkpoint.get("pre_disabled") != 1:
-            w, lo, hi = parse_wait_minutes_with_range(str(checkpoint.get("pre", "0")))
-            rows.append(
-                {
-                    "airport": "DCA",
-                    "terminal": terminal,
-                    "gate": "",
-                    "queue_type": "precheck",
-                    "wait_minutes": w,
-                    "wait_min_minutes": lo,
-                    "wait_max_minutes": hi,
-                    "source_updated_at": None,
-                    "point_id": None,
-                }
-            )
+            w, lo, hi = parse_wait_text_to_fields(str(checkpoint.get("pre", "0")))
+            if w is not None or lo is not None or hi is not None:
+                rows.append(
+                    {
+                        "airport": "DCA",
+                        "terminal": terminal,
+                        "gate": "",
+                        "queue_type": "precheck",
+                        "wait_minutes": w,
+                        "wait_min_minutes": lo,
+                        "wait_max_minutes": hi,
+                        "source_updated_at": None,
+                        "point_id": None,
+                    }
+                )
     return rows
 
 
@@ -523,7 +564,16 @@ def _mobi_terminal_gate(airport: str, wt: dict) -> tuple[str, str]:
 
 
 def _dedupe_wait_rows_by_checkpoint(rows: list[dict]) -> list[dict]:
-    """Merge duplicate airport/terminal/gate/queue rows (keep max wait, latest updated)."""
+    """Merge duplicate airport/terminal/gate/queue rows (prefer higher point wait, then fresher source)."""
+
+    def _point_rank(w: object) -> tuple[int, int]:
+        if w is None:
+            return (-1, 0)
+        try:
+            return (1, int(w))
+        except (TypeError, ValueError):
+            return (-1, 0)
+
     merged: dict[tuple[str, str, str, str], dict] = {}
     for r in rows:
         k = (r["airport"], r["terminal"], r.get("gate", ""), r["queue_type"])
@@ -531,17 +581,24 @@ def _dedupe_wait_rows_by_checkpoint(rows: list[dict]) -> list[dict]:
             merged[k] = dict(r)
             continue
         cur = merged[k]
-        if r["wait_minutes"] > cur["wait_minutes"]:
-            cur["wait_minutes"] = r["wait_minutes"]
-            cur["wait_min_minutes"] = r.get("wait_min_minutes")
-            cur["wait_max_minutes"] = r.get("wait_max_minutes")
-        a = r.get("source_updated_at") or ""
-        b = cur.get("source_updated_at") or ""
+        rw, cw = r.get("wait_minutes"), cur.get("wait_minutes")
+        r_rank, r_val = _point_rank(rw)
+        c_rank, c_val = _point_rank(cw)
+        if (r_rank, r_val) > (c_rank, c_val):
+            merged[k] = dict(r)
+            continue
+        if (r_rank, r_val) == (c_rank, c_val):
+            a, b = r.get("source_updated_at") or "", cur.get("source_updated_at") or ""
+            if a > b:
+                merged[k] = dict(r)
+            continue
+        a, b = r.get("source_updated_at") or "", cur.get("source_updated_at") or ""
         if a > b:
             cur["source_updated_at"] = r.get("source_updated_at")
-            if r["wait_minutes"] <= cur["wait_minutes"]:
-                cur["wait_min_minutes"] = r.get("wait_min_minutes")
-                cur["wait_max_minutes"] = r.get("wait_max_minutes")
+            cur["wait_min_minutes"] = r.get("wait_min_minutes")
+            cur["wait_max_minutes"] = r.get("wait_max_minutes")
+            if rw is not None and cw is None:
+                cur["wait_minutes"] = rw
     return list(merged.values())
 
 
@@ -557,24 +614,18 @@ def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
         if wt.get("isDisplayable") is False:
             continue
         lane = str(wt.get("lane") or "")
-        if airport == "MCO":
-            max_ws = wt.get("maxWaitSeconds")
-            ws = wt.get("waitSeconds")
-            try:
-                if max_ws is not None:
-                    wait_sec = int(max_ws)
-                else:
-                    wait_sec = int(ws or 0)
-            except (TypeError, ValueError):
-                wait_sec = 0
+        ws = wt.get("waitSeconds")
+        if ws is None:
+            wait_minutes: int | None = None
         else:
             try:
-                wait_sec = int(wt.get("waitSeconds", 0))
+                wait_minutes = max(0, round(int(ws) / 60))
             except (TypeError, ValueError):
-                wait_sec = 0
-        wait_minutes = max(0, round(wait_sec / 60))
+                wait_minutes = None
         wait_lo = _mobi_optional_minutes_from_seconds(wt.get("minWaitSeconds"))
         wait_hi = _mobi_optional_minutes_from_seconds(wt.get("maxWaitSeconds"))
+        if wait_minutes is None and wait_lo is None and wait_hi is None:
+            continue
         terminal, gate = _mobi_terminal_gate(airport, wt)
         wid = str(wt.get("id") or "").strip()
         point_id: int | None
@@ -588,7 +639,7 @@ def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
                 "terminal": terminal,
                 "gate": gate,
                 "queue_type": _mobi_queue_type(airport, wt, lane),
-                "wait_minutes": int(wait_minutes),
+                "wait_minutes": wait_minutes,
                 "wait_min_minutes": wait_lo,
                 "wait_max_minutes": wait_hi,
                 "source_updated_at": _iso_from_mobi_timestamp(wt.get("lastUpdatedTimestamp")),
@@ -655,23 +706,9 @@ def fetch_phx_airport() -> list[dict]:
             queue_type = "precheck"
         else:
             queue_type = normalize_queue_type(lane_word)
-        projected_wait_seconds = point.get("projectedWaitTime")
-        min_wait_m: int | None = None
-        max_wait_m: int | None = None
-        if projected_wait_seconds is not None:
-            wait_minutes = round(float(projected_wait_seconds) / 60)
-            mi = point.get("projectedMinWaitMinutes")
-            ma = point.get("projectedMaxWaitMinutes")
-            if mi is not None and ma is not None:
-                try:
-                    min_wait_m, max_wait_m = int(mi), int(ma)
-                except (TypeError, ValueError):
-                    pass
-        else:
-            min_wait = int(point.get("projectedMinWaitMinutes", 0))
-            max_wait = int(point.get("projectedMaxWaitMinutes", 0))
-            wait_minutes = round((min_wait + max_wait) / 2)
-            min_wait_m, max_wait_m = min_wait, max_wait
+        wait_minutes, min_wait_m, max_wait_m = _phx_mia_wait_fields(point)
+        if wait_minutes is None and min_wait_m is None and max_wait_m is None:
+            continue
         m = re.match(r"^(T\d+)\s+(.*)$", route)
         if m:
             terminal, gate = m.group(1), m.group(2).strip()
@@ -683,7 +720,7 @@ def fetch_phx_airport() -> list[dict]:
                 "terminal": terminal,
                 "gate": gate,
                 "queue_type": queue_type,
-                "wait_minutes": int(wait_minutes),
+                "wait_minutes": wait_minutes,
                 "wait_min_minutes": min_wait_m,
                 "wait_max_minutes": max_wait_m,
                 "source_updated_at": point.get("time") or None,
@@ -720,7 +757,9 @@ def fetch_den_airport() -> list[dict]:
             lane_title = clean_html_text(str(lane.get("title") or ""))
             if not lane_title:
                 continue
-            w, lo, hi = parse_den_wait_with_range(str(lane.get("wait_time") or "0"))
+            w, lo, hi = parse_den_wait_to_fields(str(lane.get("wait_time") or "0"))
+            if w is None and lo is None and hi is None:
+                continue
             rows.append(
                 {
                     "airport": "DEN",
@@ -890,7 +929,9 @@ def fetch_atl_airport() -> list[dict]:
     rows: list[dict] = []
     for item in raw:
         wait_text = (item.get("waitText") or "").strip()
-        w, lo, hi = parse_wait_minutes_with_range(wait_text)
+        w, lo, hi = parse_wait_text_to_fields(wait_text)
+        if w is None and lo is None and hi is None:
+            continue
         sub = (item.get("sub") or "").lower()
         queue_type = "precheck" if "pre" in sub else "general"
         checkpoint = (item.get("checkpoint") or "").strip()
@@ -911,6 +952,15 @@ def fetch_atl_airport() -> list[dict]:
     if not rows:
         raise ValueError("ATL page loaded but no checkpoint rows were found")
     return rows
+
+
+def _wait_row_has_signal(row: dict) -> bool:
+    """At least one of point wait or range columns must be present (DB invariant)."""
+    return (
+        row.get("wait_minutes") is not None
+        or row.get("wait_min_minutes") is not None
+        or row.get("wait_max_minutes") is not None
+    )
 
 
 def fetch_airport(airport: str) -> list[dict]:
@@ -946,6 +996,11 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
     cur = conn.cursor()
     inserted = 0
     for row in rows:
+        if not _wait_row_has_signal(row):
+            raise ValueError(
+                "wait row must set at least one of wait_minutes, wait_min_minutes, "
+                f"wait_max_minutes: {row!r}"
+            )
         try:
             cur.execute(
                 """
@@ -960,7 +1015,7 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
                     row["terminal"],
                     row.get("gate", ""),
                     row["queue_type"],
-                    row["wait_minutes"],
+                    row.get("wait_minutes"),
                     row.get("wait_min_minutes"),
                     row.get("wait_max_minutes"),
                     row.get("source_updated_at"),
