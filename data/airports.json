@@ -42,11 +42,11 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "BOS",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "Boston Logan International Airport",
       "metro_key": null,
       "city": "Boston",
@@ -87,7 +87,7 @@
         "chip": "range",
         "chart_series": ["range"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "DCA",
@@ -119,7 +119,7 @@
         "chip": "range",
         "chart_series": ["range"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "DEN",
@@ -144,7 +144,7 @@
         "chip": "range",
         "chart_series": ["range"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "DFW",
@@ -169,7 +169,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "EWR",
@@ -200,7 +200,7 @@
     },
     {
       "code": "FLL",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "Fort Lauderdale-Hollywood International Airport",
       "metro_key": null,
       "city": "Fort Lauderdale",
@@ -268,7 +268,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "LAX",
@@ -294,7 +294,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "LGA",
@@ -345,7 +345,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "MIA",
@@ -370,11 +370,11 @@
         "chip": "range",
         "chart_series": ["range"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "ORD",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "Chicago O'Hare International Airport",
       "metro_key": null,
       "city": "Chicago",
@@ -417,7 +417,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "SEA",
@@ -444,11 +444,11 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "active"
+      "status": "hidden"
     },
     {
       "code": "SFO",
-      "status": "no_data",
+      "status": "hidden",
       "display_name": "San Francisco International Airport",
       "metro_key": null,
       "city": "San Francisco",
