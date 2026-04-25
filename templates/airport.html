@@ -1136,6 +1136,19 @@
       return { text: '-', pillMetric: null };
     }
 
+    /** True when callout should say ``(wait)`` / ``(range)`` to tell the two apart. */
+    function readoutNeedsWaitRangeSuffix(seriesDefs) {
+      const defs = seriesDefs || [];
+      let hasAbs = false;
+      let hasRange = false;
+      for (let i = 0; i < defs.length; i++) {
+        const k = defs[i].kind;
+        if (k === 'absolute') hasAbs = true;
+        if (k === 'rmin' || k === 'rmax') hasRange = true;
+      }
+      return hasAbs && hasRange;
+    }
+
     /** Row count for layout (range = one row despite two plotted series). */
     function chartReadoutRowCount(seriesDefs) {
       const defs = seriesDefs || [];
@@ -1154,26 +1167,33 @@
     }
 
     /**
-     * Collapse rmin+rmax into one ``(range)`` row; absolute/min/max stay one row each.
+     * Collapse rmin+rmax into one range row; absolute/min/max stay one row each.
+     * ``(wait)`` / ``(range)`` suffixes only when both absolute and range are plotted.
      */
     function buildReadoutRows(seriesDefs, seriesValues) {
       const defs = seriesDefs || [];
       const vals = seriesValues || [];
+      const tagWR = readoutNeedsWaitRangeSuffix(defs);
       const rows = [];
       for (let i = 0; i < defs.length; i++) {
         const d = defs[i];
         const next = defs[i + 1];
+        const short = queueReadoutLabel(d.qt);
         if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
           rows.push({
-            readoutLbl: queueReadoutLabel(d.qt) + ' (range)',
+            readoutLbl: tagWR ? short + ' (range)' : short,
             kind: 'range',
             lo: vals[i],
             hi: vals[i + 1],
           });
           i++;
         } else {
+          let lbl = d.readoutLbl;
+          if (d.kind === 'absolute') {
+            lbl = tagWR ? d.readoutLbl : short;
+          }
           rows.push({
-            readoutLbl: d.readoutLbl,
+            readoutLbl: lbl,
             kind: 'single',
             v: vals[i],
           });
