@@ -1571,6 +1571,8 @@
       const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
       const useAreaFill =
         seriesDefs.length === 1 && queueTypes.length <= 2;
+      const rangeLegendSuffix =
+        seriesNorm.includes('absolute') && seriesNorm.includes('range');
       const seriesColorIdx = assignSeriesColorIndices(seriesDefs);
       const datasets = [];
       for (let i = 0; i < seriesDefs.length; i++) {
@@ -1585,6 +1587,7 @@
           const bandRgba = chartHexToRgba(paletteHex, 0.22);
           const segLow = makeGapBreakSegment(lineRgb);
           const segHigh = makeGapBreakSegment(lineRgb);
+          const lowIdx = datasets.length;
           datasets.push({
             label: '',
             rangeLegendSkip: true,
@@ -1608,8 +1611,12 @@
             order: -1,
           });
           datasets.push({
-            label: queueChartDatasetLabel(def.qt) + ' (range)',
+            label:
+              queueChartDatasetLabel(def.qt) +
+              (rangeLegendSuffix ? ' (range)' : ''),
             rangeLegendSkip: false,
+            rangeBandHigh: true,
+            rangeBandLowIndex: lowIdx,
             crosshairDotColor: lineRgb,
             queueTypeKey: next.qt,
             seriesKind: next.kind,
@@ -1683,18 +1690,83 @@
               display: true,
               position: 'bottom',
               align: 'end',
+              onClick: function (e, legendItem, legend) {
+                const c = legend.chart;
+                const di = legendItem.datasetIndex;
+                const ds = c.data.datasets[di];
+                if (ds.rangeBandHigh && ds.rangeBandLowIndex != null) {
+                  const show = !c.isDatasetVisible(di);
+                  c.setDatasetVisibility(di, show);
+                  c.setDatasetVisibility(ds.rangeBandLowIndex, show);
+                } else {
+                  c.setDatasetVisibility(di, !c.isDatasetVisible(di));
+                }
+                c.update();
+              },
               labels: {
                 usePointStyle: true,
                 pointStyle: 'line',
                 boxWidth: 36,
                 boxHeight: 8,
                 font: { size: 10 },
-                filter: function (legendItem, chart) {
-                  const ds =
-                    chart.data &&
-                    chart.data.datasets &&
-                    chart.data.datasets[legendItem.datasetIndex];
-                  return !(ds && ds.rangeLegendSkip);
+                generateLabels: function (chart) {
+                  const data = chart.data;
+                  const lblCfg = chart.options.plugins.legend.labels || {};
+                  const fontColor =
+                    lblCfg.color ||
+                    (typeof Chart !== 'undefined' && Chart.defaults && Chart.defaults.color) ||
+                    '#334155';
+                  if (!data.datasets.length) return [];
+                  const items = [];
+                  for (let i = 0; i < data.datasets.length; i++) {
+                    const ds = data.datasets[i];
+                    if (ds.rangeLegendSkip) continue;
+                    const meta = chart.getDatasetMeta(i);
+                    const label =
+                      ds.label != null && String(ds.label) !== ''
+                        ? String(ds.label)
+                        : 'Dataset ' + i;
+                    const stroke =
+                      typeof ds.crosshairDotColor === 'string'
+                        ? ds.crosshairDotColor
+                        : typeof ds.borderColor === 'string'
+                          ? ds.borderColor
+                          : '#334155';
+                    const hidden =
+                      typeof chart.isDatasetVisible === 'function' &&
+                      !chart.isDatasetVisible(i);
+                    if (ds.rangeBandHigh) {
+                      items.push({
+                        text: label,
+                        fillStyle: 'transparent',
+                        strokeStyle: stroke,
+                        lineWidth: 2,
+                        pointStyle: 'line',
+                        hidden: hidden,
+                        datasetIndex: i,
+                        index: items.length,
+                        fontColor: fontColor,
+                      });
+                    } else {
+                      const fillS = ds.backgroundColor;
+                      const fillOk =
+                        typeof fillS === 'string' && fillS !== 'transparent'
+                          ? fillS
+                          : 'transparent';
+                      items.push({
+                        text: label,
+                        fillStyle: fillOk,
+                        strokeStyle: stroke,
+                        lineWidth: 2,
+                        pointStyle: 'line',
+                        hidden: hidden,
+                        datasetIndex: i,
+                        index: items.length,
+                        fontColor: fontColor,
+                      });
+                    }
+                  }
+                  return items;
                 },
               },
             },
