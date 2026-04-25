@@ -38,6 +38,7 @@
    * @param {'absolute'|'range'|'min'|'max'} chip
    * @param {{ minutes: ?number, wait_min_minutes: ?number, wait_max_minutes: ?number }} slot
    * @returns {{ text: string, pillMetric: number | null }}
+   * Range band: equal min/max (after rounding) show as one value (e.g. ``0m``), not ``0-0m``.
    */
   function formatWaitChipSlot(chip, slot) {
     var mn = slot.minutes;
@@ -56,6 +57,11 @@
       if (lo == null && hi != null) return { text: '<' + hi + 'm', pillMetric: hi };
       if (hi == null && lo != null) return { text: '>' + lo + 'm', pillMetric: lo };
       if (lo != null && hi != null) {
+        var loN = Math.round(Number(lo));
+        var hiN = Math.round(Number(hi));
+        if (loN === hiN) {
+          return { text: String(loN) + 'm', pillMetric: loN };
+        }
         return { text: String(lo) + '-' + String(hi) + 'm', pillMetric: hi };
       }
       return { text: '-', pillMetric: null };

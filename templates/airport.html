@@ -1117,12 +1117,16 @@
 
     /**
      * One readout value for a range pair (same semantics as range chips; ASCII hyphen in band).
+     * Equal min/max after rounding collapse to a single value (e.g. ``0m`` / ``0 min``).
      */
     function formatReadoutRangeValue(lo, hi, compactMin) {
       const suf = compactMin ? 'm' : ' min';
       if (readoutFiniteNum(lo) && readoutFiniteNum(hi)) {
         const loN = Math.round(Number(lo));
         const hiN = Math.round(Number(hi));
+        if (loN === hiN) {
+          return { text: String(loN) + suf, pillMetric: hiN };
+        }
         return { text: String(loN) + '-' + String(hiN) + suf, pillMetric: hiN };
       }
       if (readoutFiniteNum(lo) && !readoutFiniteNum(hi)) {
