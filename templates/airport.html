@@ -129,10 +129,12 @@
       font-size: 0.9rem;
     }
     .airport-search-row {
+      box-sizing: border-box;
       padding: 0.55rem 0.75rem 0.6rem;
       cursor: pointer;
       border-bottom: 1px solid #eef2f7;
       background: #fff;
+      min-height: 4.65rem;
     }
     .airport-search-row:last-child {
       border-bottom: none;
@@ -168,7 +170,7 @@
       display: flex;
       flex-direction: row;
       flex-wrap: wrap;
-      align-items: flex-start;
+      align-items: stretch;
       gap: 0.55rem 1rem;
       width: 100%;
     }
@@ -226,15 +228,17 @@
       width: 10rem;
       min-width: 10rem;
       max-width: 10rem;
+      min-height: 3.2rem;
       flex-shrink: 0;
       border: 1px solid #d0d7e2;
       border-radius: 10px;
       background: #fff;
-      padding: 0.28rem 0.48rem 0.32rem;
+      padding: 0.22rem 0.48rem 0.26rem;
       display: flex;
       flex-direction: column;
-      gap: 0.1rem;
+      gap: 0.06rem;
       align-items: flex-start;
+      align-self: stretch;
       pointer-events: none;
     }
     .airport-search-chip__label {
@@ -253,17 +257,41 @@
       display: block;
       width: 100%;
       min-width: 0;
+    }
+    /* Match terminal tab chips: label | value per row, two rows max. */
+    .airport-search-chip__wait-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 0.12rem;
+      row-gap: 0.05rem;
+      width: 100%;
+      align-items: baseline;
       font-size: 0.65rem;
-      line-height: 1.25;
+      line-height: 1.2;
       font-weight: 400;
       color: #64748b;
     }
-    .airport-search-chip__wait-line {
-      display: block;
+    .airport-search-chip__wait-lbl {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      text-align: left;
+      margin-right: 0.08rem;
+    }
+    .airport-search-chip__wait-val {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      text-align: right;
+      justify-self: end;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .airport-search-chip__wait-lbl--placeholder,
+    .airport-search-chip__wait-val--placeholder {
+      visibility: hidden;
+      pointer-events: none;
     }
     .airport-search-chip__wait--empty {
       color: #94a3b8;
@@ -365,6 +393,9 @@
       .airport-search-chip-more {
         text-align: left;
       }
+      .airport-search-row {
+        min-height: 5.05rem;
+      }
       .airport-search-row--unavailable .airport-search-row__main {
         display: flex;
         flex-direction: column;
@@ -427,7 +458,7 @@
         display: grid;
         grid-template-rows: auto auto;
         grid-auto-flow: column;
-        grid-auto-columns: 12.5rem;
+        grid-auto-columns: 14.5rem;
         column-gap: 0.4rem;
         row-gap: 0.4rem;
         align-items: stretch;
@@ -452,17 +483,17 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 0.2rem;
-      width: 12rem;
-      min-width: 12rem;
-      max-width: 12rem;
+      width: 14rem;
+      min-width: 14rem;
+      max-width: 14rem;
       flex-shrink: 0;
     }
     @media (max-width: 768px) {
-      /* Must follow base .tab-btn so widths apply; wider chips fill grid tracks (gap stays 0.4rem). */
+      /* Wider than desktop; must match grid-auto-columns on .tab-row-scroll .tab-row. */
       .tab-row-scroll .tab-btn {
-        width: 12.5rem;
-        min-width: 12.5rem;
-        max-width: 12.5rem;
+        width: 14.5rem;
+        min-width: 14.5rem;
+        max-width: 14.5rem;
       }
     }
     .tab-btn.active {
@@ -550,6 +581,16 @@
       row-gap: 0.12rem;
       align-items: baseline;
       margin-top: 0.08rem;
+    }
+    .chart-readout-grid--series {
+      grid-template-columns: max-content auto;
+    }
+    .chart-readout-grid--series .chart-readout-lbl {
+      margin-right: 0.1rem;
+    }
+    .chart-readout-grid--series .chart-readout-val {
+      margin-right: 0;
+      margin-bottom: 0.06rem;
     }
     .chart-callout .chart-readout-grid {
       width: auto;
@@ -846,10 +887,67 @@
       '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
       '#db2777', '#0d9488', '#7c3aed',
     ];
+
+    function parseChartHexColor(hex) {
+      if (!hex || typeof hex !== 'string' || !/^#([0-9a-fA-F]{6})$/.test(hex)) {
+        return { r: 51, g: 65, b: 85 };
+      }
+      const n = parseInt(hex.slice(1), 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+
+    function chartHexToRgba(hex, alpha) {
+      const { r, g, b } = parseChartHexColor(hex);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    /** Darken RGB from a hex base (for range band edge lines vs lighter fill). */
+    function chartHexToRgbLine(hex, mult) {
+      const { r, g, b } = parseChartHexColor(hex);
+      const rn = Math.round(Math.min(255, r * mult));
+      const gn = Math.round(Math.min(255, g * mult));
+      const bn = Math.round(Math.min(255, b * mult));
+      return 'rgb(' + rn + ',' + gn + ',' + bn + ')';
+    }
+
+    /**
+     * One palette step per logical series; range low+high share an index so they match in color.
+     */
+    function assignSeriesColorIndices(seriesDefs) {
+      const defs = seriesDefs || [];
+      const out = new Array(defs.length);
+      let ci = 0;
+      for (let i = 0; i < defs.length; i++) {
+        const d = defs[i];
+        const next = defs[i + 1];
+        if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
+          out[i] = ci;
+          out[i + 1] = ci;
+          ci++;
+          i++;
+        } else {
+          out[i] = ci;
+          ci++;
+        }
+      }
+      return out;
+    }
+
     /** Align chart window with scrape cadence (same as collector interval). */
     const SCRAPE_STEP_MS = 15 * 60 * 1000;
     /** Do not draw line/fill across gaps longer than this (closed checkpoints, etc.). */
     const GAP_BREAK_MS = 45 * 60 * 1000;
+
+    function makeGapBreakSegment(lineColor) {
+      return {
+        borderColor: function (ctx) {
+          const x0 = ctx.p0.parsed.x;
+          const x1 = ctx.p1.parsed.x;
+          if (x0 == null || x1 == null) return lineColor;
+          return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
+        },
+      };
+    }
     /** Global latest `scraped_at_utc` from initial `/api/latest` only (chart right edge). */
     let pageGlobalLatestScrapedMs = null;
 
@@ -878,6 +976,80 @@
       return String(qt).replace(/_/g, ' ').replace(/\b\w/g, function (c) {
         return c.toUpperCase();
       });
+    }
+
+    function normalizeChartSeries(arr) {
+      const raw = Array.isArray(arr) && arr.length ? arr : ['absolute'];
+      const uniq = [...new Set(raw)];
+      if (!uniq.length) return ['absolute'];
+      if (uniq.includes('range')) {
+        return uniq.filter((x) => x !== 'min' && x !== 'max');
+      }
+      return uniq;
+    }
+
+    function expandChartSeriesDefs(seriesNorm, queueTypes) {
+      const defs = [];
+      for (let qi = 0; qi < queueTypes.length; qi++) {
+        const qt = queueTypes[qi];
+        for (let si = 0; si < seriesNorm.length; si++) {
+          const kind = seriesNorm[si];
+          const short = queueReadoutLabel(qt);
+          const long = queueChartDatasetLabel(qt);
+          if (kind === 'absolute') {
+            defs.push({
+              qt,
+              kind: 'absolute',
+              legend: long,
+              readoutLbl: short + ' (wait)',
+            });
+          } else if (kind === 'min') {
+            defs.push({
+              qt,
+              kind: 'min',
+              legend: long + ' min',
+              readoutLbl: short + ' (min)',
+            });
+          } else if (kind === 'max') {
+            defs.push({
+              qt,
+              kind: 'max',
+              legend: long + ' max',
+              readoutLbl: short + ' (max)',
+            });
+          } else if (kind === 'range') {
+            defs.push({
+              qt,
+              kind: 'rmin',
+              legend: long + ' low',
+              readoutLbl: short + ' (low)',
+            });
+            defs.push({
+              qt,
+              kind: 'rmax',
+              legend: long + ' high',
+              readoutLbl: short + ' (high)',
+            });
+          }
+        }
+      }
+      return defs;
+    }
+
+    function queueSnapFromPoint(p) {
+      return {
+        minutes: p && p.minutes != null ? Number(p.minutes) : null,
+        min: p && p.wait_min_minutes != null ? Number(p.wait_min_minutes) : null,
+        max: p && p.wait_max_minutes != null ? Number(p.wait_max_minutes) : null,
+      };
+    }
+
+    function seriesYFromSnap(snap, def) {
+      if (!snap) return null;
+      if (def.kind === 'absolute') return snap.minutes;
+      if (def.kind === 'min' || def.kind === 'rmin') return snap.min;
+      if (def.kind === 'max' || def.kind === 'rmax') return snap.max;
+      return null;
     }
 
     function escapeHtml(s) {
@@ -1014,7 +1186,10 @@
           const meta = chartRef.getDatasetMeta(di);
           const pt = meta.data[idx];
           if (!pt || pt.skip) continue;
-          const fill = chartRef.data.datasets[di].borderColor || '#334155';
+          const ds = chartRef.data.datasets[di];
+          const fill =
+            ds.crosshairDotColor ||
+            (typeof ds.borderColor === 'string' ? ds.borderColor : '#334155');
           dot(pt.x, pt.y, fill);
         }
         ctx.restore();
@@ -1027,75 +1202,163 @@
       calloutEl.className = 'chart-callout';
     }
 
+    function readoutFiniteNum(x) {
+      return x != null && isFinite(Number(x));
+    }
+
     /**
-     * Terminal-tab style grid: up to two queue columns per row, labels left / values right,
-     * wait minutes in colored pills. Touch UI uses compact "12m"; desktop uses "12 min".
+     * One readout value for a range pair (same semantics as range chips; ASCII hyphen in band).
+     * Equal min/max after rounding collapse to a single value (e.g. ``0m`` / ``0 min``).
      */
-    function readoutQueuesHtml(byQt, order, compactMin) {
-      const ord = order || [];
-      if (!ord.length) return '';
-      let html = '<div class="chart-readout-grid">';
-      for (let start = 0; start < ord.length; start += 2) {
-        const pair = ord.slice(start, start + 2);
-        for (let p = 0; p < 2; p++) {
-          const qt = pair[p];
-          html += '<span class="chart-readout-lbl">';
-          if (qt != null) {
-            html += escapeHtml(queueReadoutLabel(qt));
-          } else {
-            html += '\u00a0';
-          }
-          html += '</span><span class="chart-readout-val">';
-          if (qt != null) {
-            const v = byQt[qt];
-            if (v != null) {
-              const pillClass = window.waitTimePillClass(v);
-              const suffix = compactMin ? 'm' : ' min';
-              html +=
-                '<span class="' +
-                pillClass +
-                '">' +
-                escapeHtml(String(v) + suffix) +
-                '</span>';
-            } else {
-              html += '–';
-            }
-          } else {
-            html += '\u00a0';
-          }
-          html += '</span>';
+    function formatReadoutRangeValue(lo, hi, compactMin) {
+      const suf = compactMin ? 'm' : ' min';
+      if (readoutFiniteNum(lo) && readoutFiniteNum(hi)) {
+        const loN = Math.round(Number(lo));
+        const hiN = Math.round(Number(hi));
+        if (loN === hiN) {
+          return { text: String(loN) + suf, pillMetric: hiN };
         }
+        return { text: String(loN) + '-' + String(hiN) + suf, pillMetric: hiN };
+      }
+      if (readoutFiniteNum(lo) && !readoutFiniteNum(hi)) {
+        const loN = Math.round(Number(lo));
+        return { text: '>' + String(loN) + suf, pillMetric: loN };
+      }
+      if (!readoutFiniteNum(lo) && readoutFiniteNum(hi)) {
+        const hiN = Math.round(Number(hi));
+        return { text: '<' + String(hiN) + suf, pillMetric: hiN };
+      }
+      return { text: '-', pillMetric: null };
+    }
+
+    /** True when callout should say ``(wait)`` / ``(range)`` to tell the two apart. */
+    function readoutNeedsWaitRangeSuffix(seriesDefs) {
+      const defs = seriesDefs || [];
+      let hasAbs = false;
+      let hasRange = false;
+      for (let i = 0; i < defs.length; i++) {
+        const k = defs[i].kind;
+        if (k === 'absolute') hasAbs = true;
+        if (k === 'rmin' || k === 'rmax') hasRange = true;
+      }
+      return hasAbs && hasRange;
+    }
+
+    /** Row count for layout (range = one row despite two plotted series). */
+    function chartReadoutRowCount(seriesDefs) {
+      const defs = seriesDefs || [];
+      let n = 0;
+      for (let i = 0; i < defs.length; i++) {
+        const d = defs[i];
+        const next = defs[i + 1];
+        if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
+          n++;
+          i++;
+        } else {
+          n++;
+        }
+      }
+      return n;
+    }
+
+    /**
+     * Collapse rmin+rmax into one range row; absolute/min/max stay one row each.
+     * ``(wait)`` / ``(range)`` suffixes only when both absolute and range are plotted.
+     */
+    function buildReadoutRows(seriesDefs, seriesValues) {
+      const defs = seriesDefs || [];
+      const vals = seriesValues || [];
+      const tagWR = readoutNeedsWaitRangeSuffix(defs);
+      const rows = [];
+      for (let i = 0; i < defs.length; i++) {
+        const d = defs[i];
+        const next = defs[i + 1];
+        const short = queueReadoutLabel(d.qt);
+        if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
+          rows.push({
+            readoutLbl: tagWR ? short + ' (range)' : short,
+            kind: 'range',
+            lo: vals[i],
+            hi: vals[i + 1],
+          });
+          i++;
+        } else {
+          let lbl = d.readoutLbl;
+          if (d.kind === 'absolute') {
+            lbl = tagWR ? d.readoutLbl : short;
+          }
+          rows.push({
+            readoutLbl: lbl,
+            kind: 'single',
+            v: vals[i],
+          });
+        }
+      }
+      return rows;
+    }
+
+    function readoutRowsHtml(rows, compactMin) {
+      if (!rows.length) return '';
+      let html = '<div class="chart-readout-grid chart-readout-grid--series">';
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        html += '<span class="chart-readout-lbl">' + escapeHtml(r.readoutLbl) + '</span>';
+        html += '<span class="chart-readout-val">';
+        if (r.kind === 'range') {
+          const slot = formatReadoutRangeValue(r.lo, r.hi, compactMin);
+          if (slot.pillMetric == null) {
+            html += escapeHtml(slot.text);
+          } else {
+            html +=
+              '<span class="' +
+              window.waitTimePillClass(slot.pillMetric) +
+              '">' +
+              escapeHtml(slot.text) +
+              '</span>';
+          }
+        } else {
+          const v = r.v;
+          if (v == null || !isFinite(Number(v))) {
+            html += '-';
+          } else {
+            const pillClass = window.waitTimePillClass(v);
+            const suffix = compactMin ? 'm' : ' min';
+            html +=
+              '<span class="' +
+              pillClass +
+              '">' +
+              escapeHtml(String(v) + suffix) +
+              '</span>';
+          }
+        }
+        html += '</span>';
       }
       html += '</div>';
       return html;
     }
 
-    function readoutHtml(label, byQt, order) {
+    function readoutHtml(label, chartRef, idx) {
       const compactMin = touchChartUi();
+      const defs = chartRef.$seriesDefs || [];
+      const vals = readoutValuesAtIndex(chartRef, idx);
+      const rows = buildReadoutRows(defs, vals);
       return (
         '<div class="line1">' + escapeHtml(label) + '</div>' +
-        readoutQueuesHtml(byQt, order, compactMin)
+        readoutRowsHtml(rows, compactMin)
       );
     }
 
     function readoutValuesAtIndex(chartRef, idx) {
       const row = chartRef.$mergedRows && chartRef.$mergedRows[idx];
-      const order = chartRef.$queueTypeOrder || [];
-      const byQt = {};
-      if (!row) return byQt;
-      for (let oi = 0; oi < order.length; oi++) {
-        const qt = order[oi];
-        const v = row[qt];
-        byQt[qt] = v != null ? v : null;
-      }
-      return byQt;
+      if (!row || !row.seriesValues) return [];
+      return row.seriesValues;
     }
 
     function showCallout(x, label, chartRef, idx) {
-      const order = chartRef.$queueTypeOrder || [];
-      const stacked = order.length > 2;
+      const defs = chartRef.$seriesDefs || [];
+      const stacked = chartReadoutRowCount(defs) > 2;
       calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
-      calloutEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
+      calloutEl.innerHTML = readoutHtml(label, chartRef, idx);
       calloutEl.style.display = 'block';
       calloutEl.style.left = x + 'px';
       requestAnimationFrame(function () {
@@ -1111,10 +1374,10 @@
     }
 
     function setFixedReadout(label, chartRef, idx) {
-      const order = chartRef.$queueTypeOrder || [];
-      const stacked = order.length > 2;
+      const defs = chartRef.$seriesDefs || [];
+      const stacked = chartReadoutRowCount(defs) > 2;
       readingFixedEl.className = 'chart-reading-fixed' + (stacked ? ' chart-reading-fixed--stacked' : '');
-      readingFixedEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
+      readingFixedEl.innerHTML = readoutHtml(label, chartRef, idx);
     }
 
     function clearFixedReadout() {
@@ -1269,9 +1532,20 @@
       const queues = data.queues || {};
       const queueTypes = sortQueueTypesFromKeys(
         Object.keys(queues).filter(function (qt) {
-          return (queues[qt] || []).length > 0;
+          const arr = queues[qt] || [];
+          return arr.some(function (p) {
+            return (
+              p.minutes != null ||
+              p.wait_min_minutes != null ||
+              p.wait_max_minutes != null
+            );
+          });
         })
       );
+
+      const wui = pageAirportEntry.wait_times_ui || { chart_series: ['absolute'] };
+      const seriesNorm = normalizeChartSeries(wui.chart_series);
+      const seriesDefs = expandChartSeriesDefs(seriesNorm, queueTypes);
 
       let maxDataMs = null;
       const byTime = {};
@@ -1281,8 +1555,10 @@
           const tms = Date.parse(p.t);
           if (!isFinite(tms)) continue;
           if (maxDataMs == null || tms > maxDataMs) maxDataMs = tms;
-          if (!byTime[p.t]) byTime[p.t] = { t: p.t, tMs: tms };
-          byTime[p.t][qt] = p.minutes;
+          if (!byTime[p.t]) {
+            byTime[p.t] = { t: p.t, tMs: tms, queues: {} };
+          }
+          byTime[p.t].queues[qt] = queueSnapFromPoint(p);
         }
       }
 
@@ -1303,6 +1579,14 @@
           return a.tMs - b.tMs;
         });
 
+      for (let ri = 0; ri < mergedRows.length; ri++) {
+        const row = mergedRows[ri];
+        row.seriesValues = seriesDefs.map(function (def) {
+          const snap = row.queues && row.queues[def.qt];
+          return seriesYFromSnap(snap, def);
+        });
+      }
+
       const mergedTimesMs = mergedRows.map(function (r) {
         return r.tMs;
       });
@@ -1316,18 +1600,80 @@
 
       const hoursNum = Number(hours);
       const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
-      const useAreaFill = queueTypes.length <= 2;
-      const datasets = queueTypes.map(function (qt, i) {
-        const lineColor = CHART_LINE_COLORS[i % CHART_LINE_COLORS.length];
-        const fillCol = useAreaFill ? queueFillColor(qt) : 'transparent';
-        const seg = {
-          borderColor: function (ctx) {
-            const x0 = ctx.p0.parsed.x;
-            const x1 = ctx.p1.parsed.x;
-            if (x0 == null || x1 == null) return lineColor;
-            return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
-          },
-        };
+      const useAreaFill =
+        seriesDefs.length === 1 && queueTypes.length <= 2;
+      const rangeLegendSuffix =
+        seriesNorm.includes('absolute') && seriesNorm.includes('range');
+      const seriesColorIdx = assignSeriesColorIndices(seriesDefs);
+      const datasets = [];
+      for (let i = 0; i < seriesDefs.length; i++) {
+        const def = seriesDefs[i];
+        const next = seriesDefs[i + 1];
+        const ci = seriesColorIdx[i];
+        const paletteHex = CHART_LINE_COLORS[ci % CHART_LINE_COLORS.length];
+
+        if (def.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === def.qt) {
+          const j = i + 1;
+          const lineRgb = chartHexToRgbLine(paletteHex, 0.82);
+          const bandRgba = chartHexToRgba(paletteHex, 0.22);
+          const segLow = makeGapBreakSegment(lineRgb);
+          const segHigh = makeGapBreakSegment(lineRgb);
+          const lowIdx = datasets.length;
+          datasets.push({
+            label: '',
+            rangeLegendSkip: true,
+            crosshairDotColor: lineRgb,
+            queueTypeKey: def.qt,
+            seriesKind: def.kind,
+            parsing: false,
+            data: mergedRows.map(function (row) {
+              const y = row.seriesValues[i];
+              return { x: row.tMs, y: y != null && isFinite(y) ? y : null };
+            }),
+            borderColor: lineRgb,
+            borderWidth: 2,
+            backgroundColor: 'transparent',
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            fill: false,
+            tension: 0.2,
+            spanGaps: false,
+            segment: segLow,
+            order: -1,
+          });
+          datasets.push({
+            label:
+              queueChartDatasetLabel(def.qt) +
+              (rangeLegendSuffix ? ' (range)' : ''),
+            rangeLegendSkip: false,
+            rangeBandHigh: true,
+            rangeBandLowIndex: lowIdx,
+            crosshairDotColor: lineRgb,
+            queueTypeKey: next.qt,
+            seriesKind: next.kind,
+            parsing: false,
+            data: mergedRows.map(function (row) {
+              const y = row.seriesValues[j];
+              return { x: row.tMs, y: y != null && isFinite(y) ? y : null };
+            }),
+            borderColor: lineRgb,
+            borderWidth: 2,
+            backgroundColor: bandRgba,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            fill: '-1',
+            tension: 0.2,
+            spanGaps: false,
+            segment: segHigh,
+            order: -1,
+          });
+          i += 1;
+          continue;
+        }
+
+        const lineColor = paletteHex;
+        const fillCol = useAreaFill ? queueFillColor(def.qt) : 'transparent';
+        const seg = makeGapBreakSegment(lineColor);
         if (useAreaFill) {
           seg.backgroundColor = function (ctx) {
             const x0 = ctx.p0.parsed.x;
@@ -1336,12 +1682,16 @@
             return x1 - x0 > GAP_BREAK_MS ? 'transparent' : fillCol;
           };
         }
-        return {
-          label: queueChartDatasetLabel(qt),
-          queueTypeKey: qt,
+        datasets.push({
+          label: def.legend,
+          rangeLegendSkip: false,
+          crosshairDotColor: lineColor,
+          queueTypeKey: def.qt,
+          seriesKind: def.kind,
           parsing: false,
           data: mergedRows.map(function (row) {
-            return { x: row.tMs, y: row[qt] != null ? row[qt] : null };
+            const y = row.seriesValues[i];
+            return { x: row.tMs, y: y != null && isFinite(y) ? y : null };
           }),
           borderColor: lineColor,
           borderWidth: 2,
@@ -1352,8 +1702,9 @@
           tension: 0.2,
           spanGaps: false,
           segment: seg,
-        };
-      });
+          order: 0,
+        });
+      }
 
       const ctx = chartCanvas.getContext('2d');
       chart = new Chart(ctx, {
@@ -1370,12 +1721,84 @@
               display: true,
               position: 'bottom',
               align: 'end',
+              onClick: function (e, legendItem, legend) {
+                const c = legend.chart;
+                const di = legendItem.datasetIndex;
+                const ds = c.data.datasets[di];
+                if (ds.rangeBandHigh && ds.rangeBandLowIndex != null) {
+                  const show = !c.isDatasetVisible(di);
+                  c.setDatasetVisibility(di, show);
+                  c.setDatasetVisibility(ds.rangeBandLowIndex, show);
+                } else {
+                  c.setDatasetVisibility(di, !c.isDatasetVisible(di));
+                }
+                c.update();
+              },
               labels: {
                 usePointStyle: true,
                 pointStyle: 'line',
                 boxWidth: 36,
                 boxHeight: 8,
                 font: { size: 10 },
+                generateLabels: function (chart) {
+                  const data = chart.data;
+                  const lblCfg = chart.options.plugins.legend.labels || {};
+                  const fontColor =
+                    lblCfg.color ||
+                    (typeof Chart !== 'undefined' && Chart.defaults && Chart.defaults.color) ||
+                    '#334155';
+                  if (!data.datasets.length) return [];
+                  const items = [];
+                  for (let i = 0; i < data.datasets.length; i++) {
+                    const ds = data.datasets[i];
+                    if (ds.rangeLegendSkip) continue;
+                    const meta = chart.getDatasetMeta(i);
+                    const label =
+                      ds.label != null && String(ds.label) !== ''
+                        ? String(ds.label)
+                        : 'Dataset ' + i;
+                    const stroke =
+                      typeof ds.crosshairDotColor === 'string'
+                        ? ds.crosshairDotColor
+                        : typeof ds.borderColor === 'string'
+                          ? ds.borderColor
+                          : '#334155';
+                    const hidden =
+                      typeof chart.isDatasetVisible === 'function' &&
+                      !chart.isDatasetVisible(i);
+                    if (ds.rangeBandHigh) {
+                      items.push({
+                        text: label,
+                        fillStyle: 'transparent',
+                        strokeStyle: stroke,
+                        lineWidth: 2,
+                        pointStyle: 'line',
+                        hidden: hidden,
+                        datasetIndex: i,
+                        index: items.length,
+                        fontColor: fontColor,
+                      });
+                    } else {
+                      const fillS = ds.backgroundColor;
+                      const fillOk =
+                        typeof fillS === 'string' && fillS !== 'transparent'
+                          ? fillS
+                          : 'transparent';
+                      items.push({
+                        text: label,
+                        fillStyle: fillOk,
+                        strokeStyle: stroke,
+                        lineWidth: 2,
+                        pointStyle: 'line',
+                        hidden: hidden,
+                        datasetIndex: i,
+                        index: items.length,
+                        fontColor: fontColor,
+                      });
+                    }
+                  }
+                  return items;
+                },
               },
             },
             tooltip: { enabled: false }
@@ -1432,6 +1855,7 @@
         },
       });
       chart.$queueTypeOrder = queueTypes;
+      chart.$seriesDefs = seriesDefs;
       chart.$mergedRows = mergedRows;
       chart.$mergedTimesMs = mergedTimesMs;
       chart.$chartWindowMs = bounds;
@@ -1441,9 +1865,10 @@
         let last = mergedTimesMs.length - 1;
         for (let ri = mergedRows.length - 1; ri >= 0; ri--) {
           const row = mergedRows[ri];
+          const sv = row.seriesValues || [];
           let any = false;
-          for (let qi = 0; qi < queueTypes.length; qi++) {
-            if (row[queueTypes[qi]] != null) {
+          for (let si = 0; si < sv.length; si++) {
+            if (sv[si] != null && isFinite(sv[si])) {
               any = true;
               break;
             }
@@ -1561,6 +1986,8 @@
 
     function buildTabs(rows, activeIndex) {
       tabRowEl.innerHTML = '';
+      const chipMode =
+        (pageAirportEntry.wait_times_ui && pageAirportEntry.wait_times_ui.chip) || 'absolute';
       rows.forEach((row, i) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1576,7 +2003,7 @@
         const wrap = document.createElement('div');
         wrap.className = 'tab-waits';
         wrap.setAttribute('aria-hidden', 'true');
-        const gridRows = window.airportTabQueueWaitGridRows(row.queues);
+        const gridRows = window.airportTabQueueWaitGridRows(row.queues, chipMode);
         if (!gridRows.length) {
           wrap.textContent = '—';
         } else {
@@ -1591,13 +2018,13 @@
               val.className = 'tab-wait-val';
               if (seg) {
                 lbl.textContent = seg.label;
-                if (seg.minutes == null) {
-                  val.textContent = '—';
+                if (seg.pillMetric == null) {
+                  val.textContent = seg.text;
                   val.classList.add('tab-wait-val--dash');
                 } else {
                   const pill = document.createElement('span');
-                  pill.className = window.waitTimePillClass(seg.minutes);
-                  pill.textContent = String(seg.minutes) + 'm';
+                  pill.className = window.waitTimePillClass(seg.pillMetric);
+                  pill.textContent = seg.text;
                   val.appendChild(pill);
                 }
               } else {

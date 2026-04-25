@@ -182,6 +182,10 @@
         metro_label: metroLabel,
         aliases: ap.aliases || [],
         terminal_tab: terminalTab,
+        wait_times_ui: ap.wait_times_ui || {
+          chip: 'absolute',
+          chart_series: ['absolute'],
+        },
         status: st,
       });
     }
@@ -250,7 +254,11 @@
     for (var i = 0; i < list.length; i++) {
       if (list[i].code === code) return list[i];
     }
-    return { code: code, terminal_tab: {} };
+    return {
+      code: code,
+      terminal_tab: {},
+      wait_times_ui: { chip: 'absolute', chart_series: ['absolute'] },
+    };
   }
 
   function sortTerminalRows(catalogEntry, terminalRows) {
@@ -289,14 +297,21 @@
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = terminalTabLabel(apEntry, row.terminal, row.gate);
-      var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc);
+      var chipMode =
+        (apEntry.wait_times_ui && apEntry.wait_times_ui.chip) || 'absolute';
+      var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc, chipMode);
       var waitsHtml = '';
       if (waitLineHtml) {
-        waitsHtml =
-          '<span class="airport-search-chip__wait-line">' + waitLineHtml + '</span>';
+        waitsHtml = waitLineHtml;
       } else {
         waitsHtml =
-          '<span class="airport-search-chip__wait airport-search-chip__wait--empty">—</span>';
+          '<div class="airport-search-chip__wait-grid">' +
+          '<span class="airport-search-chip__wait-lbl" aria-hidden="true">\u00a0</span>' +
+          '<span class="airport-search-chip__wait-val">' +
+          '<span class="airport-search-chip__wait--empty">—</span></span>' +
+          '<span class="airport-search-chip__wait-lbl airport-search-chip__wait-lbl--placeholder" aria-hidden="true">\u00a0</span>' +
+          '<span class="airport-search-chip__wait-val airport-search-chip__wait-val--placeholder" aria-hidden="true">\u00a0</span>' +
+          '</div>';
       }
       html +=
         '<div class="airport-search-chip">' +

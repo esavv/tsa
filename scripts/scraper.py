@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sqlite3
+import time
 import urllib.parse
 import urllib.request
 import zlib
@@ -50,18 +51,19 @@ SCRAPE_AIRPORTS = (
     "MIA",
     "SEA",
     "DCA",
-    "ATL",
     "DFW",
     "DEN",
     "CLT",
     "LAS",
     "MCO",
     "PHX",
+    "ATL",
 )
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Encoding": "gzip, deflate",
 }
+SCRAPE_ERROR_MAX_LEN = 512
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
 
@@ -1030,6 +1032,39 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
     return inserted
 
 
+def _truncate_scrape_error(message: str) -> str:
+    if len(message) <= SCRAPE_ERROR_MAX_LEN:
+        return message
+    return message[: SCRAPE_ERROR_MAX_LEN - 3] + "..."
+
+
+def upsert_scrape_airport_stat(
+    db_path: str,
+    scraped_at_utc: str,
+    airport: str,
+    duration_ms: int,
+    ok: bool,
+    error: str | None,
+) -> None:
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    err_val = _truncate_scrape_error(error) if error else None
+    cur.execute(
+        """
+        INSERT INTO scrape_airport_stats
+            (scraped_at_utc, airport, duration_ms, ok, error)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(scraped_at_utc, airport) DO UPDATE SET
+            duration_ms = excluded.duration_ms,
+            ok = excluded.ok,
+            error = excluded.error
+        """,
+        (scraped_at_utc, airport, duration_ms, 1 if ok else 0, err_val),
+    )
+    conn.commit()
+    conn.close()
+
+
 def print_mobi_raw(airport: str) -> None:
     """Print the raw Mobi checkpoint JSON (DFW / CLT / MCO) for taxonomy / field inspection."""
     code = airport.strip().upper()
@@ -1093,12 +1128,26 @@ def run(db_path: str | None = None) -> None:
     failures: list[str] = []
 
     for airport in SCRAPE_AIRPORTS:
+        t0 = time.perf_counter()
         try:
             rows = fetch_airport(airport)
             inserted = store(db_path, rows, scraped_at_utc)
             total += inserted
+            duration_ms = int(round((time.perf_counter() - t0) * 1000))
+            upsert_scrape_airport_stat(
+                db_path, scraped_at_utc, airport, duration_ms, ok=True, error=None
+            )
             print(f"{airport}: stored {inserted} rows")
         except Exception as exc:
+            duration_ms = int(round((time.perf_counter() - t0) * 1000))
+            upsert_scrape_airport_stat(
+                db_path,
+                scraped_at_utc,
+                airport,
+                duration_ms,
+                ok=False,
+                error=str(exc),
+            )
             failures.append(f"{airport}: {exc}")
             print(f"{airport}: ERROR {exc}")
 
