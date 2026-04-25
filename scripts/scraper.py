@@ -174,7 +174,7 @@ DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Encoding": "gzip, deflate",
 }
-SCRAPE_ERROR_MAX_LEN = 512
+SCRAPE_ERROR_MAX_LEN = 2048
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
 
@@ -1012,6 +1012,46 @@ def _atl_scan_items_to_rows(raw: list) -> list[dict]:
     return rows
 
 
+def _atl_playwright_debug_excerpt(page) -> str:
+    """Compact page state for scrape_airport_stats.error when ATL Playwright fails."""
+    try:
+        probe: dict = page.evaluate(
+            r"""() => {
+                const t = (document.body && document.body.innerText) ? document.body.innerText : "";
+                const head = t.slice(0, 400).replace(/\s+/g, " ").trim();
+                const blob = ((document.title || "") + " " + t.slice(0, 300)).toLowerCase();
+                const h1s = [...document.querySelectorAll("h1")]
+                    .slice(0, 8)
+                    .map((h) => (h.innerText || "").replace(/\s+/g, " ").trim())
+                    .filter(Boolean);
+                return {
+                    title: document.title || "",
+                    url: location.href || "",
+                    legacy_dom: !!document.querySelector("#nesclasser2"),
+                    tsa_h1: [...document.querySelectorAll("h1")].some((h) =>
+                        (h.innerText || "").includes("TSA Security")),
+                    cf_guess: /just a moment|checking your browser|cf-browser-verification|cloudflare/i.test(
+                        blob,
+                    ),
+                    h1_join: h1s.join(" | "),
+                    body_head: head,
+                };
+            }"""
+        )
+    except Exception as snap:
+        return f"snapshot_failed={type(snap).__name__}:{snap}"
+
+    title = str(probe.get("title") or "")[:100]
+    url_s = str(probe.get("url") or "")[:160]
+    h1j = str(probe.get("h1_join") or "")[:220]
+    body_h = str(probe.get("body_head") or "")[:220]
+    return (
+        f"title={title!r} url={url_s!r} legacy_dom={probe.get('legacy_dom')} "
+        f"tsa_h1={probe.get('tsa_h1')} cf_guess={probe.get('cf_guess')} "
+        f"h1s={h1j!r} body_head={body_h!r}"
+    )
+
+
 def fetch_atl_airport() -> list[dict]:
     """Load ATL /times/ in a real browser (Cloudflare); parse checkpoint rows from the DOM."""
     from playwright.sync_api import sync_playwright
@@ -1030,40 +1070,48 @@ def fetch_atl_airport() -> list[dict]:
             locale="en-US",
         )
         page = context.new_page()
+        rows: list[dict] = []
         try:
-            page.goto(
-                ATL_TIMES_URL,
-                wait_until="domcontentloaded",
-                timeout=ATL_NAVIGATION_MS,
-            )
-            page.wait_for_function(
-                """() => {
+            try:
+                page.goto(
+                    ATL_TIMES_URL,
+                    wait_until="domcontentloaded",
+                    timeout=ATL_NAVIGATION_MS,
+                )
+                page.wait_for_function(
+                    """() => {
                     if (document.querySelector("#nesclasser2")) return true;
                     return [...document.querySelectorAll("h1")].some((h) =>
                         (h.innerText || "").includes("TSA Security"));
                 }""",
-                timeout=ATL_LAYOUT_READY_MS,
-            )
-            page.wait_for_timeout(1500)
-            raw_new = page.evaluate(ATL_NEW_SCAN_JS)
-            rows = _atl_scan_items_to_rows(raw_new)
+                    timeout=ATL_LAYOUT_READY_MS,
+                )
+                page.wait_for_timeout(1500)
+                raw_new = page.evaluate(ATL_NEW_SCAN_JS)
+                rows = _atl_scan_items_to_rows(raw_new)
+                if not rows:
+                    try:
+                        page.wait_for_selector(
+                            ATL_LEGACY_DOM_SELECTOR,
+                            timeout=ATL_LEGACY_FALLBACK_MS,
+                        )
+                    except Exception:
+                        pass
+                    page.wait_for_timeout(500)
+                    raw_legacy = page.evaluate(ATL_LEGACY_SCAN_JS)
+                    rows = _atl_scan_items_to_rows(raw_legacy)
+            except Exception as exc:
+                ctx = _atl_playwright_debug_excerpt(page)
+                raise RuntimeError(f"{exc!s}\nATL_CTX {ctx}") from exc
             if not rows:
-                try:
-                    page.wait_for_selector(
-                        ATL_LEGACY_DOM_SELECTOR,
-                        timeout=ATL_LEGACY_FALLBACK_MS,
-                    )
-                except Exception:
-                    pass
-                page.wait_for_timeout(500)
-                raw_legacy = page.evaluate(ATL_LEGACY_SCAN_JS)
-                rows = _atl_scan_items_to_rows(raw_legacy)
+                ctx = _atl_playwright_debug_excerpt(page)
+                raise RuntimeError(
+                    "ATL page loaded but no checkpoint rows were found\nATL_CTX " + ctx
+                )
         finally:
             context.close()
             browser.close()
 
-    if not rows:
-        raise ValueError("ATL page loaded but no checkpoint rows were found")
     return rows
 
 
