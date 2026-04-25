@@ -856,10 +856,67 @@
       '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
       '#db2777', '#0d9488', '#7c3aed',
     ];
+
+    function parseChartHexColor(hex) {
+      if (!hex || typeof hex !== 'string' || !/^#([0-9a-fA-F]{6})$/.test(hex)) {
+        return { r: 51, g: 65, b: 85 };
+      }
+      const n = parseInt(hex.slice(1), 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+
+    function chartHexToRgba(hex, alpha) {
+      const { r, g, b } = parseChartHexColor(hex);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    /** Darken RGB from a hex base (for range band edge lines vs lighter fill). */
+    function chartHexToRgbLine(hex, mult) {
+      const { r, g, b } = parseChartHexColor(hex);
+      const rn = Math.round(Math.min(255, r * mult));
+      const gn = Math.round(Math.min(255, g * mult));
+      const bn = Math.round(Math.min(255, b * mult));
+      return 'rgb(' + rn + ',' + gn + ',' + bn + ')';
+    }
+
+    /**
+     * One palette step per logical series; range low+high share an index so they match in color.
+     */
+    function assignSeriesColorIndices(seriesDefs) {
+      const defs = seriesDefs || [];
+      const out = new Array(defs.length);
+      let ci = 0;
+      for (let i = 0; i < defs.length; i++) {
+        const d = defs[i];
+        const next = defs[i + 1];
+        if (d.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === d.qt) {
+          out[i] = ci;
+          out[i + 1] = ci;
+          ci++;
+          i++;
+        } else {
+          out[i] = ci;
+          ci++;
+        }
+      }
+      return out;
+    }
+
     /** Align chart window with scrape cadence (same as collector interval). */
     const SCRAPE_STEP_MS = 15 * 60 * 1000;
     /** Do not draw line/fill across gaps longer than this (closed checkpoints, etc.). */
     const GAP_BREAK_MS = 45 * 60 * 1000;
+
+    function makeGapBreakSegment(lineColor) {
+      return {
+        borderColor: function (ctx) {
+          const x0 = ctx.p0.parsed.x;
+          const x1 = ctx.p1.parsed.x;
+          if (x0 == null || x1 == null) return lineColor;
+          return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
+        },
+      };
+    }
     /** Global latest `scraped_at_utc` from initial `/api/latest` only (chart right edge). */
     let pageGlobalLatestScrapedMs = null;
 
@@ -1098,7 +1155,10 @@
           const meta = chartRef.getDatasetMeta(di);
           const pt = meta.data[idx];
           if (!pt || pt.skip) continue;
-          const fill = chartRef.data.datasets[di].borderColor || '#334155';
+          const ds = chartRef.data.datasets[di];
+          const fill =
+            ds.crosshairDotColor ||
+            (typeof ds.borderColor === 'string' ? ds.borderColor : '#334155');
           dot(pt.x, pt.y, fill);
         }
         ctx.restore();
@@ -1511,17 +1571,71 @@
       const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
       const useAreaFill =
         seriesDefs.length === 1 && queueTypes.length <= 2;
-      const datasets = seriesDefs.map(function (def, i) {
-        const lineColor = CHART_LINE_COLORS[i % CHART_LINE_COLORS.length];
+      const seriesColorIdx = assignSeriesColorIndices(seriesDefs);
+      const datasets = [];
+      for (let i = 0; i < seriesDefs.length; i++) {
+        const def = seriesDefs[i];
+        const next = seriesDefs[i + 1];
+        const ci = seriesColorIdx[i];
+        const paletteHex = CHART_LINE_COLORS[ci % CHART_LINE_COLORS.length];
+
+        if (def.kind === 'rmin' && next && next.kind === 'rmax' && next.qt === def.qt) {
+          const j = i + 1;
+          const lineRgb = chartHexToRgbLine(paletteHex, 0.82);
+          const bandRgba = chartHexToRgba(paletteHex, 0.22);
+          const segLow = makeGapBreakSegment(lineRgb);
+          const segHigh = makeGapBreakSegment(lineRgb);
+          datasets.push({
+            label: '',
+            rangeLegendSkip: true,
+            crosshairDotColor: lineRgb,
+            queueTypeKey: def.qt,
+            seriesKind: def.kind,
+            parsing: false,
+            data: mergedRows.map(function (row) {
+              const y = row.seriesValues[i];
+              return { x: row.tMs, y: y != null && isFinite(y) ? y : null };
+            }),
+            borderColor: lineRgb,
+            borderWidth: 2,
+            backgroundColor: 'transparent',
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            fill: false,
+            tension: 0.2,
+            spanGaps: false,
+            segment: segLow,
+            order: -1,
+          });
+          datasets.push({
+            label: queueChartDatasetLabel(def.qt) + ' (range)',
+            rangeLegendSkip: false,
+            crosshairDotColor: lineRgb,
+            queueTypeKey: next.qt,
+            seriesKind: next.kind,
+            parsing: false,
+            data: mergedRows.map(function (row) {
+              const y = row.seriesValues[j];
+              return { x: row.tMs, y: y != null && isFinite(y) ? y : null };
+            }),
+            borderColor: lineRgb,
+            borderWidth: 2,
+            backgroundColor: bandRgba,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            fill: '-1',
+            tension: 0.2,
+            spanGaps: false,
+            segment: segHigh,
+            order: -1,
+          });
+          i += 1;
+          continue;
+        }
+
+        const lineColor = paletteHex;
         const fillCol = useAreaFill ? queueFillColor(def.qt) : 'transparent';
-        const seg = {
-          borderColor: function (ctx) {
-            const x0 = ctx.p0.parsed.x;
-            const x1 = ctx.p1.parsed.x;
-            if (x0 == null || x1 == null) return lineColor;
-            return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
-          },
-        };
+        const seg = makeGapBreakSegment(lineColor);
         if (useAreaFill) {
           seg.backgroundColor = function (ctx) {
             const x0 = ctx.p0.parsed.x;
@@ -1530,8 +1644,10 @@
             return x1 - x0 > GAP_BREAK_MS ? 'transparent' : fillCol;
           };
         }
-        return {
+        datasets.push({
           label: def.legend,
+          rangeLegendSkip: false,
+          crosshairDotColor: lineColor,
           queueTypeKey: def.qt,
           seriesKind: def.kind,
           parsing: false,
@@ -1548,8 +1664,9 @@
           tension: 0.2,
           spanGaps: false,
           segment: seg,
-        };
-      });
+          order: 0,
+        });
+      }
 
       const ctx = chartCanvas.getContext('2d');
       chart = new Chart(ctx, {
@@ -1572,6 +1689,13 @@
                 boxWidth: 36,
                 boxHeight: 8,
                 font: { size: 10 },
+                filter: function (legendItem, chart) {
+                  const ds =
+                    chart.data &&
+                    chart.data.datasets &&
+                    chart.data.datasets[legendItem.datasetIndex];
+                  return !(ds && ds.rangeLegendSkip);
+                },
               },
             },
             tooltip: { enabled: false }
