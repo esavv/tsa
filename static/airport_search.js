@@ -289,7 +289,9 @@
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = terminalTabLabel(apEntry, row.terminal, row.gate);
-      var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc);
+      var chipMode =
+        (apEntry.wait_times_ui && apEntry.wait_times_ui.chip) || 'absolute';
+      var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc, chipMode);
       var waitsHtml = '';
       if (waitLineHtml) {
         waitsHtml =

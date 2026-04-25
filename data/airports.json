@@ -38,6 +38,10 @@
       ],
       "wait_times_url": "https://www.atl.com/times/",
       "api_url": null,
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -79,6 +83,10 @@
       ],
       "wait_times_url": "https://www.cltairport.com/airport-info/security/",
       "api_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT",
+      "wait_times_ui": {
+        "chip": "range",
+        "chart_series": ["absolute", "range"]
+      },
       "status": "active"
     },
     {
@@ -107,6 +115,10 @@
       ],
       "wait_times_url": "https://www.flyreagan.com/security-wait-times",
       "api_url": null,
+      "wait_times_ui": {
+        "chip": "range",
+        "chart_series": ["absolute", "range"]
+      },
       "status": "active"
     },
     {
@@ -128,6 +140,10 @@
       ],
       "wait_times_url": "https://www.flydenver.com/security/",
       "api_url": "https://app.flyfruition.com/api/public/tsa",
+      "wait_times_ui": {
+        "chip": "range",
+        "chart_series": ["absolute", "range"]
+      },
       "status": "active"
     },
     {
@@ -149,6 +165,10 @@
       ],
       "wait_times_url": "https://www.dfwairport.com/security/",
       "api_url": "https://api.dfwairport.mobi/wait-times/checkpoint/DFW",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -172,6 +192,10 @@
       ],
       "wait_times_url": "https://www.newarkairport.com/",
       "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/EWR",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -214,6 +238,10 @@
       ],
       "wait_times_url": "https://www.jfkairport.com/",
       "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/JFK",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -236,6 +264,10 @@
       ],
       "wait_times_url": "https://www.harryreidairport.com/security-wait-times",
       "api_url": null,
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -258,6 +290,10 @@
       ],
       "wait_times_url": "https://www.flylax.com/wait-times",
       "api_url": null,
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -280,6 +316,10 @@
       ],
       "wait_times_url": "https://www.laguardiaairport.com/",
       "api_url": "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints/LGA",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -301,6 +341,10 @@
       ],
       "wait_times_url": "https://flymco.com/security/",
       "api_url": "https://api.goaa.aero/wait-times/checkpoint/MCO",
+      "wait_times_ui": {
+        "chip": "range",
+        "chart_series": ["absolute", "range"]
+      },
       "status": "active"
     },
     {
@@ -322,6 +366,10 @@
       ],
       "wait_times_url": "https://www.miami-airport.com/tsa-waittimes.asp",
       "api_url": null,
+      "wait_times_ui": {
+        "chip": "range",
+        "chart_series": ["absolute", "range"]
+      },
       "status": "active"
     },
     {
@@ -365,6 +413,10 @@
       ],
       "wait_times_url": "https://www.skyharbor.com/",
       "api_url": "https://api.phx.aero/avn-wait-times/raw",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {
@@ -388,6 +440,10 @@
       ],
       "wait_times_url": "https://www.portseattle.org/page/live-estimated-checkpoint-wait-times",
       "api_url": "https://www.portseattle.org/api/cwt/wait-times",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
       "status": "active"
     },
     {

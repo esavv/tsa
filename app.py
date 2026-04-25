@@ -49,6 +49,36 @@ _DEFAULT_TERMINAL_TAB = {
     "with_gate": "Terminal {terminal}: Gates {gate}",
 }
 
+_DEFAULT_WAIT_TIMES_UI = {
+    "chip": "absolute",
+    "chart_series": ["absolute"],
+}
+
+
+def _merge_wait_times_ui(entry: dict) -> dict:
+    merged = dict(_DEFAULT_WAIT_TIMES_UI)
+    raw_ui = entry.get("wait_times_ui")
+    if isinstance(raw_ui, dict):
+        chip = raw_ui.get("chip")
+        if chip in ("absolute", "range", "min", "max"):
+            merged["chip"] = chip
+        cs = raw_ui.get("chart_series")
+        if isinstance(cs, list):
+            allowed = {"absolute", "range", "min", "max"}
+            series = [x for x in cs if isinstance(x, str) and x in allowed]
+            if series:
+                merged["chart_series"] = series
+    return merged
+
+
+def _catalog_airport_public_dict(entry: dict) -> dict:
+    """Copy for JSON responses with terminal_tab + wait_times_ui defaults merged."""
+    out = dict(entry)
+    tab = dict(out.get("terminal_tab") or {})
+    out["terminal_tab"] = {**_DEFAULT_TERMINAL_TAB, **tab}
+    out["wait_times_ui"] = _merge_wait_times_ui(out)
+    return out
+
 
 def airport_catalog_entry_for_js(code: str) -> dict:
     """Catalog row for the current airport; terminal_tab merged with template defaults if partial."""
@@ -59,8 +89,9 @@ def airport_catalog_entry_for_js(code: str) -> dict:
         status = "active"
     raw["status"] = status
     tab = dict(raw.get("terminal_tab") or {})
-    merged = {**_DEFAULT_TERMINAL_TAB, **tab}
-    raw["terminal_tab"] = merged
+    merged_tab = {**_DEFAULT_TERMINAL_TAB, **tab}
+    raw["terminal_tab"] = merged_tab
+    raw["wait_times_ui"] = _merge_wait_times_ui(raw)
     return raw
 
 # Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
@@ -126,7 +157,7 @@ def api_catalog():
     """Airport + metro metadata for client-side search (see data/airports.json)."""
     payload = dict(AIRPORT_CATALOG)
     payload["airports"] = [
-        ap
+        _catalog_airport_public_dict(ap)
         for ap in AIRPORT_CATALOG.get("airports", [])
         if not is_hidden_airport(ap.get("code") or "")
     ]
@@ -157,16 +188,29 @@ def _compute_api_latest_payload() -> dict:
 
     cur.execute(
         """
-        SELECT airport, terminal, gate, queue_type, wait_minutes
+        SELECT airport, terminal, gate, queue_type,
+               wait_minutes, wait_min_minutes, wait_max_minutes
         FROM wait_times
         WHERE scraped_at_utc = ?
         """,
         (scraped_at_utc,),
     )
-    latest_map: dict[tuple[str, str, str, str], int | None] = {}
-    for airport, terminal, gate, queue_type, wait_minutes in cur.fetchall():
+    latest_map: dict[tuple[str, str, str, str], dict[str, int | None]] = {}
+    for (
+        airport,
+        terminal,
+        gate,
+        queue_type,
+        wait_minutes,
+        wait_min_minutes,
+        wait_max_minutes,
+    ) in cur.fetchall():
         g = gate or ""
-        latest_map[(airport, terminal, g, queue_type)] = wait_minutes
+        latest_map[(airport, terminal, g, queue_type)] = {
+            "minutes": wait_minutes,
+            "wait_min_minutes": wait_min_minutes,
+            "wait_max_minutes": wait_max_minutes,
+        }
 
     cur.execute(
         """
@@ -189,8 +233,11 @@ def _compute_api_latest_payload() -> dict:
         if key not in airports[airport]:
             airports[airport][key] = {"queues": {}}
         slot = airports[airport][key]["queues"]
+        trip = latest_map.get((airport, terminal, g, queue_type)) or {}
         slot[queue_type] = {
-            "minutes": latest_map.get((airport, terminal, g, queue_type))
+            "minutes": trip.get("minutes"),
+            "wait_min_minutes": trip.get("wait_min_minutes"),
+            "wait_max_minutes": trip.get("wait_max_minutes"),
         }
 
     result = {}
@@ -291,7 +338,8 @@ def api_history():
 
     cur.execute(
         """
-        SELECT scraped_at_utc, queue_type, wait_minutes
+        SELECT scraped_at_utc, queue_type, wait_minutes,
+               wait_min_minutes, wait_max_minutes
         FROM wait_times
         WHERE airport = ? AND terminal = ? AND gate = ? AND scraped_at_utc >= ?
         ORDER BY scraped_at_utc
@@ -302,8 +350,13 @@ def api_history():
     conn.close()
 
     queues: dict[str, list[dict]] = {}
-    for scraped_at_utc, queue_type, wait_minutes in rows:
-        point = {"t": scraped_at_utc, "minutes": wait_minutes}
+    for scraped_at_utc, queue_type, wait_minutes, wait_min_minutes, wait_max_minutes in rows:
+        point = {
+            "t": scraped_at_utc,
+            "minutes": wait_minutes,
+            "wait_min_minutes": wait_min_minutes,
+            "wait_max_minutes": wait_max_minutes,
+        }
         if queue_type not in queues:
             queues[queue_type] = []
         queues[queue_type].append(point)

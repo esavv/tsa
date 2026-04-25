@@ -551,6 +551,16 @@
       align-items: baseline;
       margin-top: 0.08rem;
     }
+    .chart-readout-grid--series {
+      grid-template-columns: max-content auto;
+    }
+    .chart-readout-grid--series .chart-readout-lbl {
+      margin-right: 0.1rem;
+    }
+    .chart-readout-grid--series .chart-readout-val {
+      margin-right: 0;
+      margin-bottom: 0.06rem;
+    }
     .chart-callout .chart-readout-grid {
       width: auto;
     }
@@ -880,6 +890,80 @@
       });
     }
 
+    function normalizeChartSeries(arr) {
+      const raw = Array.isArray(arr) && arr.length ? arr : ['absolute'];
+      const uniq = [...new Set(raw)];
+      if (!uniq.length) return ['absolute'];
+      if (uniq.includes('range')) {
+        return uniq.filter((x) => x !== 'min' && x !== 'max');
+      }
+      return uniq;
+    }
+
+    function expandChartSeriesDefs(seriesNorm, queueTypes) {
+      const defs = [];
+      for (let qi = 0; qi < queueTypes.length; qi++) {
+        const qt = queueTypes[qi];
+        for (let si = 0; si < seriesNorm.length; si++) {
+          const kind = seriesNorm[si];
+          const short = queueReadoutLabel(qt);
+          const long = queueChartDatasetLabel(qt);
+          if (kind === 'absolute') {
+            defs.push({
+              qt,
+              kind: 'absolute',
+              legend: long,
+              readoutLbl: short + ' (wait)',
+            });
+          } else if (kind === 'min') {
+            defs.push({
+              qt,
+              kind: 'min',
+              legend: long + ' min',
+              readoutLbl: short + ' (min)',
+            });
+          } else if (kind === 'max') {
+            defs.push({
+              qt,
+              kind: 'max',
+              legend: long + ' max',
+              readoutLbl: short + ' (max)',
+            });
+          } else if (kind === 'range') {
+            defs.push({
+              qt,
+              kind: 'rmin',
+              legend: long + ' low',
+              readoutLbl: short + ' (low)',
+            });
+            defs.push({
+              qt,
+              kind: 'rmax',
+              legend: long + ' high',
+              readoutLbl: short + ' (high)',
+            });
+          }
+        }
+      }
+      return defs;
+    }
+
+    function queueSnapFromPoint(p) {
+      return {
+        minutes: p && p.minutes != null ? Number(p.minutes) : null,
+        min: p && p.wait_min_minutes != null ? Number(p.wait_min_minutes) : null,
+        max: p && p.wait_max_minutes != null ? Number(p.wait_max_minutes) : null,
+      };
+    }
+
+    function seriesYFromSnap(snap, def) {
+      if (!snap) return null;
+      if (def.kind === 'absolute') return snap.minutes;
+      if (def.kind === 'min' || def.kind === 'rmin') return snap.min;
+      if (def.kind === 'max' || def.kind === 'rmax') return snap.max;
+      return null;
+    }
+
     function escapeHtml(s) {
       return String(s)
         .replace(/&/g, '&amp;')
@@ -1028,74 +1112,56 @@
     }
 
     /**
-     * Terminal-tab style grid: up to two queue columns per row, labels left / values right,
-     * wait minutes in colored pills. Touch UI uses compact "12m"; desktop uses "12 min".
+     * Chart readout: one label/value row per plotted series (matches ``chart_series``).
      */
-    function readoutQueuesHtml(byQt, order, compactMin) {
-      const ord = order || [];
-      if (!ord.length) return '';
-      let html = '<div class="chart-readout-grid">';
-      for (let start = 0; start < ord.length; start += 2) {
-        const pair = ord.slice(start, start + 2);
-        for (let p = 0; p < 2; p++) {
-          const qt = pair[p];
-          html += '<span class="chart-readout-lbl">';
-          if (qt != null) {
-            html += escapeHtml(queueReadoutLabel(qt));
-          } else {
-            html += '\u00a0';
-          }
-          html += '</span><span class="chart-readout-val">';
-          if (qt != null) {
-            const v = byQt[qt];
-            if (v != null) {
-              const pillClass = window.waitTimePillClass(v);
-              const suffix = compactMin ? 'm' : ' min';
-              html +=
-                '<span class="' +
-                pillClass +
-                '">' +
-                escapeHtml(String(v) + suffix) +
-                '</span>';
-            } else {
-              html += '–';
-            }
-          } else {
-            html += '\u00a0';
-          }
-          html += '</span>';
+    function readoutSeriesHtml(seriesDefs, values, compactMin) {
+      const defs = seriesDefs || [];
+      const vals = values || [];
+      if (!defs.length) return '';
+      let html = '<div class="chart-readout-grid chart-readout-grid--series">';
+      for (let i = 0; i < defs.length; i++) {
+        const v = vals[i];
+        html += '<span class="chart-readout-lbl">' + escapeHtml(defs[i].readoutLbl) + '</span>';
+        html += '<span class="chart-readout-val">';
+        if (v == null || !isFinite(Number(v))) {
+          html += '–';
+        } else {
+          const pillClass = window.waitTimePillClass(v);
+          const suffix = compactMin ? 'm' : ' min';
+          html +=
+            '<span class="' +
+            pillClass +
+            '">' +
+            escapeHtml(String(v) + suffix) +
+            '</span>';
         }
+        html += '</span>';
       }
       html += '</div>';
       return html;
     }
 
-    function readoutHtml(label, byQt, order) {
+    function readoutHtml(label, chartRef, idx) {
       const compactMin = touchChartUi();
+      const defs = chartRef.$seriesDefs || [];
+      const vals = readoutValuesAtIndex(chartRef, idx);
       return (
         '<div class="line1">' + escapeHtml(label) + '</div>' +
-        readoutQueuesHtml(byQt, order, compactMin)
+        readoutSeriesHtml(defs, vals, compactMin)
       );
     }
 
     function readoutValuesAtIndex(chartRef, idx) {
       const row = chartRef.$mergedRows && chartRef.$mergedRows[idx];
-      const order = chartRef.$queueTypeOrder || [];
-      const byQt = {};
-      if (!row) return byQt;
-      for (let oi = 0; oi < order.length; oi++) {
-        const qt = order[oi];
-        const v = row[qt];
-        byQt[qt] = v != null ? v : null;
-      }
-      return byQt;
+      if (!row || !row.seriesValues) return [];
+      return row.seriesValues;
     }
 
     function showCallout(x, label, chartRef, idx) {
-      const order = chartRef.$queueTypeOrder || [];
-      const stacked = order.length > 2;
+      const defs = chartRef.$seriesDefs || [];
+      const stacked = defs.length > 2;
       calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
-      calloutEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
+      calloutEl.innerHTML = readoutHtml(label, chartRef, idx);
       calloutEl.style.display = 'block';
       calloutEl.style.left = x + 'px';
       requestAnimationFrame(function () {
@@ -1111,10 +1177,10 @@
     }
 
     function setFixedReadout(label, chartRef, idx) {
-      const order = chartRef.$queueTypeOrder || [];
-      const stacked = order.length > 2;
+      const defs = chartRef.$seriesDefs || [];
+      const stacked = defs.length > 2;
       readingFixedEl.className = 'chart-reading-fixed' + (stacked ? ' chart-reading-fixed--stacked' : '');
-      readingFixedEl.innerHTML = readoutHtml(label, readoutValuesAtIndex(chartRef, idx), order);
+      readingFixedEl.innerHTML = readoutHtml(label, chartRef, idx);
     }
 
     function clearFixedReadout() {
@@ -1269,9 +1335,20 @@
       const queues = data.queues || {};
       const queueTypes = sortQueueTypesFromKeys(
         Object.keys(queues).filter(function (qt) {
-          return (queues[qt] || []).length > 0;
+          const arr = queues[qt] || [];
+          return arr.some(function (p) {
+            return (
+              p.minutes != null ||
+              p.wait_min_minutes != null ||
+              p.wait_max_minutes != null
+            );
+          });
         })
       );
+
+      const wui = pageAirportEntry.wait_times_ui || { chart_series: ['absolute'] };
+      const seriesNorm = normalizeChartSeries(wui.chart_series);
+      const seriesDefs = expandChartSeriesDefs(seriesNorm, queueTypes);
 
       let maxDataMs = null;
       const byTime = {};
@@ -1281,8 +1358,10 @@
           const tms = Date.parse(p.t);
           if (!isFinite(tms)) continue;
           if (maxDataMs == null || tms > maxDataMs) maxDataMs = tms;
-          if (!byTime[p.t]) byTime[p.t] = { t: p.t, tMs: tms };
-          byTime[p.t][qt] = p.minutes;
+          if (!byTime[p.t]) {
+            byTime[p.t] = { t: p.t, tMs: tms, queues: {} };
+          }
+          byTime[p.t].queues[qt] = queueSnapFromPoint(p);
         }
       }
 
@@ -1303,6 +1382,14 @@
           return a.tMs - b.tMs;
         });
 
+      for (let ri = 0; ri < mergedRows.length; ri++) {
+        const row = mergedRows[ri];
+        row.seriesValues = seriesDefs.map(function (def) {
+          const snap = row.queues && row.queues[def.qt];
+          return seriesYFromSnap(snap, def);
+        });
+      }
+
       const mergedTimesMs = mergedRows.map(function (r) {
         return r.tMs;
       });
@@ -1316,10 +1403,11 @@
 
       const hoursNum = Number(hours);
       const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
-      const useAreaFill = queueTypes.length <= 2;
-      const datasets = queueTypes.map(function (qt, i) {
+      const useAreaFill =
+        seriesDefs.length === 1 && queueTypes.length <= 2;
+      const datasets = seriesDefs.map(function (def, i) {
         const lineColor = CHART_LINE_COLORS[i % CHART_LINE_COLORS.length];
-        const fillCol = useAreaFill ? queueFillColor(qt) : 'transparent';
+        const fillCol = useAreaFill ? queueFillColor(def.qt) : 'transparent';
         const seg = {
           borderColor: function (ctx) {
             const x0 = ctx.p0.parsed.x;
@@ -1337,11 +1425,13 @@
           };
         }
         return {
-          label: queueChartDatasetLabel(qt),
-          queueTypeKey: qt,
+          label: def.legend,
+          queueTypeKey: def.qt,
+          seriesKind: def.kind,
           parsing: false,
           data: mergedRows.map(function (row) {
-            return { x: row.tMs, y: row[qt] != null ? row[qt] : null };
+            const y = row.seriesValues[i];
+            return { x: row.tMs, y: y != null && isFinite(y) ? y : null };
           }),
           borderColor: lineColor,
           borderWidth: 2,
@@ -1432,6 +1522,7 @@
         },
       });
       chart.$queueTypeOrder = queueTypes;
+      chart.$seriesDefs = seriesDefs;
       chart.$mergedRows = mergedRows;
       chart.$mergedTimesMs = mergedTimesMs;
       chart.$chartWindowMs = bounds;
@@ -1441,9 +1532,10 @@
         let last = mergedTimesMs.length - 1;
         for (let ri = mergedRows.length - 1; ri >= 0; ri--) {
           const row = mergedRows[ri];
+          const sv = row.seriesValues || [];
           let any = false;
-          for (let qi = 0; qi < queueTypes.length; qi++) {
-            if (row[queueTypes[qi]] != null) {
+          for (let si = 0; si < sv.length; si++) {
+            if (sv[si] != null && isFinite(sv[si])) {
               any = true;
               break;
             }
@@ -1561,6 +1653,8 @@
 
     function buildTabs(rows, activeIndex) {
       tabRowEl.innerHTML = '';
+      const chipMode =
+        (pageAirportEntry.wait_times_ui && pageAirportEntry.wait_times_ui.chip) || 'absolute';
       rows.forEach((row, i) => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1576,7 +1670,7 @@
         const wrap = document.createElement('div');
         wrap.className = 'tab-waits';
         wrap.setAttribute('aria-hidden', 'true');
-        const gridRows = window.airportTabQueueWaitGridRows(row.queues);
+        const gridRows = window.airportTabQueueWaitGridRows(row.queues, chipMode);
         if (!gridRows.length) {
           wrap.textContent = '—';
         } else {
@@ -1591,13 +1685,13 @@
               val.className = 'tab-wait-val';
               if (seg) {
                 lbl.textContent = seg.label;
-                if (seg.minutes == null) {
-                  val.textContent = '—';
+                if (seg.pillMetric == null) {
+                  val.textContent = seg.text;
                   val.classList.add('tab-wait-val--dash');
                 } else {
                   const pill = document.createElement('span');
-                  pill.className = window.waitTimePillClass(seg.minutes);
-                  pill.textContent = String(seg.minutes) + 'm';
+                  pill.className = window.waitTimePillClass(seg.pillMetric);
+                  pill.textContent = seg.text;
                   val.appendChild(pill);
                 }
               } else {
