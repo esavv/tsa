@@ -458,7 +458,7 @@
         display: grid;
         grid-template-rows: auto auto;
         grid-auto-flow: column;
-        grid-auto-columns: 14.25rem;
+        grid-auto-columns: 14.5rem;
         column-gap: 0.4rem;
         row-gap: 0.4rem;
         align-items: stretch;
@@ -483,10 +483,18 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 0.2rem;
-      width: 14.25rem;
-      min-width: 14.25rem;
-      max-width: 14.25rem;
+      width: 14rem;
+      min-width: 14rem;
+      max-width: 14rem;
       flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+      /* Wider than desktop; must match grid-auto-columns on .tab-row-scroll .tab-row. */
+      .tab-row-scroll .tab-btn {
+        width: 14.5rem;
+        min-width: 14.5rem;
+        max-width: 14.5rem;
+      }
     }
     .tab-btn.active {
       background: #1f2937;
