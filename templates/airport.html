@@ -1407,17 +1407,18 @@
               min: tMin,
               max: tMax,
               grid: { display: false, drawBorder: false },
+              // Must be on the scale, not under ticks — Chart only calls options.afterBuildTicks.
+              afterBuildTicks: function (axis) {
+                const bw = chartBuild.bounds;
+                const hr = chartBuild.hoursNum;
+                axis.ticks = buildChartTickValues(bw.tMin, bw.tMax, hr).map(function (ms) {
+                  return { value: ms };
+                });
+              },
               ticks: {
                 autoSkip: false,
                 minRotation: 45,
                 maxRotation: 45,
-                afterBuildTicks: function (axis) {
-                  const bw = chartBuild.bounds;
-                  const hr = chartBuild.hoursNum;
-                  axis.ticks = buildChartTickValues(bw.tMin, bw.tMax, hr).map(function (ms) {
-                    return { value: ms };
-                  });
-                },
                 callback: function (value, index, ticks) {
                   const tick = ticks[index];
                   const ms = tick != null && tick.value != null ? tick.value : value;
