@@ -133,7 +133,7 @@ def api_catalog():
 
 @app.route("/api/latest")
 def api_latest():
-    """Latest scrape + 6h sparkline series per airport / terminal (+ gate) / queue_type."""
+    """Latest wait minutes per airport / terminal (+ gate) / queue_type at the newest scrape."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -155,6 +155,8 @@ def api_latest():
         (scraped_at_utc,),
     )
     rows = cur.fetchall()
+    conn.close()
+
     airports: dict[str, dict[tuple[str, str], dict]] = {}
     for airport, terminal, gate, queue_type, wait_minutes in rows:
         if airport not in airports:
@@ -164,36 +166,7 @@ def api_latest():
         if key not in airports[airport]:
             airports[airport][key] = {"queues": {}}
         slot = airports[airport][key]["queues"]
-        if queue_type not in slot:
-            slot[queue_type] = {"minutes": None, "spark": []}
-        slot[queue_type]["minutes"] = wait_minutes
-
-    since_6h = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
-    cur.execute(
-        """
-        SELECT airport, terminal, gate, queue_type, scraped_at_utc, wait_minutes
-        FROM wait_times
-        WHERE scraped_at_utc >= ?
-        ORDER BY scraped_at_utc
-        """,
-        (since_6h,),
-    )
-    history_rows = cur.fetchall()
-    conn.close()
-
-    for airport, terminal, gate, queue_type, scraped_at_utc, wait_minutes in history_rows:
-        g = gate or ""
-        key = (terminal, g)
-        if airport not in airports or key not in airports[airport]:
-            continue
-        queues = airports[airport][key]["queues"]
-        if queue_type not in queues:
-            queues[queue_type] = {"minutes": None, "spark": []}
-        queues[queue_type]["spark"].append(
-            {"t": scraped_at_utc, "minutes": wait_minutes}
-        )
+        slot[queue_type] = {"minutes": wait_minutes}
 
     result = {}
     for airport, terms in airports.items():
