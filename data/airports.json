@@ -85,7 +85,7 @@
       "api_url": "https://api.cltairport.mobi/wait-times/checkpoint/CLT",
       "wait_times_ui": {
         "chip": "range",
-        "chart_series": ["absolute", "range"]
+        "chart_series": ["range"]
       },
       "status": "active"
     },
@@ -117,7 +117,7 @@
       "api_url": null,
       "wait_times_ui": {
         "chip": "range",
-        "chart_series": ["absolute", "range"]
+        "chart_series": ["range"]
       },
       "status": "active"
     },
@@ -142,7 +142,7 @@
       "api_url": "https://app.flyfruition.com/api/public/tsa",
       "wait_times_ui": {
         "chip": "range",
-        "chart_series": ["absolute", "range"]
+        "chart_series": ["range"]
       },
       "status": "active"
     },
@@ -342,8 +342,8 @@
       "wait_times_url": "https://flymco.com/security/",
       "api_url": "https://api.goaa.aero/wait-times/checkpoint/MCO",
       "wait_times_ui": {
-        "chip": "range",
-        "chart_series": ["absolute", "range"]
+        "chip": "absolute",
+        "chart_series": ["absolute"]
       },
       "status": "active"
     },
@@ -368,7 +368,7 @@
       "api_url": null,
       "wait_times_ui": {
         "chip": "range",
-        "chart_series": ["absolute", "range"]
+        "chart_series": ["range"]
       },
       "status": "active"
     },
