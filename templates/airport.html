@@ -530,6 +530,14 @@
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
+    .tab-btn .tab-wait-val--dash {
+      color: #94a3b8;
+      font-weight: 500;
+      font-variant-numeric: normal;
+    }
+    .tab-btn.active .tab-wait-val--dash {
+      color: rgba(226, 232, 240, 0.75);
+    }
     /* Chart hover / scrub readout: label|value pairs; max-content cols (not 1fr) so readout
        does not stretch to full width on mobile or shrink-wrap oddly on desktop abspos. */
     .chart-callout .chart-readout-grid,
@@ -1478,10 +1486,15 @@
               val.className = 'tab-wait-val';
               if (seg) {
                 lbl.textContent = seg.label;
-                const pill = document.createElement('span');
-                pill.className = window.waitTimePillClass(seg.minutes);
-                pill.textContent = String(seg.minutes) + 'm';
-                val.appendChild(pill);
+                if (seg.minutes == null) {
+                  val.textContent = '—';
+                  val.classList.add('tab-wait-val--dash');
+                } else {
+                  const pill = document.createElement('span');
+                  pill.className = window.waitTimePillClass(seg.minutes);
+                  pill.textContent = String(seg.minutes) + 'm';
+                  val.appendChild(pill);
+                }
               } else {
                 lbl.textContent = '\u00a0';
                 val.textContent = '\u00a0';

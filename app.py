@@ -133,7 +133,13 @@ def api_catalog():
 
 @app.route("/api/latest")
 def api_latest():
-    """Latest wait minutes per airport / terminal (+ gate) / queue_type at the newest scrape."""
+    """Wait times at the newest global scrape, keyed by activity in the last 24 hours.
+
+    ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
+    ``airports`` includes each airport / terminal / gate / queue_type that appears
+    in the last 24 hours. ``minutes`` is the value at ``scraped_at_utc`` when a row
+    exists there, otherwise ``null`` (e.g. checkpoint quiet at that scrape).
+    """
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -145,20 +151,37 @@ def api_latest():
         return jsonify(scraped_at_utc=None, airports={})
 
     scraped_at_utc = row[0]
+    since_24h = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
     cur.execute(
         """
         SELECT airport, terminal, gate, queue_type, wait_minutes
         FROM wait_times
         WHERE scraped_at_utc = ?
-        ORDER BY airport, terminal, gate, queue_type
         """,
         (scraped_at_utc,),
     )
-    rows = cur.fetchall()
+    latest_map: dict[tuple[str, str, str, str], int] = {}
+    for airport, terminal, gate, queue_type, wait_minutes in cur.fetchall():
+        g = gate or ""
+        latest_map[(airport, terminal, g, queue_type)] = wait_minutes
+
+    cur.execute(
+        """
+        SELECT DISTINCT airport, terminal, gate, queue_type
+        FROM wait_times
+        WHERE scraped_at_utc >= ?
+        ORDER BY airport, terminal, gate, queue_type
+        """,
+        (since_24h,),
+    )
+    recent_keys = cur.fetchall()
     conn.close()
 
     airports: dict[str, dict[tuple[str, str], dict]] = {}
-    for airport, terminal, gate, queue_type, wait_minutes in rows:
+    for airport, terminal, gate, queue_type in recent_keys:
         if airport not in airports:
             airports[airport] = {}
         g = gate or ""
@@ -166,7 +189,9 @@ def api_latest():
         if key not in airports[airport]:
             airports[airport][key] = {"queues": {}}
         slot = airports[airport][key]["queues"]
-        slot[queue_type] = {"minutes": wait_minutes}
+        slot[queue_type] = {
+            "minutes": latest_map.get((airport, terminal, g, queue_type))
+        }
 
     result = {}
     for airport, terms in airports.items():

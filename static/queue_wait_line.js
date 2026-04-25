@@ -1,7 +1,7 @@
 /**
  * Shared queue labeling for search chips vs airport terminal tabs.
  *
- * chipQueueWaitLine — plain text (tools); chipQueueWaitLineHtml — search chips with colored minute pills.
+ * chipQueueWaitLine — plain text (tools); chipQueueWaitLineHtml — search chips with minute pills or "—" when minutes is null.
  * airportTabQueueWaitGridRows — /airport tabs: structured rows of up to 2 {label, minutes} pairs
  *   (minutes rendered as "6m" in the template). airportTabQueueWaitTitle builds a plain-text wait summary.
  */
@@ -30,7 +30,7 @@
       if (picked.length >= 2) break;
       var qt = CHIP_QUEUE_PRIORITY[i];
       var slot = q[qt];
-      if (slot && slot.minutes != null) {
+      if (slot && Object.prototype.hasOwnProperty.call(slot, 'minutes')) {
         picked.push({ qt: qt, minutes: slot.minutes });
       }
     }
@@ -42,7 +42,9 @@
     if (!picked.length) return '';
     var segments = [];
     for (var j = 0; j < picked.length; j++) {
-      segments.push(chipQueueTypeLabel(picked[j].qt) + ' ' + picked[j].minutes);
+      var m = picked[j].minutes;
+      var mv = m == null ? '—' : String(m);
+      segments.push(chipQueueTypeLabel(picked[j].qt) + ' ' + mv);
     }
     return segments.join(' · ');
   }
@@ -69,21 +71,24 @@
           '<span class="airport-search-chip__wait-sep" aria-hidden="true"> · </span>'
         );
       }
-      parts.push(
-        esc(chipQueueTypeLabel(picked[j].qt)) +
-          ' <span class="' +
-          waitTimePillClass(picked[j].minutes) +
-          '">' +
-          esc(String(picked[j].minutes)) +
-          '</span>'
-      );
+      var m = picked[j].minutes;
+      var valueHtml =
+        m == null
+          ? '<span class="airport-search-chip__wait--empty">' + esc('—') + '</span>'
+          : '<span class="' +
+            waitTimePillClass(m) +
+            '">' +
+            esc(String(m)) +
+            '</span>';
+      parts.push(esc(chipQueueTypeLabel(picked[j].qt)) + ' ' + valueHtml);
     }
     return parts.join('');
   }
 
   /**
-   * All queue types that have numeric minutes, in CHIP_QUEUE_PRIORITY order then any others sorted.
-   * @returns {{ qt: string, minutes: number }[]}
+   * Queue types present in ``queues`` (from /api/latest), priority order then others sorted.
+   * ``minutes`` may be null when the checkpoint had no row at the global latest scrape.
+   * @returns {{ qt: string, minutes: number | null }[]}
    */
   function queuesWithMinutesOrdered(queues) {
     var q = queues || {};
@@ -92,14 +97,18 @@
     for (var i = 0; i < CHIP_QUEUE_PRIORITY.length; i++) {
       var qt = CHIP_QUEUE_PRIORITY[i];
       var slot = q[qt];
-      if (slot && slot.minutes != null) {
+      if (slot && Object.prototype.hasOwnProperty.call(slot, 'minutes')) {
         out.push({ qt: qt, minutes: slot.minutes });
         seen[qt] = true;
       }
     }
     var rest = Object.keys(q)
       .filter(function (k) {
-        return !seen[k] && q[k] && q[k].minutes != null;
+        return (
+          !seen[k] &&
+          q[k] &&
+          Object.prototype.hasOwnProperty.call(q[k], 'minutes')
+        );
       })
       .sort();
     for (var j = 0; j < rest.length; j++) {
@@ -111,7 +120,7 @@
 
   /**
    * Each item is one visual row of the tab chip: up to two { label, minutes } (for a 4-column grid).
-   * @returns {Array<Array<{ label: string, minutes: number }>>}
+   * @returns {Array<Array<{ label: string, minutes: number | null }>>}
    */
   function airportTabQueueWaitGridRows(queues) {
     var ordered = queuesWithMinutesOrdered(queues);
@@ -134,7 +143,8 @@
       .map(function (pairs) {
         return pairs
           .map(function (s) {
-            return s.label + ' ' + s.minutes + 'm';
+            var mv = s.minutes == null ? '—' : s.minutes + 'm';
+            return s.label + ' ' + mv;
           })
           .join(' · ');
       })
