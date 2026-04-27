@@ -1809,12 +1809,6 @@
       currentHours = Number(hours);
       hideCallout();
       clearFixedReadout();
-      if (chart) {
-        detachChartTouchHandlers();
-        chart.destroy();
-        chart = null;
-      }
-      clearChartHtmlLegend();
 
       const queues = data.queues || {};
       const queueTypes = sortQueueTypesFromKeys(
@@ -1833,6 +1827,31 @@
       const wui = pageAirportEntry.wait_times_ui || { chart_series: ['absolute'] };
       const seriesNorm = normalizeChartSeries(wui.chart_series);
       const seriesDefs = expandChartSeriesDefs(seriesNorm, queueTypes);
+
+      const visibilityCtxKey =
+        pageAirport +
+        '\0' +
+        selectedTerminal +
+        '\0' +
+        String(selectedGate || '') +
+        '\0' +
+        seriesNorm.join(',') +
+        '\0' +
+        queueTypes.join(',');
+
+      let preservedVisibility = null;
+      if (chart && chart.$visibilityCtxKey === visibilityCtxKey && chart.data.datasets.length) {
+        preservedVisibility = chart.data.datasets.map(function (_ds, i) {
+          return chart.isDatasetVisible(i);
+        });
+      }
+
+      if (chart) {
+        detachChartTouchHandlers();
+        chart.destroy();
+        chart = null;
+      }
+      clearChartHtmlLegend();
 
       let maxDataMs = null;
       const byTime = {};
@@ -2059,6 +2078,14 @@
       chart.$mergedTimesMs = mergedTimesMs;
       chart.$chartWindowMs = bounds;
       chart.$chartHours = hoursNum;
+      chart.$visibilityCtxKey = visibilityCtxKey;
+
+      if (preservedVisibility && preservedVisibility.length) {
+        const n = Math.min(preservedVisibility.length, chart.data.datasets.length);
+        for (let vi = 0; vi < n; vi++) {
+          chart.setDatasetVisibility(vi, preservedVisibility[vi]);
+        }
+      }
 
       if (mergedTimesMs.length) {
         let last = mergedTimesMs.length - 1;
