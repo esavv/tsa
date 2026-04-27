@@ -1391,6 +1391,7 @@
           ctx.stroke();
         }
         for (let di = 0; di < n; di++) {
+          if (typeof chartRef.isDatasetVisible === 'function' && !chartRef.isDatasetVisible(di)) continue;
           const meta = chartRef.getDatasetMeta(di);
           const pt = meta.data[idx];
           if (!pt || pt.skip) continue;
