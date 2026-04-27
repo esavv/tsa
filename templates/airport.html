@@ -14,6 +14,7 @@
       min-width: 0;
     }
     .airport-layout,
+    .chart-area-wrap,
     .chart-shell,
     .chart-container {
       width: 100%;
@@ -638,12 +639,62 @@
       font-size: 0.85rem;
       line-height: 1.35;
     }
+    .chart-area-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .chart-area-wrap .range-group {
+      order: 1;
+      align-self: flex-end;
+    }
+    .chart-area-wrap #chart-shell {
+      order: 2;
+    }
+    .chart-area-wrap #chart-legend {
+      order: 3;
+    }
+    @media (min-width: 769px) {
+      .chart-area-wrap {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        column-gap: 1rem;
+        row-gap: 0.35rem;
+        align-items: center;
+      }
+      .chart-area-wrap .range-group,
+      .chart-area-wrap #chart-shell,
+      .chart-area-wrap #chart-legend {
+        order: unset;
+        align-self: unset;
+      }
+      .chart-area-wrap #chart-legend {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
+        margin-top: 0;
+      }
+      .chart-area-wrap .range-group {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        margin-bottom: 0;
+      }
+      .chart-area-wrap #chart-shell {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+    }
     .range-group {
       display: flex;
       gap: 0.35rem;
       flex-wrap: wrap;
       justify-content: flex-end;
       margin-bottom: 0.5rem;
+    }
+    .chart-area-wrap .range-group {
+      margin-bottom: 0;
     }
     .range-btn {
       border: 1px solid #d0d7e2;
@@ -729,6 +780,12 @@
       margin-top: 0.4rem;
       font-size: 0.8125rem;
       color: #334155;
+    }
+    @media (min-width: 769px) {
+      .chart-legend {
+        justify-content: flex-start;
+        margin-top: 0;
+      }
     }
     .chart-legend[hidden] {
       display: none !important;
@@ -869,23 +926,25 @@
           <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
         </div>
         <p class="muted" id="last-scraped-at"></p>
-        <div class="range-group" id="range-group">
-          <button type="button" class="range-btn" data-hours="6">6H</button>
-          <button type="button" class="range-btn" data-hours="12">12H</button>
-          <button type="button" class="range-btn active" data-hours="24">24H</button>
-          <button type="button" class="range-btn" data-hours="72">3D</button>
-          <button type="button" class="range-btn" data-hours="168">7D</button>
-        </div>
-        <div id="chart-shell" class="chart-shell">
-          <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
-          <div class="chart-container">
-            <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
-              Loading…
-            </div>
-            <div id="chart-callout" class="chart-callout"></div>
-            <canvas id="chart"></canvas>
-          </div>
+        <div class="chart-area-wrap" id="chart-area-wrap">
           <div id="chart-legend" class="chart-legend" role="group" aria-label="Show or hide chart series" hidden></div>
+          <div class="range-group" id="range-group">
+            <button type="button" class="range-btn" data-hours="6">6H</button>
+            <button type="button" class="range-btn" data-hours="12">12H</button>
+            <button type="button" class="range-btn active" data-hours="24">24H</button>
+            <button type="button" class="range-btn" data-hours="72">3D</button>
+            <button type="button" class="range-btn" data-hours="168">7D</button>
+          </div>
+          <div id="chart-shell" class="chart-shell">
+            <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
+            <div class="chart-container">
+              <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
+                Loading…
+              </div>
+              <div id="chart-callout" class="chart-callout"></div>
+              <canvas id="chart"></canvas>
+            </div>
+          </div>
         </div>
         <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
         <div
@@ -1142,6 +1201,7 @@
 
     const chartCanvas = document.getElementById('chart');
     const chartShell = document.getElementById('chart-shell');
+    const chartAreaWrap = document.getElementById('chart-area-wrap');
     const chartLegendEl = document.getElementById('chart-legend');
     const readingFixedEl = document.getElementById('chart-reading-fixed');
     let chart = null;
@@ -1577,6 +1637,11 @@
       return '#334155';
     }
 
+    /** Legend-only copy: shorter PreCheck wording than dataset labels used elsewhere. */
+    function formatChartHtmlLegendText(rawLabel) {
+      return String(rawLabel).replace(/\bTSA PreCheck\b/g, 'PreCheck');
+    }
+
     function mountChartHtmlLegend(chartRef) {
       if (!chartLegendEl) return;
       chartLegendEl.innerHTML = '';
@@ -1591,10 +1656,11 @@
         const ds = data.datasets[i];
         if (ds.rangeLegendSkip) continue;
         anyEntry = true;
-        const label =
+        const rawLabel =
           ds.label != null && String(ds.label) !== ''
             ? String(ds.label)
             : 'Dataset ' + i;
+        const label = formatChartHtmlLegendText(rawLabel);
         const stroke = chartLegendStrokeForDataset(ds);
         const row = document.createElement('div');
         row.className = 'chart-legend__row';
@@ -2112,12 +2178,14 @@
         if (!rows || !rows.length) {
           bootstrapMsgEl.textContent = 'No wait time data for this airport yet.';
           bootstrapMsgEl.hidden = false;
-          chartShell.style.display = 'none';
+          if (chartAreaWrap) chartAreaWrap.style.display = 'none';
+          else chartShell.style.display = 'none';
           hideChartLoading();
           return;
         }
         bootstrapMsgEl.hidden = true;
-        chartShell.style.display = '';
+        if (chartAreaWrap) chartAreaWrap.style.display = '';
+        else chartShell.style.display = '';
         terminalRows = rows;
         let pick = 0;
         if (initialTerminal) {
@@ -2133,7 +2201,8 @@
       .catch(e => {
         bootstrapMsgEl.textContent = 'Error: ' + e.message;
         bootstrapMsgEl.hidden = false;
-        chartShell.style.display = 'none';
+        if (chartAreaWrap) chartAreaWrap.style.display = 'none';
+        else chartShell.style.display = 'none';
         hideChartLoading();
       });
   </script>
