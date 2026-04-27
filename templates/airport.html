@@ -720,6 +720,46 @@
       position: relative;
       height: 390px;
     }
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.5rem 1.1rem;
+      margin-top: 0.4rem;
+      font-size: 0.7rem;
+      color: #334155;
+    }
+    .chart-legend[hidden] {
+      display: none !important;
+    }
+    .chart-legend__row {
+      flex: 0 0 auto;
+    }
+    .chart-legend__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      user-select: none;
+      margin: 0;
+      font-weight: 400;
+    }
+    .chart-legend__cb {
+      margin: 0;
+      flex-shrink: 0;
+      accent-color: #334155;
+    }
+    .chart-legend__swatch {
+      display: inline-block;
+      width: 28px;
+      height: 0;
+      border-top: 3px solid #334155;
+      flex-shrink: 0;
+    }
+    .chart-legend__text {
+      line-height: 1.2;
+    }
     @media (min-width: 1200px) {
       .chart-container {
         height: 460px;
@@ -845,6 +885,7 @@
             <div id="chart-callout" class="chart-callout"></div>
             <canvas id="chart"></canvas>
           </div>
+          <div id="chart-legend" class="chart-legend" role="group" aria-label="Show or hide chart series" hidden></div>
         </div>
         <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
         <div
@@ -1101,6 +1142,7 @@
 
     const chartCanvas = document.getElementById('chart');
     const chartShell = document.getElementById('chart-shell');
+    const chartLegendEl = document.getElementById('chart-legend');
     const readingFixedEl = document.getElementById('chart-reading-fixed');
     let chart = null;
     let chartTouchAbort = null;
@@ -1523,6 +1565,77 @@
       return nearestTimeIndex(xs, tMs);
     }
 
+    function clearChartHtmlLegend() {
+      if (!chartLegendEl) return;
+      chartLegendEl.innerHTML = '';
+      chartLegendEl.hidden = true;
+    }
+
+    function chartLegendStrokeForDataset(ds) {
+      if (typeof ds.crosshairDotColor === 'string') return ds.crosshairDotColor;
+      if (typeof ds.borderColor === 'string') return ds.borderColor;
+      return '#334155';
+    }
+
+    function mountChartHtmlLegend(chartRef) {
+      if (!chartLegendEl) return;
+      chartLegendEl.innerHTML = '';
+      const data = chartRef.data;
+      if (!data.datasets.length) {
+        chartLegendEl.hidden = true;
+        return;
+      }
+      chartLegendEl.hidden = false;
+      let anyEntry = false;
+      for (let i = 0; i < data.datasets.length; i++) {
+        const ds = data.datasets[i];
+        if (ds.rangeLegendSkip) continue;
+        anyEntry = true;
+        const label =
+          ds.label != null && String(ds.label) !== ''
+            ? String(ds.label)
+            : 'Dataset ' + i;
+        const stroke = chartLegendStrokeForDataset(ds);
+        const row = document.createElement('div');
+        row.className = 'chart-legend__row';
+        const lbl = document.createElement('label');
+        lbl.className = 'chart-legend__label';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'chart-legend__cb';
+        cb.checked = chartRef.isDatasetVisible(i);
+        cb.dataset.datasetIndex = String(i);
+        cb.addEventListener('change', function () {
+          const di = Number(cb.dataset.datasetIndex);
+          const show = cb.checked;
+          const dds = chartRef.data.datasets[di];
+          if (dds.rangeBandHigh && dds.rangeBandLowIndex != null) {
+            chartRef.setDatasetVisibility(di, show);
+            chartRef.setDatasetVisibility(dds.rangeBandLowIndex, show);
+          } else {
+            chartRef.setDatasetVisibility(di, show);
+          }
+          chartRef.update();
+        });
+        const swatch = document.createElement('span');
+        swatch.className = 'chart-legend__swatch';
+        swatch.setAttribute('aria-hidden', 'true');
+        swatch.style.borderTopColor = stroke;
+        const text = document.createElement('span');
+        text.className = 'chart-legend__text';
+        text.textContent = label;
+        lbl.appendChild(cb);
+        lbl.appendChild(swatch);
+        lbl.appendChild(text);
+        row.appendChild(lbl);
+        chartLegendEl.appendChild(row);
+      }
+      if (!anyEntry) {
+        chartLegendEl.innerHTML = '';
+        chartLegendEl.hidden = true;
+      }
+    }
+
     function buildChartFromHistory(data, hours) {
       currentHours = Number(hours);
       hideCallout();
@@ -1532,6 +1645,7 @@
         chart.destroy();
         chart = null;
       }
+      clearChartHtmlLegend();
 
       const queues = data.queues || {};
       const queueTypes = sortQueueTypesFromKeys(
@@ -1570,6 +1684,7 @@
       if (!bounds) {
         hideCallout();
         clearFixedReadout();
+        clearChartHtmlLegend();
         hideChartLoading();
         return;
       }
@@ -1598,6 +1713,7 @@
       if (!queueTypes.length) {
         hideCallout();
         clearFixedReadout();
+        clearChartHtmlLegend();
         hideChartLoading();
         return;
       }
@@ -1714,90 +1830,7 @@
           maintainAspectRatio: false,
           interaction: { mode: 'nearest', axis: 'x', intersect: false },
           plugins: {
-            legend: {
-              display: true,
-              position: 'bottom',
-              align: 'end',
-              onClick: function (e, legendItem, legend) {
-                const c = legend.chart;
-                const di = legendItem.datasetIndex;
-                const ds = c.data.datasets[di];
-                if (ds.rangeBandHigh && ds.rangeBandLowIndex != null) {
-                  const show = !c.isDatasetVisible(di);
-                  c.setDatasetVisibility(di, show);
-                  c.setDatasetVisibility(ds.rangeBandLowIndex, show);
-                } else {
-                  c.setDatasetVisibility(di, !c.isDatasetVisible(di));
-                }
-                c.update();
-              },
-              labels: {
-                usePointStyle: true,
-                pointStyle: 'line',
-                boxWidth: 36,
-                boxHeight: 8,
-                font: { size: 10 },
-                generateLabels: function (chart) {
-                  const data = chart.data;
-                  const lblCfg = chart.options.plugins.legend.labels || {};
-                  const fontColor =
-                    lblCfg.color ||
-                    (typeof Chart !== 'undefined' && Chart.defaults && Chart.defaults.color) ||
-                    '#334155';
-                  if (!data.datasets.length) return [];
-                  const items = [];
-                  for (let i = 0; i < data.datasets.length; i++) {
-                    const ds = data.datasets[i];
-                    if (ds.rangeLegendSkip) continue;
-                    const meta = chart.getDatasetMeta(i);
-                    const label =
-                      ds.label != null && String(ds.label) !== ''
-                        ? String(ds.label)
-                        : 'Dataset ' + i;
-                    const stroke =
-                      typeof ds.crosshairDotColor === 'string'
-                        ? ds.crosshairDotColor
-                        : typeof ds.borderColor === 'string'
-                          ? ds.borderColor
-                          : '#334155';
-                    const hidden =
-                      typeof chart.isDatasetVisible === 'function' &&
-                      !chart.isDatasetVisible(i);
-                    if (ds.rangeBandHigh) {
-                      items.push({
-                        text: label,
-                        fillStyle: 'transparent',
-                        strokeStyle: stroke,
-                        lineWidth: 2,
-                        pointStyle: 'line',
-                        hidden: hidden,
-                        datasetIndex: i,
-                        index: items.length,
-                        fontColor: fontColor,
-                      });
-                    } else {
-                      const fillS = ds.backgroundColor;
-                      const fillOk =
-                        typeof fillS === 'string' && fillS !== 'transparent'
-                          ? fillS
-                          : 'transparent';
-                      items.push({
-                        text: label,
-                        fillStyle: fillOk,
-                        strokeStyle: stroke,
-                        lineWidth: 2,
-                        pointStyle: 'line',
-                        hidden: hidden,
-                        datasetIndex: i,
-                        index: items.length,
-                        fontColor: fontColor,
-                      });
-                    }
-                  }
-                  return items;
-                },
-              },
-            },
+            legend: { display: false },
             tooltip: { enabled: false }
           },
           onHover: (event, _elements, chartRef) => {
@@ -1891,6 +1924,7 @@
         chart.$readoutIndex = null;
         chart.update('none');
       }
+      mountChartHtmlLegend(chart);
       hideChartLoading();
     }
 
@@ -1939,6 +1973,7 @@
             chart.destroy();
             chart = null;
           }
+          clearChartHtmlLegend();
         });
     }
 
