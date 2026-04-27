@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}TSA Wait Times for US Airports{% endblock %}
+{% block title %}TSA Wait Times at US Airports{% endblock %}
 {% block head %}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
@@ -14,6 +14,7 @@
       min-width: 0;
     }
     .airport-layout,
+    .chart-area-wrap,
     .chart-shell,
     .chart-container {
       width: 100%;
@@ -115,6 +116,12 @@
     @media (prefers-reduced-motion: reduce) {
       .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
         transition: none;
+      }
+    }
+    @media (max-width: 768px) {
+      .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
+        /* Past 100% alone (same as parent height); extend downward, capped to viewport */
+        max-height: min(calc(100% + 1rem), 92vh);
       }
     }
     .airport-search-results {
@@ -638,12 +645,95 @@
       font-size: 0.85rem;
       line-height: 1.35;
     }
+    .chart-area-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .chart-area-wrap .chart-ctrl-strip {
+      order: 1;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .chart-area-wrap #chart-shell {
+      order: 2;
+    }
+    .chart-area-wrap #chart-legend {
+      order: 3;
+    }
+    @media (max-width: 768px) {
+      .chart-area-wrap {
+        gap: 0;
+        margin-top: 0.4rem;
+      }
+      .chart-ctrl-strip {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 0.35rem;
+        margin-bottom: 0;
+      }
+      .chart-area-wrap > #chart-shell.chart-shell {
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+      .chart-ctrl-strip .chart-reading-fixed {
+        flex: 1;
+        min-width: 0;
+        margin-bottom: 0;
+      }
+      .chart-ctrl-strip .range-group {
+        flex: 0 0 auto;
+        align-self: center;
+        margin-left: auto;
+      }
+    }
+    @media (min-width: 769px) {
+      .chart-area-wrap {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        column-gap: 1rem;
+        row-gap: 0.35rem;
+        align-items: center;
+      }
+      .chart-ctrl-strip {
+        display: contents;
+      }
+      .chart-area-wrap .chart-ctrl-strip,
+      .chart-area-wrap #chart-shell,
+      .chart-area-wrap #chart-legend {
+        order: unset;
+        align-self: unset;
+        width: unset;
+      }
+      .chart-area-wrap #chart-legend {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
+        margin-top: 0;
+      }
+      .chart-area-wrap .range-group {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        margin-bottom: 0;
+        margin-left: 0;
+      }
+      .chart-area-wrap #chart-shell {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+    }
     .range-group {
       display: flex;
       gap: 0.35rem;
       flex-wrap: wrap;
       justify-content: flex-end;
       margin-bottom: 0.5rem;
+    }
+    .chart-area-wrap .range-group {
+      margin-bottom: 0;
     }
     .range-btn {
       border: 1px solid #d0d7e2;
@@ -668,7 +758,7 @@
       margin-bottom: 0.5rem;
       min-height: 2.8rem;
     }
-    .chart-shell.touch-chart-ui .chart-reading-fixed {
+    .chart-area-wrap.touch-chart-ui .chart-reading-fixed {
       display: block;
     }
     .chart-reading-fixed .line1 {
@@ -716,9 +806,120 @@
       font-weight: 600;
       margin-bottom: 0.1rem;
     }
+    @media (max-width: 768px) {
+      .chart-callout {
+        padding: 0.32rem 0.52rem;
+        font-size: 0.72rem;
+        line-height: 1.25;
+        min-width: 9rem;
+      }
+      .chart-callout.chart-callout--stacked {
+        min-width: 11rem;
+      }
+      .chart-callout .line1 {
+        font-size: 0.72rem;
+        margin-bottom: 0.06rem;
+      }
+      .chart-callout .chart-readout-grid {
+        font-size: 0.68rem;
+        line-height: 1.22;
+        margin-top: 0.05rem;
+      }
+      .chart-reading-fixed .line1 {
+        font-size: 0.82rem;
+        margin-bottom: 0.1rem;
+      }
+      .chart-reading-fixed .chart-readout-grid {
+        font-size: 0.72rem;
+        line-height: 1.28;
+      }
+      .range-group {
+        gap: 0.16rem;
+      }
+      .range-btn {
+        font-size: 0.78rem;
+        padding: 0.19rem 0.46rem;
+      }
+    }
     .chart-container {
       position: relative;
       height: 390px;
+    }
+    /* base.html sets .chart-container { margin: 1rem 0 }; remove so strip/chart/legend stack tight */
+    .chart-shell .chart-container {
+      margin: 0;
+    }
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.5rem 1.1rem;
+      margin-top: 0.4rem;
+      font-size: 0.8125rem;
+      color: #334155;
+    }
+    @media (max-width: 768px) {
+      .chart-legend {
+        margin-top: 0;
+        width: calc(100% + 2rem);
+        max-width: none;
+        margin-left: -1rem;
+        margin-right: -1rem;
+        padding-inline: 1rem;
+        box-sizing: border-box;
+        justify-content: flex-end;
+        align-content: flex-end;
+        gap: 0.22rem 0.42rem;
+      }
+    }
+    @media (min-width: 769px) {
+      .chart-legend {
+        justify-content: flex-start;
+        margin-top: 0;
+      }
+      .chart-area-wrap #chart-shell.chart-shell {
+        margin-bottom: 0.12rem;
+      }
+      body:has(main.airport-layout) > footer {
+        margin-top: 0.35rem !important;
+        padding: 0.45rem 0 !important;
+      }
+    }
+    .chart-legend[hidden] {
+      display: none !important;
+    }
+    .chart-legend__row {
+      flex: 0 0 auto;
+    }
+    .chart-legend__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem 0.45rem;
+      cursor: pointer;
+      user-select: none;
+      margin: 0;
+      font-weight: 400;
+    }
+    .chart-legend__cb {
+      margin: 0;
+      flex-shrink: 0;
+      accent-color: #334155;
+    }
+    .chart-legend__swatch {
+      display: inline-block;
+      width: 14px;
+      height: 0;
+      border-top: 3px solid #334155;
+      flex-shrink: 0;
+    }
+    .chart-legend__text {
+      line-height: 1.2;
+    }
+    @media (max-width: 768px) {
+      .chart-legend .chart-legend__label {
+        gap: 0.28rem 0.35rem;
+      }
     }
     @media (min-width: 1200px) {
       .chart-container {
@@ -829,21 +1030,26 @@
           <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
         </div>
         <p class="muted" id="last-scraped-at"></p>
-        <div class="range-group" id="range-group">
-          <button type="button" class="range-btn" data-hours="6">6H</button>
-          <button type="button" class="range-btn" data-hours="12">12H</button>
-          <button type="button" class="range-btn active" data-hours="24">24H</button>
-          <button type="button" class="range-btn" data-hours="72">3D</button>
-          <button type="button" class="range-btn" data-hours="168">7D</button>
-        </div>
-        <div id="chart-shell" class="chart-shell">
-          <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
-          <div class="chart-container">
-            <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
-              Loading…
+        <div class="chart-area-wrap" id="chart-area-wrap">
+          <div id="chart-legend" class="chart-legend" role="group" aria-label="Show or hide chart series" hidden></div>
+          <div class="chart-ctrl-strip">
+            <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
+            <div class="range-group" id="range-group">
+              <button type="button" class="range-btn" data-hours="6">6H</button>
+              <button type="button" class="range-btn" data-hours="12">12H</button>
+              <button type="button" class="range-btn active" data-hours="24">24H</button>
+              <button type="button" class="range-btn" data-hours="72">3D</button>
+              <button type="button" class="range-btn" data-hours="168">7D</button>
             </div>
-            <div id="chart-callout" class="chart-callout"></div>
-            <canvas id="chart"></canvas>
+          </div>
+          <div id="chart-shell" class="chart-shell">
+            <div class="chart-container">
+              <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
+                Loading…
+              </div>
+              <div id="chart-callout" class="chart-callout"></div>
+              <canvas id="chart"></canvas>
+            </div>
           </div>
         </div>
         <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
@@ -887,6 +1093,8 @@
       '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
       '#db2777', '#0d9488', '#7c3aed',
     ];
+    /** Area under absolute curves: same hue as the line, low alpha. */
+    const ABS_AREA_FILL_ALPHA = 0.1;
 
     function parseChartHexColor(hex) {
       if (!hex || typeof hex !== 'string' || !/^#([0-9a-fA-F]{6})$/.test(hex)) {
@@ -938,8 +1146,12 @@
     /** Do not draw line/fill across gaps longer than this (closed checkpoints, etc.). */
     const GAP_BREAK_MS = 45 * 60 * 1000;
 
-    function makeGapBreakSegment(lineColor) {
-      return {
+    /**
+     * Per-segment line (and optional area) styling: hide across time gaps longer than GAP_BREAK_MS.
+     * Used for absolute area fill and range band fill so closed-checkpoint gaps stay empty.
+     */
+    function makeGapBreakSegment(lineColor, segmentFill) {
+      const out = {
         borderColor: function (ctx) {
           const x0 = ctx.p0.parsed.x;
           const x1 = ctx.p1.parsed.x;
@@ -947,6 +1159,15 @@
           return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
         },
       };
+      if (segmentFill != null) {
+        out.backgroundColor = function (ctx) {
+          const x0 = ctx.p0.parsed.x;
+          const x1 = ctx.p1.parsed.x;
+          if (x0 == null || x1 == null) return 'transparent';
+          return x1 - x0 > GAP_BREAK_MS ? 'transparent' : segmentFill;
+        };
+      }
+      return out;
     }
     /** Global latest `scraped_at_utc` from initial `/api/latest` only (chart right edge). */
     let pageGlobalLatestScrapedMs = null;
@@ -1070,17 +1291,6 @@
       return datePart + ', ' + timePart;
     }
 
-    const QUEUE_FILL_BY_TYPE = {
-      general: 'rgba(37,99,235,0.1)',
-      precheck: 'rgba(22,163,74,0.1)',
-      priority: 'rgba(202,138,4,0.12)',
-      clear: 'rgba(147,51,234,0.12)',
-    };
-
-    function queueFillColor(qt) {
-      return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
-    }
-
     function syncUrl() {
       const u = new URL(window.location.origin + '/' + pageAirport);
       if (selectedTerminal) u.searchParams.set('terminal', selectedTerminal);
@@ -1097,6 +1307,8 @@
 
     const chartCanvas = document.getElementById('chart');
     const chartShell = document.getElementById('chart-shell');
+    const chartAreaWrap = document.getElementById('chart-area-wrap');
+    const chartLegendEl = document.getElementById('chart-legend');
     const readingFixedEl = document.getElementById('chart-reading-fixed');
     let chart = null;
     let chartTouchAbort = null;
@@ -1142,7 +1354,9 @@
       return mqTouch.matches;
     }
     function syncTouchChartShell() {
-      chartShell.classList.toggle('touch-chart-ui', touchChartUi());
+      const t = touchChartUi();
+      chartShell.classList.toggle('touch-chart-ui', t);
+      if (chartAreaWrap) chartAreaWrap.classList.toggle('touch-chart-ui', t);
     }
     syncTouchChartShell();
     mqTouch.addEventListener('change', () => {
@@ -1183,6 +1397,7 @@
           ctx.stroke();
         }
         for (let di = 0; di < n; di++) {
+          if (typeof chartRef.isDatasetVisible === 'function' && !chartRef.isDatasetVisible(di)) continue;
           const meta = chartRef.getDatasetMeta(di);
           const pt = meta.data[idx];
           if (!pt || pt.skip) continue;
@@ -1519,15 +1734,87 @@
       return nearestTimeIndex(xs, tMs);
     }
 
+    function clearChartHtmlLegend() {
+      if (!chartLegendEl) return;
+      chartLegendEl.innerHTML = '';
+      chartLegendEl.hidden = true;
+    }
+
+    function chartLegendStrokeForDataset(ds) {
+      if (typeof ds.crosshairDotColor === 'string') return ds.crosshairDotColor;
+      if (typeof ds.borderColor === 'string') return ds.borderColor;
+      return '#334155';
+    }
+
+    /** Legend-only copy: shorter PreCheck wording than dataset labels used elsewhere. */
+    function formatChartHtmlLegendText(rawLabel) {
+      return String(rawLabel).replace(/\bTSA PreCheck\b/g, 'PreCheck');
+    }
+
+    function mountChartHtmlLegend(chartRef) {
+      if (!chartLegendEl) return;
+      chartLegendEl.innerHTML = '';
+      const data = chartRef.data;
+      if (!data.datasets.length) {
+        chartLegendEl.hidden = true;
+        return;
+      }
+      chartLegendEl.hidden = false;
+      let anyEntry = false;
+      for (let i = 0; i < data.datasets.length; i++) {
+        const ds = data.datasets[i];
+        if (ds.rangeLegendSkip) continue;
+        anyEntry = true;
+        const rawLabel =
+          ds.label != null && String(ds.label) !== ''
+            ? String(ds.label)
+            : 'Dataset ' + i;
+        const label = formatChartHtmlLegendText(rawLabel);
+        const stroke = chartLegendStrokeForDataset(ds);
+        const row = document.createElement('div');
+        row.className = 'chart-legend__row';
+        const lbl = document.createElement('label');
+        lbl.className = 'chart-legend__label';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'chart-legend__cb';
+        cb.checked = chartRef.isDatasetVisible(i);
+        cb.dataset.datasetIndex = String(i);
+        cb.addEventListener('change', function () {
+          const di = Number(cb.dataset.datasetIndex);
+          const show = cb.checked;
+          const dds = chartRef.data.datasets[di];
+          if (dds.rangeBandHigh && dds.rangeBandLowIndex != null) {
+            chartRef.setDatasetVisibility(di, show);
+            chartRef.setDatasetVisibility(dds.rangeBandLowIndex, show);
+          } else {
+            chartRef.setDatasetVisibility(di, show);
+          }
+          chartRef.update();
+        });
+        const swatch = document.createElement('span');
+        swatch.className = 'chart-legend__swatch';
+        swatch.setAttribute('aria-hidden', 'true');
+        swatch.style.borderTopColor = stroke;
+        const text = document.createElement('span');
+        text.className = 'chart-legend__text';
+        text.textContent = label;
+        lbl.appendChild(swatch);
+        lbl.appendChild(text);
+        lbl.appendChild(cb);
+        row.appendChild(lbl);
+        chartLegendEl.appendChild(row);
+      }
+      if (!anyEntry) {
+        chartLegendEl.innerHTML = '';
+        chartLegendEl.hidden = true;
+      }
+    }
+
     function buildChartFromHistory(data, hours) {
       currentHours = Number(hours);
       hideCallout();
       clearFixedReadout();
-      if (chart) {
-        detachChartTouchHandlers();
-        chart.destroy();
-        chart = null;
-      }
 
       const queues = data.queues || {};
       const queueTypes = sortQueueTypesFromKeys(
@@ -1546,6 +1833,31 @@
       const wui = pageAirportEntry.wait_times_ui || { chart_series: ['absolute'] };
       const seriesNorm = normalizeChartSeries(wui.chart_series);
       const seriesDefs = expandChartSeriesDefs(seriesNorm, queueTypes);
+
+      const visibilityCtxKey =
+        pageAirport +
+        '\0' +
+        selectedTerminal +
+        '\0' +
+        String(selectedGate || '') +
+        '\0' +
+        seriesNorm.join(',') +
+        '\0' +
+        queueTypes.join(',');
+
+      let preservedVisibility = null;
+      if (chart && chart.$visibilityCtxKey === visibilityCtxKey && chart.data.datasets.length) {
+        preservedVisibility = chart.data.datasets.map(function (_ds, i) {
+          return chart.isDatasetVisible(i);
+        });
+      }
+
+      if (chart) {
+        detachChartTouchHandlers();
+        chart.destroy();
+        chart = null;
+      }
+      clearChartHtmlLegend();
 
       let maxDataMs = null;
       const byTime = {};
@@ -1566,6 +1878,7 @@
       if (!bounds) {
         hideCallout();
         clearFixedReadout();
+        clearChartHtmlLegend();
         hideChartLoading();
         return;
       }
@@ -1594,14 +1907,13 @@
       if (!queueTypes.length) {
         hideCallout();
         clearFixedReadout();
+        clearChartHtmlLegend();
         hideChartLoading();
         return;
       }
 
       const hoursNum = Number(hours);
       const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
-      const useAreaFill =
-        seriesDefs.length === 1 && queueTypes.length <= 2;
       const rangeLegendSuffix =
         seriesNorm.includes('absolute') && seriesNorm.includes('range');
       const seriesColorIdx = assignSeriesColorIndices(seriesDefs);
@@ -1617,7 +1929,7 @@
           const lineRgb = chartHexToRgbLine(paletteHex, 0.82);
           const bandRgba = chartHexToRgba(paletteHex, 0.22);
           const segLow = makeGapBreakSegment(lineRgb);
-          const segHigh = makeGapBreakSegment(lineRgb);
+          const segHigh = makeGapBreakSegment(lineRgb, bandRgba);
           const lowIdx = datasets.length;
           datasets.push({
             label: '',
@@ -1672,16 +1984,11 @@
         }
 
         const lineColor = paletteHex;
-        const fillCol = useAreaFill ? queueFillColor(def.qt) : 'transparent';
-        const seg = makeGapBreakSegment(lineColor);
-        if (useAreaFill) {
-          seg.backgroundColor = function (ctx) {
-            const x0 = ctx.p0.parsed.x;
-            const x1 = ctx.p1.parsed.x;
-            if (x0 == null || x1 == null) return fillCol;
-            return x1 - x0 > GAP_BREAK_MS ? 'transparent' : fillCol;
-          };
-        }
+        const absAreaFill = def.kind === 'absolute';
+        const fillCol = absAreaFill
+          ? chartHexToRgba(paletteHex, ABS_AREA_FILL_ALPHA)
+          : 'transparent';
+        const seg = makeGapBreakSegment(lineColor, absAreaFill ? fillCol : null);
         datasets.push({
           label: def.legend,
           rangeLegendSkip: false,
@@ -1695,10 +2002,10 @@
           }),
           borderColor: lineColor,
           borderWidth: 2,
-          backgroundColor: useAreaFill ? fillCol : 'transparent',
+          backgroundColor: absAreaFill ? fillCol : 'transparent',
           pointRadius: 0,
           pointHoverRadius: 5,
-          fill: useAreaFill,
+          fill: absAreaFill,
           tension: 0.2,
           spanGaps: false,
           segment: seg,
@@ -1717,90 +2024,7 @@
           maintainAspectRatio: false,
           interaction: { mode: 'nearest', axis: 'x', intersect: false },
           plugins: {
-            legend: {
-              display: true,
-              position: 'bottom',
-              align: 'end',
-              onClick: function (e, legendItem, legend) {
-                const c = legend.chart;
-                const di = legendItem.datasetIndex;
-                const ds = c.data.datasets[di];
-                if (ds.rangeBandHigh && ds.rangeBandLowIndex != null) {
-                  const show = !c.isDatasetVisible(di);
-                  c.setDatasetVisibility(di, show);
-                  c.setDatasetVisibility(ds.rangeBandLowIndex, show);
-                } else {
-                  c.setDatasetVisibility(di, !c.isDatasetVisible(di));
-                }
-                c.update();
-              },
-              labels: {
-                usePointStyle: true,
-                pointStyle: 'line',
-                boxWidth: 36,
-                boxHeight: 8,
-                font: { size: 10 },
-                generateLabels: function (chart) {
-                  const data = chart.data;
-                  const lblCfg = chart.options.plugins.legend.labels || {};
-                  const fontColor =
-                    lblCfg.color ||
-                    (typeof Chart !== 'undefined' && Chart.defaults && Chart.defaults.color) ||
-                    '#334155';
-                  if (!data.datasets.length) return [];
-                  const items = [];
-                  for (let i = 0; i < data.datasets.length; i++) {
-                    const ds = data.datasets[i];
-                    if (ds.rangeLegendSkip) continue;
-                    const meta = chart.getDatasetMeta(i);
-                    const label =
-                      ds.label != null && String(ds.label) !== ''
-                        ? String(ds.label)
-                        : 'Dataset ' + i;
-                    const stroke =
-                      typeof ds.crosshairDotColor === 'string'
-                        ? ds.crosshairDotColor
-                        : typeof ds.borderColor === 'string'
-                          ? ds.borderColor
-                          : '#334155';
-                    const hidden =
-                      typeof chart.isDatasetVisible === 'function' &&
-                      !chart.isDatasetVisible(i);
-                    if (ds.rangeBandHigh) {
-                      items.push({
-                        text: label,
-                        fillStyle: 'transparent',
-                        strokeStyle: stroke,
-                        lineWidth: 2,
-                        pointStyle: 'line',
-                        hidden: hidden,
-                        datasetIndex: i,
-                        index: items.length,
-                        fontColor: fontColor,
-                      });
-                    } else {
-                      const fillS = ds.backgroundColor;
-                      const fillOk =
-                        typeof fillS === 'string' && fillS !== 'transparent'
-                          ? fillS
-                          : 'transparent';
-                      items.push({
-                        text: label,
-                        fillStyle: fillOk,
-                        strokeStyle: stroke,
-                        lineWidth: 2,
-                        pointStyle: 'line',
-                        hidden: hidden,
-                        datasetIndex: i,
-                        index: items.length,
-                        fontColor: fontColor,
-                      });
-                    }
-                  }
-                  return items;
-                },
-              },
-            },
+            legend: { display: false },
             tooltip: { enabled: false }
           },
           onHover: (event, _elements, chartRef) => {
@@ -1860,6 +2084,14 @@
       chart.$mergedTimesMs = mergedTimesMs;
       chart.$chartWindowMs = bounds;
       chart.$chartHours = hoursNum;
+      chart.$visibilityCtxKey = visibilityCtxKey;
+
+      if (preservedVisibility && preservedVisibility.length) {
+        const n = Math.min(preservedVisibility.length, chart.data.datasets.length);
+        for (let vi = 0; vi < n; vi++) {
+          chart.setDatasetVisibility(vi, preservedVisibility[vi]);
+        }
+      }
 
       if (mergedTimesMs.length) {
         let last = mergedTimesMs.length - 1;
@@ -1894,6 +2126,7 @@
         chart.$readoutIndex = null;
         chart.update('none');
       }
+      mountChartHtmlLegend(chart);
       hideChartLoading();
     }
 
@@ -1942,6 +2175,7 @@
             chart.destroy();
             chart = null;
           }
+          clearChartHtmlLegend();
         });
     }
 
@@ -2080,12 +2314,14 @@
         if (!rows || !rows.length) {
           bootstrapMsgEl.textContent = 'No wait time data for this airport yet.';
           bootstrapMsgEl.hidden = false;
-          chartShell.style.display = 'none';
+          if (chartAreaWrap) chartAreaWrap.style.display = 'none';
+          else chartShell.style.display = 'none';
           hideChartLoading();
           return;
         }
         bootstrapMsgEl.hidden = true;
-        chartShell.style.display = '';
+        if (chartAreaWrap) chartAreaWrap.style.display = '';
+        else chartShell.style.display = '';
         terminalRows = rows;
         let pick = 0;
         if (initialTerminal) {
@@ -2101,7 +2337,8 @@
       .catch(e => {
         bootstrapMsgEl.textContent = 'Error: ' + e.message;
         bootstrapMsgEl.hidden = false;
-        chartShell.style.display = 'none';
+        if (chartAreaWrap) chartAreaWrap.style.display = 'none';
+        else chartShell.style.display = 'none';
         hideChartLoading();
       });
   </script>

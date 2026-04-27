@@ -2,6 +2,7 @@
 """Simple webapp: latest wait times + 24h terminal history charts."""
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -71,11 +72,30 @@ def _merge_wait_times_ui(entry: dict) -> dict:
     return merged
 
 
+def _overlay_terminal_display_labels(code: str, terminal_tab: dict) -> dict:
+    """Merge optional terminal_tab.terminal_labels (canonical DB key -> UI copy).
+
+    Scrapers keep stable terminal strings for URLs and history queries; labels are
+    presentation-only (e.g. LAX ``TBIT`` -> Tom Bradley Intl).
+    """
+    tab = dict(terminal_tab)
+    labels = dict(tab.get("terminal_labels") or {})
+    if code == "LAX":
+        labels.setdefault("TBIT", "Tom Bradley Intl")
+    if labels:
+        tab["terminal_labels"] = labels
+    else:
+        tab.pop("terminal_labels", None)
+    return tab
+
+
 def _catalog_airport_public_dict(entry: dict) -> dict:
     """Copy for JSON responses with terminal_tab + wait_times_ui defaults merged."""
     out = dict(entry)
     tab = dict(out.get("terminal_tab") or {})
-    out["terminal_tab"] = {**_DEFAULT_TERMINAL_TAB, **tab}
+    merged = {**_DEFAULT_TERMINAL_TAB, **tab}
+    ap_code = str(out.get("code") or "")
+    out["terminal_tab"] = _overlay_terminal_display_labels(ap_code, merged)
     out["wait_times_ui"] = _merge_wait_times_ui(out)
     return out
 
@@ -89,7 +109,7 @@ def airport_catalog_entry_for_js(code: str) -> dict:
         status = "active"
     raw["status"] = status
     tab = dict(raw.get("terminal_tab") or {})
-    merged_tab = {**_DEFAULT_TERMINAL_TAB, **tab}
+    merged_tab = _overlay_terminal_display_labels(code, {**_DEFAULT_TERMINAL_TAB, **tab})
     raw["terminal_tab"] = merged_tab
     raw["wait_times_ui"] = _merge_wait_times_ui(raw)
     return raw
@@ -169,6 +189,19 @@ _latest_cache_lock = threading.Lock()
 _latest_cache: dict = {"mono_at": 0.0, "payload": None}
 
 
+def _natural_sort_key(s: str | None) -> tuple:
+    """Sort key so digit runs compare numerically (e.g. gate 9 before 30; checkpoint 2 before 10)."""
+    parts: list[tuple[int, int | str]] = []
+    for part in re.split(r"(\d+)", str(s) if s is not None else ""):
+        if not part:
+            continue
+        if part.isdigit():
+            parts.append((0, int(part)))
+        else:
+            parts.append((1, part.casefold()))
+    return tuple(parts)
+
+
 def _compute_api_latest_payload() -> dict:
     """Build the JSON-serializable body for ``GET /api/latest`` (no HTTP)."""
     conn = get_db()
@@ -205,6 +238,8 @@ def _compute_api_latest_payload() -> dict:
         wait_min_minutes,
         wait_max_minutes,
     ) in cur.fetchall():
+        if not (terminal or "").strip():
+            continue
         g = gate or ""
         latest_map[(airport, terminal, g, queue_type)] = {
             "minutes": wait_minutes,
@@ -226,6 +261,8 @@ def _compute_api_latest_payload() -> dict:
 
     airports: dict[str, dict[tuple[str, str], dict]] = {}
     for airport, terminal, gate, queue_type in recent_keys:
+        if not (terminal or "").strip():
+            continue
         if airport not in airports:
             airports[airport] = {}
         g = gate or ""
@@ -248,7 +285,13 @@ def _compute_api_latest_payload() -> dict:
                 "gate": g,
                 "queues": d["queues"],
             }
-            for (t, g), d in sorted(terms.items(), key=lambda item: (item[0][0], item[0][1]))
+            for (t, g), d in sorted(
+                terms.items(),
+                key=lambda item: (
+                    _natural_sort_key(item[0][0]),
+                    _natural_sort_key(item[0][1]),
+                ),
+            )
         ]
 
     result = {
@@ -264,7 +307,8 @@ def api_latest():
 
     ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
     ``airports`` includes each airport / terminal / gate / queue_type that appears
-    in the last 24 hours. ``minutes`` is the raw point wait at ``scraped_at_utc`` when
+    in the last 24 hours. Terminal rows are ordered by natural sort of ``(terminal, gate)``
+    (numeric runs compare as numbers). ``minutes`` is the raw point wait at ``scraped_at_utc`` when
     stored, otherwise ``null`` (range-only rows or missing checkpoint at that scrape).
 
     Responses are ``Cache-Control: public, max-age=30`` and recomputed at most

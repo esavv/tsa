@@ -260,13 +260,14 @@ def parse_wait_minutes(value: str) -> int:
 def parse_wait_text_to_fields(value: str) -> tuple[int | None, int | None, int | None]:
     """(wait_minutes, wait_min_minutes, wait_max_minutes). Point only for a lone integer; bands never fill point.
 
-    ``<n`` → (None, 0, n); ``>n`` → (None, n, None); ``a-b`` → (None, a, b); closed/unavailable → (0, None, None).
+    ``<n`` → (None, 0, n); ``>n`` → (None, n, None); ``a-b`` → (None, a, b).
+    Substrings ``closed`` or ``unavailable`` → (None, None, None) so callers omit the row (no wait signal).
     """
     lowered = (value or "").lower().strip()
     if not lowered:
         return None, None, None
-    if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
-        return 0, None, None
+    if any(marker in lowered for marker in ("closed", "unavailable")):
+        return None, None, None
 
     gt_match = re.search(r">\s*(\d+)", lowered)
     if gt_match:
@@ -524,13 +525,15 @@ def fetch_sea_airport() -> list[dict]:
     payload = fetch_json_url(SEA_WAIT_TIMES_URL)
     rows = []
     for checkpoint in payload:
+        if not checkpoint.get("IsOpen") or not checkpoint.get("IsDataAvailable"):
+            continue
         rows.append(
             {
                 "airport": "SEA",
                 "terminal": normalize_terminal(str(checkpoint.get("Name", ""))),
                 "gate": "",
                 "queue_type": "general",
-                "wait_minutes": int(checkpoint.get("WaitTimeMinutes", 0)) if checkpoint.get("IsOpen") and checkpoint.get("IsDataAvailable") else 0,
+                "wait_minutes": int(checkpoint.get("WaitTimeMinutes", 0)),
                 "wait_min_minutes": None,
                 "wait_max_minutes": None,
                 "source_updated_at": parse_microsoft_json_date(checkpoint.get("LastUpdated")),
@@ -548,38 +551,45 @@ def fetch_dca_airport() -> list[dict]:
 
     for checkpoint in checkpoints.values():
         terminal = normalize_terminal(checkpoint.get("location", ""))
+        # Bare "Terminal" normalizes to "" (prefix strip); skip — no stable tab key.
+        if not terminal:
+            continue
         if checkpoint.get("isDisabled") != 1:
-            w, lo, hi = parse_wait_text_to_fields(str(checkpoint.get("waittime", "0")))
-            if w is not None or lo is not None or hi is not None:
-                rows.append(
-                    {
-                        "airport": "DCA",
-                        "terminal": terminal,
-                        "gate": "",
-                        "queue_type": "general",
-                        "wait_minutes": w,
-                        "wait_min_minutes": lo,
-                        "wait_max_minutes": hi,
-                        "source_updated_at": None,
-                        "point_id": None,
-                    }
-                )
+            raw_wt = checkpoint.get("waittime")
+            if raw_wt is not None and str(raw_wt).strip() != "":
+                w, lo, hi = parse_wait_text_to_fields(str(raw_wt))
+                if w is not None or lo is not None or hi is not None:
+                    rows.append(
+                        {
+                            "airport": "DCA",
+                            "terminal": terminal,
+                            "gate": "",
+                            "queue_type": "general",
+                            "wait_minutes": w,
+                            "wait_min_minutes": lo,
+                            "wait_max_minutes": hi,
+                            "source_updated_at": None,
+                            "point_id": None,
+                        }
+                    )
         if checkpoint.get("pre_disabled") != 1:
-            w, lo, hi = parse_wait_text_to_fields(str(checkpoint.get("pre", "0")))
-            if w is not None or lo is not None or hi is not None:
-                rows.append(
-                    {
-                        "airport": "DCA",
-                        "terminal": terminal,
-                        "gate": "",
-                        "queue_type": "precheck",
-                        "wait_minutes": w,
-                        "wait_min_minutes": lo,
-                        "wait_max_minutes": hi,
-                        "source_updated_at": None,
-                        "point_id": None,
-                    }
-                )
+            raw_pre = checkpoint.get("pre")
+            if raw_pre is not None and str(raw_pre).strip() != "":
+                w, lo, hi = parse_wait_text_to_fields(str(raw_pre))
+                if w is not None or lo is not None or hi is not None:
+                    rows.append(
+                        {
+                            "airport": "DCA",
+                            "terminal": terminal,
+                            "gate": "",
+                            "queue_type": "precheck",
+                            "wait_minutes": w,
+                            "wait_min_minutes": lo,
+                            "wait_max_minutes": hi,
+                            "source_updated_at": None,
+                            "point_id": None,
+                        }
+                    )
     return rows
 
 

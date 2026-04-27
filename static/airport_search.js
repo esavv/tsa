@@ -261,16 +261,6 @@
     };
   }
 
-  function sortTerminalRows(catalogEntry, terminalRows) {
-    return terminalRows.slice().sort(function (a, b) {
-      var ga = effectiveGateForTab(catalogEntry, (a && a.gate) || '');
-      var gb = effectiveGateForTab(catalogEntry, (b && b.gate) || '');
-      var ka = String((a && a.terminal) || '') + '\0' + ga;
-      var kb = String((b && b.terminal) || '') + '\0' + gb;
-      return ka.localeCompare(kb);
-    });
-  }
-
   function maxTerminalChipsForViewport() {
     if (typeof window !== 'undefined' && window.matchMedia) {
       return window.matchMedia('(max-width: 768px)').matches ? 2 : 3;
@@ -289,9 +279,8 @@
       );
     }
     var apEntry = catalogEntryForCode(catalogRows || [], code);
-    var sorted = sortTerminalRows(apEntry, terminals);
-    var show = sorted.slice(0, maxTerminalChipsForViewport());
-    var more = sorted.length - show.length;
+    var show = terminals.slice(0, maxTerminalChipsForViewport());
+    var more = terminals.length - show.length;
     var html = '<div class="airport-search-row__chips" role="presentation">';
     html += '<div class="airport-search-row__chip-run">';
     for (var i = 0; i < show.length; i++) {

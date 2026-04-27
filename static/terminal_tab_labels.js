@@ -9,6 +9,7 @@
  * Optional:
  *   - ignore_gate: if true, gate is omitted for URLs, sorting, and matching; only without_gate is used.
  *   - gate_transform: "titlecase_words" to title-case each whitespace-delimited word of the gate for display.
+ *   - terminal_labels: object mapping canonical terminal key (from DB/API) to UI label only.
  *
  * If templates are missing, defaults match the common "Terminal … / Gates …" pattern.
  */
@@ -30,18 +31,32 @@
       .join(' ');
   }
 
+  function sanitizeTerminalLabels(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var out = {};
+    for (var k in raw) {
+      if (!Object.prototype.hasOwnProperty.call(raw, k)) continue;
+      var v = raw[k];
+      if (typeof v === 'string' && v) out[k] = v;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   /**
    * @param {object|null|undefined} tab raw terminal_tab from catalog
-   * @returns {{ ignore_gate: boolean, gate_transform: string, without_gate: string, with_gate: string }}
+   * @returns {{ ignore_gate: boolean, gate_transform: string, without_gate: string, with_gate: string, terminal_labels?: object }}
    */
   function normalizeTerminalTab(tab) {
     var t = tab && typeof tab === 'object' ? tab : {};
-    return {
+    var labels = sanitizeTerminalLabels(t.terminal_labels);
+    var base = {
       ignore_gate: t.ignore_gate === true,
       gate_transform: t.gate_transform === 'titlecase_words' ? 'titlecase_words' : 'none',
       without_gate: typeof t.without_gate === 'string' && t.without_gate ? t.without_gate : DEFAULT_TAB.without_gate,
       with_gate: typeof t.with_gate === 'string' && t.with_gate ? t.with_gate : DEFAULT_TAB.with_gate,
     };
+    if (labels) base.terminal_labels = labels;
+    return base;
   }
 
   function terminalTabConfig(airportEntry) {
@@ -61,6 +76,13 @@
       .replace(/\{gate\}/g, gateDisplay || '');
   }
 
+  function terminalForDisplay(cfg, terminalRaw) {
+    var tr = terminalRaw || '';
+    var map = cfg.terminal_labels;
+    if (map && map[tr]) return map[tr];
+    return tr;
+  }
+
   /**
    * Gate value for URLs and matching; empty when catalog says to ignore gate (e.g. CLT).
    */
@@ -75,7 +97,7 @@
    */
   function terminalTabLabel(airportEntry, terminal, gateRaw) {
     var cfg = terminalTabConfig(airportEntry);
-    var t = terminal || '';
+    var t = terminalForDisplay(cfg, terminal || '');
     var g = effectiveGateForTab(airportEntry, gateRaw);
     if (!g) return interpolate(cfg.without_gate, t, '');
     return interpolate(cfg.with_gate, t, displayGateForLabel(cfg, gateRaw));
