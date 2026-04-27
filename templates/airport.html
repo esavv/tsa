@@ -644,20 +644,38 @@
       flex-direction: column;
       gap: 0.5rem;
     }
-    @media (max-width: 768px) {
-      .chart-area-wrap {
-        gap: 0;
-      }
-    }
-    .chart-area-wrap .range-group {
+    .chart-area-wrap .chart-ctrl-strip {
       order: 1;
-      align-self: flex-end;
+      width: 100%;
+      box-sizing: border-box;
     }
     .chart-area-wrap #chart-shell {
       order: 2;
     }
     .chart-area-wrap #chart-legend {
       order: 3;
+    }
+    @media (max-width: 768px) {
+      .chart-area-wrap {
+        gap: 0;
+      }
+      .chart-ctrl-strip {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 0.35rem;
+        margin-bottom: 0.4rem;
+      }
+      .chart-ctrl-strip .chart-reading-fixed {
+        flex: 1;
+        min-width: 0;
+        margin-bottom: 0;
+      }
+      .chart-ctrl-strip .range-group {
+        flex: 0 0 auto;
+        align-self: center;
+        margin-left: auto;
+      }
     }
     @media (min-width: 769px) {
       .chart-area-wrap {
@@ -668,11 +686,15 @@
         row-gap: 0.35rem;
         align-items: center;
       }
-      .chart-area-wrap .range-group,
+      .chart-ctrl-strip {
+        display: contents;
+      }
+      .chart-area-wrap .chart-ctrl-strip,
       .chart-area-wrap #chart-shell,
       .chart-area-wrap #chart-legend {
         order: unset;
         align-self: unset;
+        width: unset;
       }
       .chart-area-wrap #chart-legend {
         grid-column: 1;
@@ -685,6 +707,7 @@
         grid-row: 1;
         justify-self: end;
         margin-bottom: 0;
+        margin-left: 0;
       }
       .chart-area-wrap #chart-shell {
         grid-column: 1 / -1;
@@ -700,11 +723,6 @@
     }
     .chart-area-wrap .range-group {
       margin-bottom: 0;
-    }
-    @media (max-width: 768px) {
-      .chart-area-wrap .range-group {
-        margin-bottom: 0.4rem;
-      }
     }
     .range-btn {
       border: 1px solid #d0d7e2;
@@ -729,7 +747,7 @@
       margin-bottom: 0.5rem;
       min-height: 2.8rem;
     }
-    .chart-shell.touch-chart-ui .chart-reading-fixed {
+    .chart-area-wrap.touch-chart-ui .chart-reading-fixed {
       display: block;
     }
     .chart-reading-fixed .line1 {
@@ -985,15 +1003,17 @@
         <p class="muted" id="last-scraped-at"></p>
         <div class="chart-area-wrap" id="chart-area-wrap">
           <div id="chart-legend" class="chart-legend" role="group" aria-label="Show or hide chart series" hidden></div>
-          <div class="range-group" id="range-group">
-            <button type="button" class="range-btn" data-hours="6">6H</button>
-            <button type="button" class="range-btn" data-hours="12">12H</button>
-            <button type="button" class="range-btn active" data-hours="24">24H</button>
-            <button type="button" class="range-btn" data-hours="72">3D</button>
-            <button type="button" class="range-btn" data-hours="168">7D</button>
+          <div class="chart-ctrl-strip">
+            <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
+            <div class="range-group" id="range-group">
+              <button type="button" class="range-btn" data-hours="6">6H</button>
+              <button type="button" class="range-btn" data-hours="12">12H</button>
+              <button type="button" class="range-btn active" data-hours="24">24H</button>
+              <button type="button" class="range-btn" data-hours="72">3D</button>
+              <button type="button" class="range-btn" data-hours="168">7D</button>
+            </div>
           </div>
           <div id="chart-shell" class="chart-shell">
-            <div id="chart-reading-fixed" class="chart-reading-fixed" aria-live="polite" aria-atomic="true"></div>
             <div class="chart-container">
               <div id="chart-loading" class="chart-loading-overlay muted" hidden aria-live="polite">
                 Loading…
@@ -1305,7 +1325,9 @@
       return mqTouch.matches;
     }
     function syncTouchChartShell() {
-      chartShell.classList.toggle('touch-chart-ui', touchChartUi());
+      const t = touchChartUi();
+      chartShell.classList.toggle('touch-chart-ui', t);
+      if (chartAreaWrap) chartAreaWrap.classList.toggle('touch-chart-ui', t);
     }
     syncTouchChartShell();
     mqTouch.addEventListener('change', () => {
