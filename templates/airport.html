@@ -120,8 +120,8 @@
     }
     @media (max-width: 768px) {
       .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
-        /* max(100%, …) so we never shrink below the default overlay cap; min() only lifts short columns */
-        max-height: max(100%, min(400px, 62vh));
+        /* Past 100% alone (same as parent height); extend downward, capped to viewport */
+        max-height: min(calc(100% + 9rem), 92vh);
       }
     }
     .airport-search-results {
