@@ -1600,8 +1600,6 @@
 
       const hoursNum = Number(hours);
       const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
-      const useAreaFill =
-        seriesDefs.length === 1 && queueTypes.length <= 2;
       const rangeLegendSuffix =
         seriesNorm.includes('absolute') && seriesNorm.includes('range');
       const seriesColorIdx = assignSeriesColorIndices(seriesDefs);
@@ -1672,9 +1670,10 @@
         }
 
         const lineColor = paletteHex;
-        const fillCol = useAreaFill ? queueFillColor(def.qt) : 'transparent';
+        const absAreaFill = def.kind === 'absolute';
+        const fillCol = absAreaFill ? queueFillColor(def.qt) : 'transparent';
         const seg = makeGapBreakSegment(lineColor);
-        if (useAreaFill) {
+        if (absAreaFill) {
           seg.backgroundColor = function (ctx) {
             const x0 = ctx.p0.parsed.x;
             const x1 = ctx.p1.parsed.x;
@@ -1695,10 +1694,10 @@
           }),
           borderColor: lineColor,
           borderWidth: 2,
-          backgroundColor: useAreaFill ? fillCol : 'transparent',
+          backgroundColor: absAreaFill ? fillCol : 'transparent',
           pointRadius: 0,
           pointHoverRadius: 5,
-          fill: useAreaFill,
+          fill: absAreaFill,
           tension: 0.2,
           spanGaps: false,
           segment: seg,
