@@ -887,6 +887,8 @@
       '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
       '#db2777', '#0d9488', '#7c3aed',
     ];
+    /** Area under absolute curves: same hue as the line, low alpha. */
+    const ABS_AREA_FILL_ALPHA = 0.1;
 
     function parseChartHexColor(hex) {
       if (!hex || typeof hex !== 'string' || !/^#([0-9a-fA-F]{6})$/.test(hex)) {
@@ -1068,17 +1070,6 @@
       const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
       const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       return datePart + ', ' + timePart;
-    }
-
-    const QUEUE_FILL_BY_TYPE = {
-      general: 'rgba(37,99,235,0.1)',
-      precheck: 'rgba(22,163,74,0.1)',
-      priority: 'rgba(202,138,4,0.12)',
-      clear: 'rgba(147,51,234,0.12)',
-    };
-
-    function queueFillColor(qt) {
-      return QUEUE_FILL_BY_TYPE[qt] || 'rgba(51,65,85,0.08)';
     }
 
     function syncUrl() {
@@ -1671,7 +1662,9 @@
 
         const lineColor = paletteHex;
         const absAreaFill = def.kind === 'absolute';
-        const fillCol = absAreaFill ? queueFillColor(def.qt) : 'transparent';
+        const fillCol = absAreaFill
+          ? chartHexToRgba(paletteHex, ABS_AREA_FILL_ALPHA)
+          : 'transparent';
         const seg = makeGapBreakSegment(lineColor);
         if (absAreaFill) {
           seg.backgroundColor = function (ctx) {
