@@ -118,6 +118,12 @@
         transition: none;
       }
     }
+    @media (max-width: 768px) {
+      .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
+        /* max(100%, …) so we never shrink below the default overlay cap; min() only lifts short columns */
+        max-height: max(100%, min(400px, 62vh));
+      }
+    }
     .airport-search-results {
       padding: 0.25rem 0;
     }
