@@ -940,8 +940,12 @@
     /** Do not draw line/fill across gaps longer than this (closed checkpoints, etc.). */
     const GAP_BREAK_MS = 45 * 60 * 1000;
 
-    function makeGapBreakSegment(lineColor) {
-      return {
+    /**
+     * Per-segment line (and optional area) styling: hide across time gaps longer than GAP_BREAK_MS.
+     * Used for absolute area fill and range band fill so closed-checkpoint gaps stay empty.
+     */
+    function makeGapBreakSegment(lineColor, segmentFill) {
+      const out = {
         borderColor: function (ctx) {
           const x0 = ctx.p0.parsed.x;
           const x1 = ctx.p1.parsed.x;
@@ -949,6 +953,15 @@
           return x1 - x0 > GAP_BREAK_MS ? 'transparent' : lineColor;
         },
       };
+      if (segmentFill != null) {
+        out.backgroundColor = function (ctx) {
+          const x0 = ctx.p0.parsed.x;
+          const x1 = ctx.p1.parsed.x;
+          if (x0 == null || x1 == null) return 'transparent';
+          return x1 - x0 > GAP_BREAK_MS ? 'transparent' : segmentFill;
+        };
+      }
+      return out;
     }
     /** Global latest `scraped_at_utc` from initial `/api/latest` only (chart right edge). */
     let pageGlobalLatestScrapedMs = null;
@@ -1606,7 +1619,7 @@
           const lineRgb = chartHexToRgbLine(paletteHex, 0.82);
           const bandRgba = chartHexToRgba(paletteHex, 0.22);
           const segLow = makeGapBreakSegment(lineRgb);
-          const segHigh = makeGapBreakSegment(lineRgb);
+          const segHigh = makeGapBreakSegment(lineRgb, bandRgba);
           const lowIdx = datasets.length;
           datasets.push({
             label: '',
@@ -1665,15 +1678,7 @@
         const fillCol = absAreaFill
           ? chartHexToRgba(paletteHex, ABS_AREA_FILL_ALPHA)
           : 'transparent';
-        const seg = makeGapBreakSegment(lineColor);
-        if (absAreaFill) {
-          seg.backgroundColor = function (ctx) {
-            const x0 = ctx.p0.parsed.x;
-            const x1 = ctx.p1.parsed.x;
-            if (x0 == null || x1 == null) return fillCol;
-            return x1 - x0 > GAP_BREAK_MS ? 'transparent' : fillCol;
-          };
-        }
+        const seg = makeGapBreakSegment(lineColor, absAreaFill ? fillCol : null);
         datasets.push({
           label: def.legend,
           rangeLegendSkip: false,
