@@ -72,11 +72,30 @@ def _merge_wait_times_ui(entry: dict) -> dict:
     return merged
 
 
+def _overlay_terminal_display_labels(code: str, terminal_tab: dict) -> dict:
+    """Merge optional terminal_tab.terminal_labels (canonical DB key -> UI copy).
+
+    Scrapers keep stable terminal strings for URLs and history queries; labels are
+    presentation-only (e.g. LAX ``TBIT`` -> Tom Bradley Intl).
+    """
+    tab = dict(terminal_tab)
+    labels = dict(tab.get("terminal_labels") or {})
+    if code == "LAX":
+        labels.setdefault("TBIT", "Tom Bradley Intl")
+    if labels:
+        tab["terminal_labels"] = labels
+    else:
+        tab.pop("terminal_labels", None)
+    return tab
+
+
 def _catalog_airport_public_dict(entry: dict) -> dict:
     """Copy for JSON responses with terminal_tab + wait_times_ui defaults merged."""
     out = dict(entry)
     tab = dict(out.get("terminal_tab") or {})
-    out["terminal_tab"] = {**_DEFAULT_TERMINAL_TAB, **tab}
+    merged = {**_DEFAULT_TERMINAL_TAB, **tab}
+    ap_code = str(out.get("code") or "")
+    out["terminal_tab"] = _overlay_terminal_display_labels(ap_code, merged)
     out["wait_times_ui"] = _merge_wait_times_ui(out)
     return out
 
@@ -90,7 +109,7 @@ def airport_catalog_entry_for_js(code: str) -> dict:
         status = "active"
     raw["status"] = status
     tab = dict(raw.get("terminal_tab") or {})
-    merged_tab = {**_DEFAULT_TERMINAL_TAB, **tab}
+    merged_tab = _overlay_terminal_display_labels(code, {**_DEFAULT_TERMINAL_TAB, **tab})
     raw["terminal_tab"] = merged_tab
     raw["wait_times_ui"] = _merge_wait_times_ui(raw)
     return raw
