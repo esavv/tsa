@@ -238,6 +238,8 @@ def _compute_api_latest_payload() -> dict:
         wait_min_minutes,
         wait_max_minutes,
     ) in cur.fetchall():
+        if not (terminal or "").strip():
+            continue
         g = gate or ""
         latest_map[(airport, terminal, g, queue_type)] = {
             "minutes": wait_minutes,
@@ -259,6 +261,8 @@ def _compute_api_latest_payload() -> dict:
 
     airports: dict[str, dict[tuple[str, str], dict]] = {}
     for airport, terminal, gate, queue_type in recent_keys:
+        if not (terminal or "").strip():
+            continue
         if airport not in airports:
             airports[airport] = {}
         g = gate or ""

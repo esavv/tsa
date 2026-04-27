@@ -551,6 +551,9 @@ def fetch_dca_airport() -> list[dict]:
 
     for checkpoint in checkpoints.values():
         terminal = normalize_terminal(checkpoint.get("location", ""))
+        # Bare "Terminal" normalizes to "" (prefix strip); skip — no stable tab key.
+        if not terminal:
+            continue
         if checkpoint.get("isDisabled") != 1:
             raw_wt = checkpoint.get("waittime")
             if raw_wt is not None and str(raw_wt).strip() != "":
