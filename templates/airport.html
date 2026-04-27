@@ -644,6 +644,11 @@
       flex-direction: column;
       gap: 0.5rem;
     }
+    @media (max-width: 768px) {
+      .chart-area-wrap {
+        gap: 0.35rem;
+      }
+    }
     .chart-area-wrap .range-group {
       order: 1;
       align-self: flex-end;
@@ -781,10 +786,22 @@
       font-size: 0.8125rem;
       color: #334155;
     }
+    @media (max-width: 768px) {
+      .chart-legend {
+        margin-top: 0;
+      }
+    }
     @media (min-width: 769px) {
       .chart-legend {
         justify-content: flex-start;
         margin-top: 0;
+      }
+      .chart-area-wrap #chart-shell.chart-shell {
+        margin-bottom: 0.12rem;
+      }
+      body:has(main.airport-layout) > footer {
+        margin-top: 0.35rem !important;
+        padding: 0.45rem 0 !important;
       }
     }
     .chart-legend[hidden] {
