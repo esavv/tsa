@@ -669,6 +669,7 @@
       }
       .chart-area-wrap > #chart-shell.chart-shell {
         margin-top: 0;
+        margin-bottom: 0;
       }
       .chart-ctrl-strip .chart-reading-fixed {
         flex: 1;
@@ -827,7 +828,7 @@
         line-height: 1.28;
       }
       .range-group {
-        gap: 0.26rem;
+        gap: 0.16rem;
       }
       .range-btn {
         font-size: 0.78rem;
@@ -837,6 +838,10 @@
     .chart-container {
       position: relative;
       height: 390px;
+    }
+    /* base.html sets .chart-container { margin: 1rem 0 }; remove so strip/chart/legend stack tight */
+    .chart-shell .chart-container {
+      margin: 0;
     }
     .chart-legend {
       display: flex;
@@ -851,6 +856,15 @@
     @media (max-width: 768px) {
       .chart-legend {
         margin-top: 0;
+        width: calc(100% + 2rem);
+        max-width: none;
+        margin-left: -1rem;
+        margin-right: -1rem;
+        padding-inline: 1rem;
+        box-sizing: border-box;
+        justify-content: flex-start;
+        align-content: flex-start;
+        gap: 0.22rem 0.42rem;
       }
     }
     @media (min-width: 769px) {
@@ -895,6 +909,11 @@
     }
     .chart-legend__text {
       line-height: 1.2;
+    }
+    @media (max-width: 768px) {
+      .chart-legend .chart-legend__label {
+        gap: 0.28rem 0.35rem;
+      }
     }
     @media (min-width: 1200px) {
       .chart-container {
