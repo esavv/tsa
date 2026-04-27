@@ -2,6 +2,7 @@
 """Simple webapp: latest wait times + 24h terminal history charts."""
 import json
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -169,6 +170,19 @@ _latest_cache_lock = threading.Lock()
 _latest_cache: dict = {"mono_at": 0.0, "payload": None}
 
 
+def _natural_sort_key(s: str | None) -> tuple:
+    """Sort key so digit runs compare numerically (e.g. gate 9 before 30; checkpoint 2 before 10)."""
+    parts: list[tuple[int, int | str]] = []
+    for part in re.split(r"(\d+)", str(s) if s is not None else ""):
+        if not part:
+            continue
+        if part.isdigit():
+            parts.append((0, int(part)))
+        else:
+            parts.append((1, part.casefold()))
+    return tuple(parts)
+
+
 def _compute_api_latest_payload() -> dict:
     """Build the JSON-serializable body for ``GET /api/latest`` (no HTTP)."""
     conn = get_db()
@@ -248,7 +262,13 @@ def _compute_api_latest_payload() -> dict:
                 "gate": g,
                 "queues": d["queues"],
             }
-            for (t, g), d in sorted(terms.items(), key=lambda item: (item[0][0], item[0][1]))
+            for (t, g), d in sorted(
+                terms.items(),
+                key=lambda item: (
+                    _natural_sort_key(item[0][0]),
+                    _natural_sort_key(item[0][1]),
+                ),
+            )
         ]
 
     result = {
@@ -264,7 +284,8 @@ def api_latest():
 
     ``scraped_at_utc`` is the latest timestamp in the DB (newest pipeline run).
     ``airports`` includes each airport / terminal / gate / queue_type that appears
-    in the last 24 hours. ``minutes`` is the raw point wait at ``scraped_at_utc`` when
+    in the last 24 hours. Terminal rows are ordered by natural sort of ``(terminal, gate)``
+    (numeric runs compare as numbers). ``minutes`` is the raw point wait at ``scraped_at_utc`` when
     stored, otherwise ``null`` (range-only rows or missing checkpoint at that scrape).
 
     Responses are ``Cache-Control: public, max-age=30`` and recomputed at most
