@@ -65,7 +65,7 @@
     },
     {
       "code": "BWI",
-      "display_name": "Baltimore/Washington International Thurgood Marshall Airport",
+      "display_name": "Baltimore/Washington Intl Thurgood Marshall Airport",
       "metro_key": null,
       "city": "Baltimore",
       "state": "MD",
@@ -80,6 +80,7 @@
         "bwi airport",
         "baltimore airport",
         "baltimore washington airport",
+        "baltimore washington international airport",
         "thurgood marshall airport"
       ],
       "wait_times_url": "https://bwiairport.com/",
@@ -88,7 +89,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "hidden"
+      "status": "active"
     },
     {
       "code": "CLT",
@@ -222,7 +223,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "hidden"
+      "status": "active"
     },
     {
       "code": "EWR",
@@ -294,7 +295,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "hidden"
+      "status": "active"
     },
     {
       "code": "JFK",
@@ -476,7 +477,7 @@
         "chip": "range",
         "chart_series": ["range"]
       },
-      "status": "hidden"
+      "status": "active"
     },
     {
       "code": "ORD",
@@ -522,7 +523,7 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
-      "status": "hidden"
+      "status": "active"
     },
     {
       "code": "PHX",
