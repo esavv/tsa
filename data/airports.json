@@ -64,6 +64,33 @@
       "api_url": null
     },
     {
+      "code": "BWI",
+      "display_name": "Baltimore/Washington International Thurgood Marshall Airport",
+      "metro_key": null,
+      "city": "Baltimore",
+      "state": "MD",
+      "state_name": "Maryland",
+      "terminal_tab": {
+        "without_gate": "Concourse {terminal}",
+        "with_gate": "Concourse {terminal}: {gate}"
+      },
+      "aliases": [
+        "bwi",
+        "bwi marshall",
+        "bwi airport",
+        "baltimore airport",
+        "baltimore washington airport",
+        "thurgood marshall airport"
+      ],
+      "wait_times_url": "https://bwiairport.com/",
+      "api_url": "https://bwiairport.com/wp-content/themes/bwitheme/cache/wait-times.json",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
+      "status": "hidden"
+    },
+    {
       "code": "CLT",
       "display_name": "Charlotte Douglas International Airport",
       "metro_key": null,
@@ -172,6 +199,32 @@
       "status": "active"
     },
     {
+      "code": "DTW",
+      "display_name": "Detroit Metropolitan Wayne County Airport",
+      "metro_key": null,
+      "city": "Detroit",
+      "state": "MI",
+      "state_name": "Michigan",
+      "terminal_tab": {
+        "without_gate": "{terminal} Terminal",
+        "with_gate": "{terminal} Terminal: {gate}"
+      },
+      "aliases": [
+        "dtw",
+        "detroit airport",
+        "detroit metro",
+        "detroit metropolitan",
+        "wayne county airport"
+      ],
+      "wait_times_url": "https://www.metroairport.com/",
+      "api_url": "https://proxy.metroairport.com/SkyFiiTSAProxy.ashx",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
+      "status": "hidden"
+    },
+    {
       "code": "EWR",
       "display_name": "Newark Liberty International Airport",
       "metro_key": "nyc",
@@ -215,6 +268,33 @@
       ],
       "wait_times_url": null,
       "api_url": null
+    },
+    {
+      "code": "IAH",
+      "display_name": "George Bush Intercontinental Airport",
+      "metro_key": null,
+      "city": "Houston",
+      "state": "TX",
+      "state_name": "Texas",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: {gate}"
+      },
+      "aliases": [
+        "iah",
+        "bush airport",
+        "george bush airport",
+        "george bush intercontinental",
+        "houston intercontinental",
+        "houston airport"
+      ],
+      "wait_times_url": "https://www.fly2houston.com/iah/security/",
+      "api_url": "https://api.houstonairports.mobi/wait-times/checkpoint/IAH",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
+      "status": "hidden"
     },
     {
       "code": "JFK",
@@ -373,6 +453,32 @@
       "status": "active"
     },
     {
+      "code": "MSP",
+      "display_name": "Minneapolis-Saint Paul International Airport",
+      "metro_key": null,
+      "city": "Minneapolis",
+      "state": "MN",
+      "state_name": "Minnesota",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal}: {gate}"
+      },
+      "aliases": [
+        "msp",
+        "minneapolis airport",
+        "minneapolis saint paul",
+        "minneapolis st paul",
+        "twin cities airport"
+      ],
+      "wait_times_url": "https://www.mspairport.com/airport/security-screening/security-wait-times",
+      "api_url": null,
+      "wait_times_ui": {
+        "chip": "range",
+        "chart_series": ["range"]
+      },
+      "status": "hidden"
+    },
+    {
       "code": "ORD",
       "status": "no_data",
       "display_name": "Chicago O'Hare International Airport",
@@ -392,6 +498,31 @@
       ],
       "wait_times_url": null,
       "api_url": null
+    },
+    {
+      "code": "PHL",
+      "display_name": "Philadelphia International Airport",
+      "metro_key": null,
+      "city": "Philadelphia",
+      "state": "PA",
+      "state_name": "Pennsylvania",
+      "terminal_tab": {
+        "without_gate": "Terminal {terminal}",
+        "with_gate": "Terminal {terminal} {gate}"
+      },
+      "aliases": [
+        "phl",
+        "philadelphia airport",
+        "philadelphia international",
+        "philly airport"
+      ],
+      "wait_times_url": "https://www.phl.org/flights/security-information/checkpoint-hours",
+      "api_url": "https://www.phl.org/phllivereach/metrics",
+      "wait_times_ui": {
+        "chip": "absolute",
+        "chart_series": ["absolute"]
+      },
+      "status": "hidden"
     },
     {
       "code": "PHX",
