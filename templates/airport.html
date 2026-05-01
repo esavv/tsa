@@ -1075,7 +1075,7 @@
     let selectedGate = '';
     let terminalRows = [];
 
-    const QUEUE_TAB_ORDER = ['general', 'precheck', 'priority', 'clear'];
+    const QUEUE_TAB_ORDER = ['general', 'precheck', 'premier', 'priority', 'clear'];
 
     function sortQueueTypesFromKeys(types) {
       const set = new Set(types);
@@ -1176,6 +1176,7 @@
       const labels = {
         general: 'General',
         precheck: 'TSA PreCheck',
+        premier: 'Premier',
         priority: 'Priority',
         clear: 'Clear',
       };
@@ -1190,6 +1191,7 @@
       const labels = {
         general: 'General',
         precheck: 'PreCheck',
+        premier: 'Premier',
         priority: 'Priority',
         clear: 'Clear',
       };

@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 import zlib
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 NYC_API_BASE = "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints"
 NYC_AIRPORTS = {
@@ -158,6 +159,7 @@ MSP_WAIT_TIMES_URL = "https://www.mspairport.com/airport/security-screening/secu
 DTW_WAIT_TIMES_URL = "https://proxy.metroairport.com/SkyFiiTSAProxy.ashx"
 PHL_WAIT_TIMES_URL = "https://www.phl.org/phllivereach/metrics"
 PHL_CHECKPOINT_PAGE_URL = "https://www.phl.org/flights/security-information/checkpoint-hours"
+PHL_WAIT_API_JS_URL = "https://www.phl.org/modules/custom/phl_wait_api/js/wait-api.js?tec001"
 BWI_WAIT_TIMES_URL = "https://bwiairport.com/wp-content/themes/bwitheme/cache/wait-times.json"
 BWI_HOME_URL = "https://bwiairport.com/"
 ZENSORS_TRPC_BASE = "https://embed.zensors.live/api/embeddable-widget/trpc"
@@ -251,6 +253,8 @@ def normalize_queue_type(value: str) -> str:
     lowered = value.lower()
     if "pre" in lowered:
         return "precheck"
+    if "premier" in lowered:
+        return "premier"
     if "priority" in lowered:
         return "priority"
     if "clear" in lowered:
@@ -688,7 +692,9 @@ def _iah_queue_type(wt: dict) -> str:
     name = str(wt.get("name") or "").lower()
     if "precheck" in name or "pre check" in name:
         return "precheck"
-    if "premier" in name or "priority" in name:
+    if "premier" in name:
+        return "premier"
+    if "priority" in name:
         return "priority"
     return "general"
 
@@ -1278,19 +1284,50 @@ def fetch_dtw_airport() -> list[dict]:
     return rows
 
 
-PHL_METRIC_MAP: dict[int, tuple[str, str, str]] = {
-    4377: ("A-West", "", "general"),
-    4368: ("A-East", "", "general"),
-    4386: ("A-East", "", "precheck"),
-    5047: ("B", "", "general"),
-    5052: ("C", "", "general"),
-    3971: ("D/E", "", "general"),
-    4126: ("D/E", "", "precheck"),
-    5068: ("F", "", "general"),
+PHL_METRIC_MAP: dict[int, tuple[str, str, str, str]] = {
+    4377: ("A", "West", "general", "tA"),
+    4368: ("A", "East", "general", "tAe"),
+    4386: ("A", "East", "precheck", "tAepre"),
+    5047: ("B", "", "general", "tB"),
+    5052: ("C", "", "general", "tC"),
+    3971: ("D/E", "", "general", "tDE"),
+    4126: ("D/E", "", "precheck", "tDEpre"),
+    5068: ("F", "", "general", "tF"),
 }
 
 
+def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, tuple[str, str]]:
+    m = re.search(r"const\s+tHours\s*=\s*\{(?P<body>.*?)\};", js_text, flags=re.DOTALL)
+    if not m:
+        raise ValueError("PHL wait-api.js missing tHours block")
+    hours: dict[str, tuple[str, str]] = {}
+    entry_re = re.compile(
+        r"['\"](?P<key>[^'\"]+)['\"]\s*:\s*\{\s*"
+        r"['\"]open['\"]\s*:\s*['\"](?P<open>\d{2}:\d{2})['\"]\s*,\s*"
+        r"['\"]close['\"]\s*:\s*['\"](?P<close>\d{2}:\d{2})['\"]\s*,?\s*\}",
+        flags=re.DOTALL,
+    )
+    for item in entry_re.finditer(m.group("body")):
+        hours[item.group("key")] = (item.group("open"), item.group("close"))
+    missing = sorted({meta[3] for meta in PHL_METRIC_MAP.values()} - set(hours))
+    if missing:
+        raise ValueError("PHL wait-api.js missing tHours entries: " + ", ".join(missing))
+    return hours
+
+
+def _phl_schedule_is_open(hours: dict[str, tuple[str, str]], schedule_key: str) -> bool:
+    open_time, close_time = hours[schedule_key]
+    if open_time == close_time:
+        return False
+    now = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M")
+    if open_time < close_time:
+        return open_time < now < close_time
+    return now > open_time or now < close_time
+
+
 def fetch_phl_airport() -> list[dict]:
+    wait_api_js = fetch_text(PHL_WAIT_API_JS_URL, headers={"Referer": PHL_CHECKPOINT_PAGE_URL})
+    checkpoint_hours = _parse_phl_checkpoint_hours(wait_api_js)
     payload = fetch_json_url(
         PHL_WAIT_TIMES_URL,
         headers={
@@ -1314,7 +1351,9 @@ def fetch_phl_airport() -> list[dict]:
         mapped = PHL_METRIC_MAP.get(metric_id)
         if not mapped:
             continue
-        terminal, gate, queue_type = mapped
+        terminal, gate, queue_type, schedule_key = mapped
+        if not _phl_schedule_is_open(checkpoint_hours, schedule_key):
+            continue
         try:
             wait_minutes = max(0, math.ceil(float(item[1])))
         except (TypeError, ValueError):
@@ -1550,11 +1589,24 @@ def print_mobi_raw(airport: str) -> None:
     print(json.dumps(payload, indent=2))
 
 
+def _natural_preview_part(value: object) -> list[tuple[int, object]]:
+    parts = re.split(r"(\d+)", "" if value is None else str(value).strip().lower())
+    return [(1, int(p)) if p.isdigit() else (0, p) for p in parts]
+
+
+def _preview_row_sort_key(row: dict) -> tuple:
+    return (
+        _natural_preview_part(row.get("terminal")),
+        _natural_preview_part(row.get("gate")),
+        _natural_preview_part(row.get("queue_type")),
+    )
+
+
 def preview(airport: str) -> None:
     """Fetch one airport and print rows to stdout (no database writes)."""
     code = airport.strip().upper()
     scraped_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    rows = fetch_airport(code)
+    rows = sorted(fetch_airport(code), key=_preview_row_sort_key)
     print(f"# preview {code} at {scraped_at_utc} ({len(rows)} rows, not stored)")
     if not rows:
         return

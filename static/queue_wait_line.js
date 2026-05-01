@@ -8,12 +8,13 @@
  * Chart series use ``wait_times_ui.chart_series`` (see airport page script).
  */
 (function (global) {
-  var CHIP_QUEUE_PRIORITY = ['general', 'precheck', 'clear', 'priority'];
+  var CHIP_QUEUE_PRIORITY = ['general', 'precheck', 'premier', 'clear', 'priority'];
 
   function chipQueueTypeLabel(qt) {
     var map = {
       general: 'General',
       precheck: 'PreCheck',
+      premier: 'Premier',
       clear: 'Clear',
       priority: 'Priority',
     };
