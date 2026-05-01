@@ -984,6 +984,23 @@
       font-style: normal;
       text-align: center;
     }
+    @media (max-width: 768px) {
+      .airport-search-row--unavailable .airport-search-row__main {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .airport-search-row--unavailable .airport-search-row__chips.airport-search-row__chips--status {
+        margin-left: 0;
+        width: 100%;
+        flex: none;
+        justify-content: flex-start;
+        align-self: stretch;
+      }
+      .airport-search-row--unavailable .airport-search-row__chips--status .airport-search-row__chips-msg {
+        text-align: left;
+      }
+    }
   </style>
 {% endblock %}
 {% block body %}
