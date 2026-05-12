@@ -3,9 +3,9 @@ Agent: Do not modify this file unless explicitly requested
 ## Project Context
 - This is a lightweight TSA wait-time tracker for US airports
 - Data is collected from a public wait-times API every 15 minutes via cron (`scripts/run_scrape.py`) and stored in a local SQLite DB (`tsa.db`).
-- Status as of Apr 27, 2026:
-  - Airports fully supported: ATL, CLT, DEN, DFW, EWR, JFK, LAX, LAS, LGA, MCO, MIA, PHX, SEA, 
-- Brief summary of tech stack: TODO
+- Status as of May 12, 2026:
+ - Airports fully supported (19): ATL, BWI, CLT, DCA, DEN, DFW, DTW, EWR, IAH, JFK, LAS, LAX, LGA, MCO, MIA, MSP, PHL, PHX, SEA
+- Tech stack: Python scrapers (mostly `urllib` against public JSON APIs; Playwright + Chromium for ATL's Cloudflare-gated page) writing to a local SQLite DB. Flask + Jinja templates serve the webapp; frontend is vanilla JS with Chart.js for historical charts. Deployed on EC2 behind nginx + certbot; scraper runs via cron every 15 min.
 - Much of how airports are displayed and which data is used is configured in the airport catalog in `data/airports.json`\
 - The Flask app (`app.py`) serves a home page with latest wait times plus mini trend sparklines, and per-terminal detail pages with interactive historical charts (range toggles, hover readouts).
 - Analytics handled by PostHog
