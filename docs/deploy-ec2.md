@@ -7,7 +7,7 @@ So the app keeps running after you disconnect and restarts on reboot.
 From the project root (where `aws_ec2.pem` lives):
 
 ```bash
-ssh -i aws_ec2.pem ubuntu@ec2-98-89-0-90.compute-1.amazonaws.com
+ssh -i aws_ec2.pem ubuntu@ec2-54-226-252-200.compute-1.amazonaws.com
 ```
 
 If your instance’s public DNS or IP changes, update the host in the command above.
