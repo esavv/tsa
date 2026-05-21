@@ -7,7 +7,11 @@ import json
 import math
 import os
 import re
+import signal
 import sqlite3
+import subprocess
+import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -30,6 +34,9 @@ ATL_LEGACY_DOM_SELECTOR = "#nesclasser2 .declasser3 button span"
 ATL_NAVIGATION_MS = 60_000
 ATL_LAYOUT_READY_MS = 60_000
 ATL_LEGACY_FALLBACK_MS = 30_000
+# Wall-clock cap for the out-of-process ATL Playwright worker (sum of in-page
+# timeouts is ~3 min; this is the kill-the-subprocess-group backstop).
+ATL_WORKER_TIMEOUT_S = 240
 ATL_NEW_SCAN_JS = r"""() => {
     const norm = (el) => (typeof el === "string" ? el : (el.textContent || ""))
         .replace(/\s+/g, " ")
@@ -1143,7 +1150,57 @@ def _atl_playwright_debug_excerpt(page) -> str:
 
 
 def fetch_atl_airport() -> list[dict]:
-    """Load ATL /times/ in a real browser (Cloudflare); parse checkpoint rows from the DOM."""
+    """Run the ATL Playwright scrape in a subprocess with a hard wall-clock timeout.
+
+    A Chromium hang in ``page.evaluate`` or during cleanup
+    (``context.close`` / ``browser.close``) can wedge the scrape indefinitely
+    and leave orphaned chromium children. Running out-of-process with
+    ``start_new_session=True`` means a timeout kill propagates to the whole
+    process group, so chromium children die with the worker rather than
+    accumulating across cron runs.
+    """
+    fd, out_path = tempfile.mkstemp(prefix="atl_worker_", suffix=".json")
+    os.close(fd)
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, os.path.abspath(__file__), "--atl-worker-output", out_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        try:
+            _, stderr = proc.communicate(timeout=ATL_WORKER_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            try:
+                proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            raise RuntimeError(
+                f"ATL worker exceeded {ATL_WORKER_TIMEOUT_S}s wall-clock; killed process group"
+            )
+
+        if proc.returncode != 0:
+            err = (stderr or b"").decode("utf-8", errors="replace").strip()[:1024]
+            raise RuntimeError(f"ATL worker exited {proc.returncode}: {err}")
+
+        try:
+            with open(out_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"ATL worker produced no valid output: {exc}")
+    finally:
+        try:
+            os.unlink(out_path)
+        except FileNotFoundError:
+            pass
+
+
+def _fetch_atl_airport_impl() -> list[dict]:
+    """Playwright-driven ATL scrape body; runs inside the subprocess worker."""
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -1696,10 +1753,19 @@ if __name__ == "__main__":
         metavar="CODE",
         help="DFW, CLT, MCO, or IAH only: print raw Mobi checkpoint JSON (includes attributes) for inspection; no DB write.",
     )
+    group.add_argument(
+        "--atl-worker-output",
+        metavar="PATH",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args()
     if args.preview:
         preview(args.preview)
     elif args.raw:
         print_mobi_raw(args.raw)
+    elif args.atl_worker_output:
+        rows = _fetch_atl_airport_impl()
+        with open(args.atl_worker_output, "w", encoding="utf-8") as f:
+            json.dump(rows, f)
     else:
         run()
