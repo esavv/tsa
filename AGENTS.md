@@ -16,7 +16,7 @@ Agent: Do not modify this file unless explicitly requested
 - When testing locally, invoke the venv, do not depend on global/native python installations. When I ask for commands so I can test locally, invoke the venv's python vs global/native installations.
 - When asked to inspect airport sites, use the Cursor IDE browser MCP when sites are not accessible via curl / blocked Cloudflare browser challenges etc
 - v1 of the app was deployed to an ec2 instance on March 12, 2026
-- Info about how this app is deployed is available in `docs/deploy-ec2.md`. When asked for assistance with deployment, instance management, and file transfer refer to this document
+- Info about how this app is deployed is available in `docs/deploy.md`. When asked for assistance with deployment, instance management, and file transfer refer to this document
 - When asked to make changes, always commit your changes unless told not to. 
 
 ## git Conventions
