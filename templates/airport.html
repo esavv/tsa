@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ page_title }}{% endblock %}
 {% block head %}
+  <link rel="canonical" href="{{ canonical_url }}">
   <meta name="description" content="{{ meta_description }}">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
