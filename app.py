@@ -212,12 +212,20 @@ def airport(code: str):
     state = entry.get("state") or ""
     locale_bits = [x for x in (city, state) if x]
     airport_locale_line = ", ".join(locale_bits) if locale_bits else None
+    location_phrase = f" in {airport_locale_line}" if airport_locale_line else ""
+    page_title = f"TSA Wait Times at {c}"
+    meta_description = (
+        f"Live TSA security wait times for {airport_display_name} ({c})"
+        f"{location_phrase}, updated throughout the day."
+    )
     return render_template(
         "airport.html",
         airport=c,
         airport_display_name=airport_display_name,
         airport_locale_line=airport_locale_line,
         airport_catalog_entry=airport_catalog_entry_for_js(c),
+        page_title=page_title,
+        meta_description=meta_description,
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
     )
