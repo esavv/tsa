@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Simple webapp: latest wait times + 24h terminal history charts."""
+import html
 import json
 import os
 import re
@@ -8,11 +9,12 @@ import threading
 import time
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, jsonify, redirect, render_template, request, url_for
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("TSA_DB_PATH", os.path.join(APP_DIR, "tsa.db"))
 CATALOG_PATH = os.path.join(APP_DIR, "data", "airports.json")
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://tsa-times.com").rstrip("/")
 
 
 def load_airport_catalog():
@@ -42,6 +44,15 @@ def airport_catalog_status(code: str) -> str:
 
 def is_hidden_airport(code: str) -> bool:
     return airport_catalog_status(code) == "hidden"
+
+
+def active_airport_codes() -> list[str]:
+    return sorted(
+        str(ap.get("code") or "").upper()
+        for ap in AIRPORT_CATALOG.get("airports", [])
+        if str(ap.get("code") or "").strip()
+        and (ap.get("status") or "active") == "active"
+    )
 
 
 _DEFAULT_TERMINAL_TAB = {
@@ -144,6 +155,46 @@ def get_db():
 @app.route("/")
 def index():
     return redirect(url_for("airport", code="JFK"), code=302)
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    urls = [
+        f"{SITE_BASE_URL}{url_for('airport', code=code)}"
+        for code in active_airport_codes()
+    ]
+    body = "\n".join(
+        [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+            *[
+                (
+                    "  <url>\n"
+                    f"    <loc>{html.escape(url)}</loc>\n"
+                    "    <changefreq>hourly</changefreq>\n"
+                    "  </url>"
+                )
+                for url in urls
+            ],
+            "</urlset>",
+            "",
+        ]
+    )
+    return Response(body, mimetype="application/xml")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    body = "\n".join(
+        [
+            "User-agent: *",
+            "Allow: /",
+            "",
+            f"Sitemap: {SITE_BASE_URL}/sitemap.xml",
+            "",
+        ]
+    )
+    return Response(body, mimetype="text/plain")
 
 
 @app.route("/<code>")
