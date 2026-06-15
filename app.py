@@ -215,7 +215,7 @@ def airport(code: str):
     location_phrase = f" in {airport_locale_line}" if airport_locale_line else ""
     page_title = f"TSA Wait Times at {c}"
     canonical_url = f"{SITE_BASE_URL}{url_for('airport', code=c)}"
-    social_image_url = f"{SITE_BASE_URL}{url_for('static', filename='social-preview-03.png')}"
+    social_image_url = f"{SITE_BASE_URL}{url_for('static', filename='social-preview-02.png')}"
     meta_description = (
         f"Live TSA security wait times for {airport_display_name} ({c})"
         f"{location_phrase}, updated throughout the day."
