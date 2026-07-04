@@ -7,10 +7,18 @@ Production runs on EC2 (Ubuntu 24.04) behind nginx + certbot (HTTPS). The Flask 
 From the project root (where `aws_ec2.pem` lives):
 
 ```bash
-ssh -i aws_ec2.pem ubuntu@ec2-98-89-0-90.compute-1.amazonaws.com
+ssh -i aws_ec2.pem ubuntu@ec2-54-226-252-200.compute-1.amazonaws.com
+ssh -i aws_ec2.pem ubuntu@tsa-times.com
 ```
 
 If your instance's public DNS or IP changes, update the host in the command above.
+
+## Copy prod database locally
+
+```bash
+scp -i aws_ec2.pem ubuntu@ec2-54-226-252-200.compute-1.amazonaws.com:/home/ubuntu/tsa/tsa.db ./tsa.db
+scp -i aws_ec2.pem ubuntu@tsa-times.com:/home/ubuntu/tsa/tsa.db ./tsa.db
+```
 
 ## First-time host setup
 
