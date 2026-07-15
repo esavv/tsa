@@ -1,7 +1,9 @@
 import os
 import sys
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.join(REPO_ROOT, "scripts")
@@ -99,6 +101,58 @@ class TweetAlertTests(unittest.TestCase):
         )
         self.assertIn("Terminal 4: Gates A: 46 min", posts[0].text)
         self.assertIn("Terminal 5: 61 min", posts[0].text)
+
+    def test_single_target_tweet_uses_one_line_headline(self):
+        candidate = alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog)
+
+        post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z", candidate
+        )[0]
+
+        self.assertTrue(
+            post.text.startswith(
+                "TSA wait times are elevated at JFK Terminal 5: 57 min"
+            )
+        )
+        self.assertNotIn("JFK:\n\nTerminal", post.text)
+
+    def test_generated_post_id_is_stable_and_content_specific(self):
+        first = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+        )[0]
+        same = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+        )[0]
+        changed = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=58)], self.catalog),
+        )[0]
+
+        self.assertEqual(first.post_id, same.post_id)
+        self.assertNotEqual(first.post_id, changed.post_id)
+        self.assertRegex(
+            first.post_id,
+            r"^20260714T200000Z-JFK-[0-9a-f]{12}$",
+        )
+
+    def test_summary_counts_posts_by_airport(self):
+        first = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+        )[0]
+        later = alerts.posts_for_candidates(
+            "2026-07-15T02:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=61)], self.catalog),
+        )[0]
+        output = StringIO()
+
+        with redirect_stdout(output):
+            alerts.print_summary([first, later], 7)
+
+        self.assertIn("Projected tweets: 2 over 7 days", output.getvalue())
+        self.assertIn("JFK  2", output.getvalue())
 
     def test_cooldown_suppresses_same_threshold(self):
         candidate = alerts.candidates_for_rows([row(wait_minutes=49)], self.catalog)[0]

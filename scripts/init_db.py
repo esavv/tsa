@@ -110,6 +110,30 @@ def migrate_wait_times_nullable_wait_minutes(conn: sqlite3.Connection) -> None:
     )
 
 
+def migrate_tweet_alerts_test_columns(conn: sqlite3.Connection) -> None:
+    """Add generated-post identity and test markers to existing alert tables."""
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tweet_alerts'")
+    if not cur.fetchone():
+        return
+    cur.execute("PRAGMA table_info(tweet_alerts)")
+    cols = {row[1] for row in cur.fetchall()}
+    if "source_post_id" not in cols:
+        try:
+            cur.execute("ALTER TABLE tweet_alerts ADD COLUMN source_post_id TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+    if "is_test" not in cols:
+        try:
+            cur.execute(
+                "ALTER TABLE tweet_alerts ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+
+
 def init_db(db_path: str | None = None) -> str:
     db_path = db_path or os.environ.get("TSA_DB_PATH", DEFAULT_DB_PATH)
     with open(SCHEMA_PATH) as f:
@@ -119,6 +143,7 @@ def init_db(db_path: str | None = None) -> str:
     conn.executescript(schema_sql)
     migrate_wait_times_add_range_columns(conn)
     migrate_wait_times_nullable_wait_minutes(conn)
+    migrate_tweet_alerts_test_columns(conn)
     conn.commit()
     conn.close()
     return db_path

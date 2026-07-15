@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sqlite3
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -49,6 +52,24 @@ class AlertPost:
     candidates: tuple[Candidate, ...]
     text: str
     url: str
+
+    @property
+    def post_id(self) -> str:
+        timestamp = utc_from_iso(self.scraped_at_utc).strftime("%Y%m%dT%H%M%SZ")
+        identity = "\n".join(
+            [
+                self.scraped_at_utc,
+                self.airport,
+                self.text,
+                *(
+                    f"{candidate.target.terminal}\0{candidate.target.gate}"
+                    f"\0{candidate.threshold}\0{candidate.wait_minutes}"
+                    for candidate in self.candidates
+                ),
+            ]
+        )
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12]
+        return f"{timestamp}-{self.airport}-{digest}"
 
 
 def utc_from_iso(value: str) -> datetime:
@@ -214,11 +235,17 @@ def make_post(scraped_at_utc: str, airport: str, candidates: list[Candidate]) ->
     )
     url = target_url(ordered[0].target)
     lines = [f"{candidate.label}: {candidate.wait_display}" for candidate in ordered]
-    text = (
-        f"TSA wait times are elevated at {airport}:\n\n"
-        + "\n".join(lines)
-        + f"\n\nLive updates: {url}"
-    )
+    if len(lines) == 1:
+        text = (
+            f"TSA wait times are elevated at {airport} {lines[0]}"
+            f"\n\nLive updates: {url}"
+        )
+    else:
+        text = (
+            f"TSA wait times are elevated at {airport}:\n\n"
+            + "\n".join(lines)
+            + f"\n\nLive updates: {url}"
+        )
     if weighted_post_length(text, url) > 280:
         raise ValueError(
             f"{airport} alert is too long for X "
@@ -278,10 +305,11 @@ def actual_alert_state(
     sql = """
         SELECT airport, terminal, gate, threshold_minutes, alerted_at_utc
         FROM tweet_alerts
+        WHERE is_test = 0
     """
     params: list[str] = []
     if airport:
-        sql += " WHERE airport = ?"
+        sql += " AND airport = ?"
         params.append(airport)
     sql += " ORDER BY alerted_at_utc"
     state = {}
@@ -315,24 +343,19 @@ def preview_latest(
     return posts_for_candidates(scraped_at_utc, eligible)
 
 
-def backtest(
+def historical_posts(
     conn: sqlite3.Connection,
     catalog: dict[str, dict],
     airport: str | None,
-    days: int,
+    start: datetime,
+    end: datetime,
 ) -> list[AlertPost]:
-    latest = latest_scrape_at(conn)
-    if not latest:
-        return []
-    end = utc_from_iso(latest)
-    start = end - timedelta(days=days)
-    scan_start = start - COOLDOWN
     sql = """
         SELECT DISTINCT scraped_at_utc
         FROM wait_times
-        WHERE scraped_at_utc >= ? AND scraped_at_utc <= ?
+        WHERE scraped_at_utc <= ?
     """
-    params: list[str] = [utc_iso(scan_start), utc_iso(end)]
+    params: list[str] = [utc_iso(end)]
     if airport:
         sql += " AND airport = ?"
         params.append(airport)
@@ -353,6 +376,48 @@ def backtest(
     return posts
 
 
+def backtest(
+    conn: sqlite3.Connection,
+    catalog: dict[str, dict],
+    airport: str | None,
+    days: int,
+) -> list[AlertPost]:
+    latest = latest_scrape_at(conn)
+    if not latest:
+        return []
+    end = utc_from_iso(latest)
+    return historical_posts(conn, catalog, airport, end - timedelta(days=days), end)
+
+
+POST_ID_RE = re.compile(r"^\d{8}T\d{6}Z-([A-Z]{3})-[0-9a-f]{12}$")
+
+
+def find_post_by_id(
+    conn: sqlite3.Connection,
+    catalog: dict[str, dict],
+    post_id: str,
+) -> AlertPost | None:
+    match = POST_ID_RE.fullmatch(post_id)
+    if not match:
+        return None
+    airport = match.group(1)
+    if airport not in catalog:
+        return None
+
+    for post in preview_latest(conn, catalog, airport, live=False):
+        if post.post_id == post_id:
+            return post
+
+    timestamp_text = post_id.split("-", 1)[0]
+    timestamp = datetime.strptime(timestamp_text, "%Y%m%dT%H%M%SZ").replace(
+        tzinfo=timezone.utc
+    )
+    for post in historical_posts(conn, catalog, airport, timestamp, timestamp):
+        if post.post_id == post_id:
+            return post
+    return None
+
+
 def print_posts(posts: list[AlertPost]) -> None:
     if not posts:
         print("No tweets would be generated.")
@@ -360,9 +425,20 @@ def print_posts(posts: list[AlertPost]) -> None:
     for index, post in enumerate(posts):
         if index:
             print("\n" + "-" * 72)
+        print(f"Tweet ID: {post.post_id}")
         print(f"{post.scraped_at_utc} | {post.airport}")
         print(post.text)
         print(f"[{weighted_post_length(post.text, post.url)} weighted characters]")
+
+
+def print_summary(posts: list[AlertPost], days: int) -> None:
+    print(f"Projected tweets: {len(posts)} over {days} days")
+    counts = Counter(post.airport for post in posts)
+    if counts:
+        print("\nBy airport:")
+        width = max(len(airport) for airport in counts)
+        for airport in sorted(counts):
+            print(f"  {airport:<{width}}  {counts[airport]}")
 
 
 def x_client():
@@ -397,15 +473,17 @@ def record_post(
     post: AlertPost,
     tweet_id: str,
     alerted_at_utc: str,
+    is_test: bool,
 ) -> None:
     for candidate in post.candidates:
         conn.execute(
             """
             INSERT INTO tweet_alerts (
                 airport, terminal, gate, threshold_minutes, wait_minutes,
-                tweet_text, tweet_url, tweet_id, alerted_at_utc, scraped_at_utc
+                tweet_text, tweet_url, tweet_id, alerted_at_utc, scraped_at_utc,
+                source_post_id, is_test
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 candidate.target.airport,
@@ -418,12 +496,19 @@ def record_post(
                 tweet_id,
                 alerted_at_utc,
                 post.scraped_at_utc,
+                post.post_id,
+                int(is_test),
             ),
         )
     conn.commit()
 
 
-def publish_posts(conn: sqlite3.Connection, posts: list[AlertPost]) -> None:
+def publish_posts(
+    conn: sqlite3.Connection,
+    posts: list[AlertPost],
+    *,
+    is_test: bool = False,
+) -> None:
     if not posts:
         print("No eligible tweets to publish.")
         return
@@ -432,7 +517,7 @@ def publish_posts(conn: sqlite3.Connection, posts: list[AlertPost]) -> None:
         response = client.create_tweet(text=post.text)
         tweet_id = str(response.data["id"])
         alerted_at_utc = utc_iso(datetime.now(timezone.utc))
-        record_post(conn, post, tweet_id, alerted_at_utc)
+        record_post(conn, post, tweet_id, alerted_at_utc, is_test=is_test)
         print(f"Published https://x.com/tsatimez/status/{tweet_id}")
 
 
@@ -455,9 +540,18 @@ def parse_args() -> argparse.Namespace:
         metavar="DAYS",
         help="report tweets that historical data would have generated",
     )
+    mode.add_argument(
+        "--post-id",
+        help="publish one generated dry-run/backtest tweet as an explicit live test",
+    )
     parser.add_argument(
         "--airport",
         help="limit evaluation to one three-letter airport code",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="with --backtest-days, show only totals by airport",
     )
     return parser.parse_args()
 
@@ -472,15 +566,47 @@ def main() -> int:
     if args.backtest_days is not None and args.backtest_days <= 0:
         print("--backtest-days must be greater than zero", file=sys.stderr)
         return 2
+    if args.summary and args.backtest_days is None:
+        print("--summary requires --backtest-days", file=sys.stderr)
+        return 2
+    if args.post_id and airport:
+        print("--airport cannot be combined with --post-id", file=sys.stderr)
+        return 2
 
     db_path = init_db(os.environ.get("TSA_DB_PATH", DEFAULT_DB_PATH))
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        if args.backtest_days is not None:
+        if args.post_id:
+            existing = conn.execute(
+                "SELECT tweet_id FROM tweet_alerts WHERE source_post_id = ? LIMIT 1",
+                (args.post_id,),
+            ).fetchone()
+            if existing:
+                print(
+                    f"Tweet ID {args.post_id} was already published as "
+                    f"https://x.com/tsatimez/status/{existing['tweet_id']}",
+                    file=sys.stderr,
+                )
+                return 2
+            post = find_post_by_id(conn, catalog, args.post_id)
+            if post is None:
+                print(f"Tweet ID not found: {args.post_id}", file=sys.stderr)
+                return 2
+            if not alerts_enabled(catalog[post.airport]):
+                print(
+                    f"{post.airport} is not enrolled for live tweet alerts",
+                    file=sys.stderr,
+                )
+                return 2
+            publish_posts(conn, [post], is_test=True)
+        elif args.backtest_days is not None:
             posts = backtest(conn, catalog, airport, args.backtest_days)
-            print_posts(posts)
-            print(f"\nProjected tweets: {len(posts)} over {args.backtest_days} days")
+            if args.summary:
+                print_summary(posts, args.backtest_days)
+            else:
+                print_posts(posts)
+                print(f"\nProjected tweets: {len(posts)} over {args.backtest_days} days")
         else:
             posts = preview_latest(conn, catalog, airport, live=args.live)
             if args.live:

@@ -143,11 +143,25 @@ The alert runner defaults to a safe dry run. It evaluates 45-, 60-, and
 ./venv/bin/python scripts/run_tweet_alerts.py --dry-run --airport JFK
 ./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7
 ./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7 --airport JFK
+./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7 --summary
 ```
 
 Dry runs and backtests evaluate all supported airports. Live posting only
 includes airports with `tweet_alerts.enabled` set to `true` in
 `data/airports.json`.
+
+Detailed dry-run and backtest output assigns each generated tweet a stable ID.
+To publish one enrolled airport's generated tweet as an explicit API test:
+
+```bash
+./venv/bin/python scripts/run_tweet_alerts.py --post-id 20260714T200000Z-JFK-0123456789ab
+```
+
+Use an ID copied from actual command output. This publishes the historical
+tweet exactly as shown and requires the same credentials as `--live`. Test
+tweets are recorded in `tweet_alerts`, cannot be posted twice by the same ID,
+and do not affect production cooldowns. Delete the test post manually from X
+after checking it.
 
 Live posting requires these OAuth 1.0a credentials:
 
@@ -166,9 +180,9 @@ than placing their values directly in crontab, then use:
 */15 * * * * cd /path/to/tsa && (set -a && . /path/to/x-alerts.env && set +a && ./venv/bin/python scripts/run_scrape.py && ./venv/bin/python scripts/run_tweet_alerts.py --live) >> /path/to/tsa/logs/cron.log 2>&1
 ```
 
-The live command is the only mode that calls X or writes to `tweet_alerts`.
-Each successfully published post is recorded once per included chart target so
-subsequent runs can enforce cooldowns.
+The `--live` and `--post-id` commands are the only modes that call X or write to
+`tweet_alerts`. Each successfully published post is recorded once per included
+chart target so subsequent production runs can enforce cooldowns.
 
 ## Querying the data
 
