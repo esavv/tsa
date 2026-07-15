@@ -10,7 +10,7 @@ import re
 import sqlite3
 import sys
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
@@ -44,6 +44,7 @@ class Candidate:
     wait_minutes: int
     wait_display: str
     label: str
+    is_escalation: bool = False
 
 
 @dataclass(frozen=True)
@@ -210,8 +211,10 @@ def eligible_candidates(
             eligible.append(candidate)
             continue
         previous_at, previous_threshold = previous
-        if at - previous_at >= COOLDOWN or candidate.threshold > previous_threshold:
+        if at - previous_at >= COOLDOWN:
             eligible.append(candidate)
+        elif candidate.threshold > previous_threshold:
+            eligible.append(replace(candidate, is_escalation=True))
     return eligible
 
 
@@ -246,7 +249,14 @@ def make_post(
     url = target_url(ordered[0].target)
     lines = [f"{candidate.label}: {candidate.wait_display}" for candidate in ordered]
     if len(lines) == 1:
-        text = f"TSA wait times are elevated at {airport} {lines[0]}"
+        candidate = ordered[0]
+        if candidate.is_escalation and candidate.threshold >= 90:
+            qualifier = "very long"
+        elif candidate.is_escalation and candidate.threshold >= 60:
+            qualifier = "even longer"
+        else:
+            qualifier = "elevated"
+        text = f"TSA wait times are {qualifier} at {airport} {lines[0]}"
     else:
         text = f"TSA wait times are elevated at {airport}:\n\n" + "\n".join(lines)
     if include_link:

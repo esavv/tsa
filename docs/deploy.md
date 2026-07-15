@@ -138,7 +138,14 @@ Optional: set `TSA_DB_PATH` in crontab if you want the DB elsewhere:
 The alert runner defaults to a safe dry run. It evaluates 45-, 60-, and
 90-minute thresholds with a six-hour per-terminal cooldown. At most one
 production tweet in any rolling seven-day period includes a link; additional
-tweets are text-only until the link cooldown expires:
+tweets are text-only until the link cooldown expires.
+
+Within the terminal cooldown, crossing 60 minutes changes single-terminal copy
+to “even longer,” and crossing 90 minutes changes it to “very long.” Initial
+alerts and alerts after the cooldown continue to use “elevated.” Grouped
+multi-terminal posts retain the standard heading.
+
+Preview and backtest commands:
 
 ```bash
 ./venv/bin/python scripts/run_tweet_alerts.py --dry-run

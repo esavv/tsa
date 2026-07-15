@@ -207,7 +207,10 @@ class TweetAlertTests(unittest.TestCase):
         at_60 = alerts.candidates_for_rows([row(wait_minutes=61)], self.catalog)[0]
         state = {at_45.target: (now - timedelta(hours=2), 45)}
 
-        self.assertEqual([at_60], alerts.eligible_candidates([at_60], now, state))
+        escalations = alerts.eligible_candidates([at_60], now, state)
+        self.assertEqual(1, len(escalations))
+        self.assertTrue(escalations[0].is_escalation)
+        self.assertEqual(at_60.target, escalations[0].target)
         state[at_60.target] = (now, at_60.threshold)
         self.assertEqual(
             [],
@@ -217,6 +220,47 @@ class TweetAlertTests(unittest.TestCase):
             [at_60],
             alerts.eligible_candidates([at_60], now + timedelta(hours=6), state),
         )
+
+    def test_escalation_copy_uses_threshold_specific_wording(self):
+        now = datetime(2026, 7, 14, 20, tzinfo=timezone.utc)
+        at_60 = alerts.candidates_for_rows([row(wait_minutes=61)], self.catalog)[0]
+        escalation_60 = alerts.eligible_candidates(
+            [at_60],
+            now,
+            {at_60.target: (now - timedelta(minutes=15), 45)},
+        )
+        post_60 = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            escalation_60,
+            link_available=False,
+        )[0]
+
+        at_90 = alerts.candidates_for_rows([row(wait_minutes=92)], self.catalog)[0]
+        escalation_90 = alerts.eligible_candidates(
+            [at_90],
+            now,
+            {at_90.target: (now - timedelta(minutes=15), 60)},
+        )
+        post_90 = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            escalation_90,
+            link_available=False,
+        )[0]
+
+        self.assertIn("wait times are even longer", post_60.text)
+        self.assertIn("wait times are very long", post_90.text)
+
+    def test_first_high_threshold_alert_still_uses_initial_wording(self):
+        candidate = alerts.candidates_for_rows([row(wait_minutes=92)], self.catalog)
+
+        post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            candidate,
+            link_available=False,
+        )[0]
+
+        self.assertIn("wait times are elevated", post.text)
+        self.assertNotIn("wait times are very long", post.text)
 
     def test_range_airport_uses_displayed_upper_bound(self):
         catalog = {
