@@ -2,3 +2,4 @@
 # Webapp:
 flask>=3.0
 playwright>=1.40
+tweepy>=4.17

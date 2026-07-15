@@ -29,3 +29,22 @@ CREATE TABLE IF NOT EXISTS scrape_airport_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scrape_airport_stats_scraped ON scrape_airport_stats(scraped_at_utc);
+
+-- Actual X posts, one row per terminal/chart target included in a post.
+-- Grouped airport alerts share the same tweet_id.
+CREATE TABLE IF NOT EXISTS tweet_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    airport TEXT NOT NULL,
+    terminal TEXT NOT NULL,
+    gate TEXT NOT NULL DEFAULT '',
+    threshold_minutes INTEGER NOT NULL,
+    wait_minutes INTEGER NOT NULL,
+    tweet_text TEXT NOT NULL,
+    tweet_url TEXT NOT NULL,
+    tweet_id TEXT NOT NULL,
+    alerted_at_utc TEXT NOT NULL,
+    scraped_at_utc TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tweet_alerts_target_time
+ON tweet_alerts(airport, terminal, gate, alerted_at_utc);
