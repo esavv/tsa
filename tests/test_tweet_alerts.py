@@ -91,7 +91,9 @@ class TweetAlertTests(unittest.TestCase):
             self.catalog,
         )
 
-        posts = alerts.posts_for_candidates("2026-07-14T20:00:00Z", candidates)
+        posts = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z", candidates, link_available=True
+        )
 
         self.assertEqual(1, len(posts))
         self.assertEqual(2, len(posts[0].candidates))
@@ -106,7 +108,7 @@ class TweetAlertTests(unittest.TestCase):
         candidate = alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog)
 
         post = alerts.posts_for_candidates(
-            "2026-07-14T20:00:00Z", candidate
+            "2026-07-14T20:00:00Z", candidate, link_available=True
         )[0]
 
         self.assertTrue(
@@ -116,18 +118,52 @@ class TweetAlertTests(unittest.TestCase):
         )
         self.assertNotIn("JFK:\n\nTerminal", post.text)
 
+    def test_text_only_post_omits_url(self):
+        candidate = alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog)
+
+        post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z", candidate, link_available=False
+        )[0]
+
+        self.assertFalse(post.included_link)
+        self.assertNotIn("https://", post.text)
+        self.assertNotIn("tsa-times.com", post.text)
+
+    def test_only_first_same_scrape_post_receives_available_link(self):
+        candidates = alerts.candidates_for_rows(
+            [
+                row(wait_minutes=57),
+                row(
+                    airport="CLT",
+                    terminal="Checkpoint 1",
+                    wait_minutes=61,
+                ),
+            ],
+            self.catalog,
+        )
+
+        posts = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z", candidates, link_available=True
+        )
+
+        self.assertEqual(2, len(posts))
+        self.assertEqual(1, sum(post.included_link for post in posts))
+
     def test_generated_post_id_is_stable_and_content_specific(self):
         first = alerts.posts_for_candidates(
             "2026-07-14T20:00:00Z",
             alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+            link_available=True,
         )[0]
         same = alerts.posts_for_candidates(
             "2026-07-14T20:00:00Z",
             alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+            link_available=True,
         )[0]
         changed = alerts.posts_for_candidates(
             "2026-07-14T20:00:00Z",
             alerts.candidates_for_rows([row(wait_minutes=58)], self.catalog),
+            link_available=True,
         )[0]
 
         self.assertEqual(first.post_id, same.post_id)
@@ -141,10 +177,12 @@ class TweetAlertTests(unittest.TestCase):
         first = alerts.posts_for_candidates(
             "2026-07-14T20:00:00Z",
             alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+            link_available=True,
         )[0]
         later = alerts.posts_for_candidates(
             "2026-07-15T02:00:00Z",
             alerts.candidates_for_rows([row(wait_minutes=61)], self.catalog),
+            link_available=False,
         )[0]
         output = StringIO()
 
@@ -152,6 +190,8 @@ class TweetAlertTests(unittest.TestCase):
             alerts.print_summary([first, later], 7)
 
         self.assertIn("Projected tweets: 2 over 7 days", output.getvalue())
+        self.assertIn("Link posts: 1", output.getvalue())
+        self.assertIn("Text-only posts: 1", output.getvalue())
         self.assertIn("JFK  2", output.getvalue())
 
     def test_cooldown_suppresses_same_threshold(self):

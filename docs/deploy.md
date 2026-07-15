@@ -136,7 +136,9 @@ Optional: set `TSA_DB_PATH` in crontab if you want the DB elsewhere:
 ## X wait-time alerts
 
 The alert runner defaults to a safe dry run. It evaluates 45-, 60-, and
-90-minute thresholds with a six-hour per-terminal cooldown:
+90-minute thresholds with a six-hour per-terminal cooldown. At most one
+production tweet in any rolling seven-day period includes a link; additional
+tweets are text-only until the link cooldown expires:
 
 ```bash
 ./venv/bin/python scripts/run_tweet_alerts.py --dry-run
@@ -151,6 +153,8 @@ includes airports with `tweet_alerts.enabled` set to `true` in
 `data/airports.json`.
 
 Detailed dry-run and backtest output assigns each generated tweet a stable ID.
+It also identifies whether each post includes a link. Backtest summaries split
+the forecast into link and text-only posts in addition to per-airport totals.
 To publish one enrolled airport's generated tweet as an explicit API test:
 
 ```bash

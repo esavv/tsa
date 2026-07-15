@@ -26,6 +26,7 @@ DEFAULT_DB_PATH = os.path.join(REPO_ROOT, "tsa.db")
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://tsa-times.com").rstrip("/")
 THRESHOLDS = (45, 60, 90)
 COOLDOWN = timedelta(hours=6)
+LINK_COOLDOWN = timedelta(days=7)
 X_URL_LENGTH = 23
 
 
@@ -52,6 +53,7 @@ class AlertPost:
     candidates: tuple[Candidate, ...]
     text: str
     url: str
+    included_link: bool
 
     @property
     def post_id(self) -> str:
@@ -221,10 +223,18 @@ def target_url(target: Target) -> str:
 
 
 def weighted_post_length(text: str, url: str) -> int:
+    if url not in text:
+        return len(text)
     return len(text) - len(url) + X_URL_LENGTH
 
 
-def make_post(scraped_at_utc: str, airport: str, candidates: list[Candidate]) -> AlertPost:
+def make_post(
+    scraped_at_utc: str,
+    airport: str,
+    candidates: list[Candidate],
+    *,
+    include_link: bool,
+) -> AlertPost:
     ordered = sorted(
         candidates,
         key=lambda candidate: (
@@ -236,16 +246,11 @@ def make_post(scraped_at_utc: str, airport: str, candidates: list[Candidate]) ->
     url = target_url(ordered[0].target)
     lines = [f"{candidate.label}: {candidate.wait_display}" for candidate in ordered]
     if len(lines) == 1:
-        text = (
-            f"TSA wait times are elevated at {airport} {lines[0]}"
-            f"\n\nLive updates: {url}"
-        )
+        text = f"TSA wait times are elevated at {airport} {lines[0]}"
     else:
-        text = (
-            f"TSA wait times are elevated at {airport}:\n\n"
-            + "\n".join(lines)
-            + f"\n\nLive updates: {url}"
-        )
+        text = f"TSA wait times are elevated at {airport}:\n\n" + "\n".join(lines)
+    if include_link:
+        text += f"\n\nLive updates: {url}"
     if weighted_post_length(text, url) > 280:
         raise ValueError(
             f"{airport} alert is too long for X "
@@ -257,20 +262,31 @@ def make_post(scraped_at_utc: str, airport: str, candidates: list[Candidate]) ->
         candidates=tuple(ordered),
         text=text,
         url=url,
+        included_link=include_link,
     )
 
 
 def posts_for_candidates(
     scraped_at_utc: str,
     candidates: list[Candidate],
+    *,
+    link_available: bool,
 ) -> list[AlertPost]:
     grouped: dict[str, list[Candidate]] = {}
     for candidate in candidates:
         grouped.setdefault(candidate.target.airport, []).append(candidate)
-    return [
-        make_post(scraped_at_utc, airport, grouped[airport])
-        for airport in sorted(grouped)
-    ]
+    posts = []
+    for airport in sorted(grouped):
+        include_link = link_available and not posts
+        posts.append(
+            make_post(
+                scraped_at_utc,
+                airport,
+                grouped[airport],
+                include_link=include_link,
+            )
+        )
+    return posts
 
 
 def wait_rows_at(
@@ -321,6 +337,17 @@ def actual_alert_state(
     return state
 
 
+def last_production_link_at(conn: sqlite3.Connection) -> datetime | None:
+    row = conn.execute(
+        """
+        SELECT MAX(alerted_at_utc)
+        FROM tweet_alerts
+        WHERE is_test = 0 AND included_link = 1
+        """
+    ).fetchone()
+    return utc_from_iso(row[0]) if row and row[0] else None
+
+
 def preview_latest(
     conn: sqlite3.Connection,
     catalog: dict[str, dict],
@@ -340,7 +367,16 @@ def preview_latest(
         ]
     at = utc_from_iso(scraped_at_utc)
     eligible = eligible_candidates(candidates, at, actual_alert_state(conn, airport))
-    return posts_for_candidates(scraped_at_utc, eligible)
+    last_link_at = last_production_link_at(conn)
+    link_available = (
+        last_link_at is None
+        or datetime.now(timezone.utc) - last_link_at >= LINK_COOLDOWN
+    )
+    return posts_for_candidates(
+        scraped_at_utc,
+        eligible,
+        link_available=link_available,
+    )
 
 
 def historical_posts(
@@ -362,6 +398,7 @@ def historical_posts(
     sql += " ORDER BY scraped_at_utc"
 
     state: dict[Target, tuple[datetime, int]] = {}
+    last_link_at: datetime | None = None
     posts: list[AlertPost] = []
     for timestamp_row in conn.execute(sql, params):
         scraped_at_utc = str(timestamp_row[0])
@@ -371,8 +408,17 @@ def historical_posts(
         eligible = eligible_candidates(candidates, at, state)
         for candidate in eligible:
             state[candidate.target] = (at, candidate.threshold)
+        generated = posts_for_candidates(
+            scraped_at_utc,
+            eligible,
+            link_available=(
+                last_link_at is None or at - last_link_at >= LINK_COOLDOWN
+            ),
+        )
+        if any(post.included_link for post in generated):
+            last_link_at = at
         if at >= start:
-            posts.extend(posts_for_candidates(scraped_at_utc, eligible))
+            posts.extend(generated)
     return posts
 
 
@@ -428,11 +474,19 @@ def print_posts(posts: list[AlertPost]) -> None:
         print(f"Tweet ID: {post.post_id}")
         print(f"{post.scraped_at_utc} | {post.airport}")
         print(post.text)
+        print(
+            "[link included]"
+            if post.included_link
+            else "[text only: link used during the prior 7 days]"
+        )
         print(f"[{weighted_post_length(post.text, post.url)} weighted characters]")
 
 
 def print_summary(posts: list[AlertPost], days: int) -> None:
     print(f"Projected tweets: {len(posts)} over {days} days")
+    link_posts = sum(post.included_link for post in posts)
+    print(f"Link posts: {link_posts}")
+    print(f"Text-only posts: {len(posts) - link_posts}")
     counts = Counter(post.airport for post in posts)
     if counts:
         print("\nBy airport:")
@@ -481,9 +535,9 @@ def record_post(
             INSERT INTO tweet_alerts (
                 airport, terminal, gate, threshold_minutes, wait_minutes,
                 tweet_text, tweet_url, tweet_id, alerted_at_utc, scraped_at_utc,
-                source_post_id, is_test
+                source_post_id, is_test, included_link
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 candidate.target.airport,
@@ -498,6 +552,7 @@ def record_post(
                 post.scraped_at_utc,
                 post.post_id,
                 int(is_test),
+                int(post.included_link),
             ),
         )
     conn.commit()

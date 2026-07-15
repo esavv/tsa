@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS tweet_alerts (
     alerted_at_utc TEXT NOT NULL,
     scraped_at_utc TEXT NOT NULL,
     source_post_id TEXT,
-    is_test INTEGER NOT NULL DEFAULT 0
+    is_test INTEGER NOT NULL DEFAULT 0,
+    included_link INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_tweet_alerts_target_time
