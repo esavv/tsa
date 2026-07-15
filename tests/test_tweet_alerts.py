@@ -3,6 +3,7 @@ import sys
 import unittest
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from io import StringIO
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -192,7 +193,26 @@ class TweetAlertTests(unittest.TestCase):
         self.assertIn("Projected tweets: 2 over 7 days", output.getvalue())
         self.assertIn("Link posts: 1", output.getvalue())
         self.assertIn("Text-only posts: 1", output.getvalue())
-        self.assertIn("JFK  2", output.getvalue())
+        self.assertIn("Expected API cost: $0.215", output.getvalue())
+        self.assertIn("JFK", output.getvalue())
+        self.assertIn("2 tweets", output.getvalue())
+        self.assertIn("$0.215", output.getvalue())
+
+    def test_projected_cost_uses_link_and_text_rates(self):
+        link_post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=57)], self.catalog),
+            link_available=True,
+        )[0]
+        text_post = alerts.posts_for_candidates(
+            "2026-07-15T02:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=61)], self.catalog),
+            link_available=False,
+        )[0]
+
+        self.assertEqual(Decimal("0.200"), alerts.post_cost(link_post))
+        self.assertEqual(Decimal("0.015"), alerts.post_cost(text_post))
+        self.assertEqual(Decimal("0.215"), alerts.total_cost([link_post, text_post]))
 
     def test_cooldown_suppresses_same_threshold(self):
         candidate = alerts.candidates_for_rows([row(wait_minutes=49)], self.catalog)[0]

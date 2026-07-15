@@ -12,6 +12,7 @@ import sys
 from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from urllib.parse import urlencode
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,6 +29,8 @@ THRESHOLDS = (45, 60, 90)
 COOLDOWN = timedelta(hours=6)
 LINK_COOLDOWN = timedelta(days=7)
 X_URL_LENGTH = 23
+TEXT_POST_COST = Decimal("0.015")
+LINK_POST_COST = Decimal("0.200")
 
 
 @dataclass(frozen=True, order=True)
@@ -492,17 +495,34 @@ def print_posts(posts: list[AlertPost]) -> None:
         print(f"[{weighted_post_length(post.text, post.url)} weighted characters]")
 
 
+def post_cost(post: AlertPost) -> Decimal:
+    return LINK_POST_COST if post.included_link else TEXT_POST_COST
+
+
+def total_cost(posts: list[AlertPost]) -> Decimal:
+    return sum((post_cost(post) for post in posts), start=Decimal("0"))
+
+
+def format_cost(cost: Decimal) -> str:
+    return f"${cost:.3f}"
+
+
 def print_summary(posts: list[AlertPost], days: int) -> None:
     print(f"Projected tweets: {len(posts)} over {days} days")
     link_posts = sum(post.included_link for post in posts)
     print(f"Link posts: {link_posts}")
     print(f"Text-only posts: {len(posts) - link_posts}")
+    print(f"Expected API cost: {format_cost(total_cost(posts))}")
     counts = Counter(post.airport for post in posts)
     if counts:
         print("\nBy airport:")
         width = max(len(airport) for airport in counts)
         for airport in sorted(counts):
-            print(f"  {airport:<{width}}  {counts[airport]}")
+            airport_posts = [post for post in posts if post.airport == airport]
+            print(
+                f"  {airport:<{width}}  {counts[airport]:>3} tweets  "
+                f"{format_cost(total_cost(airport_posts)):>7}"
+            )
 
 
 def x_client():
@@ -672,6 +692,7 @@ def main() -> int:
             else:
                 print_posts(posts)
                 print(f"\nProjected tweets: {len(posts)} over {args.backtest_days} days")
+                print(f"Expected API cost: {format_cost(total_cost(posts))}")
         else:
             posts = preview_latest(conn, catalog, airport, live=args.live)
             if args.live:

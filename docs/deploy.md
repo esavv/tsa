@@ -161,7 +161,9 @@ includes airports with `tweet_alerts.enabled` set to `true` in
 
 Detailed dry-run and backtest output assigns each generated tweet a stable ID.
 It also identifies whether each post includes a link. Backtest summaries split
-the forecast into link and text-only posts in addition to per-airport totals.
+the forecast into link and text-only posts, calculate expected API cost at
+$0.200 per link post and $0.015 per text-only post, and break out tweet counts
+and costs per airport.
 To publish one enrolled airport's generated tweet as an explicit API test:
 
 ```bash
