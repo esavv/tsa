@@ -133,6 +133,43 @@ Optional: set `TSA_DB_PATH` in crontab if you want the DB elsewhere:
 */15 * * * * cd /path/to/tsa && TSA_DB_PATH=/path/to/tsa/tsa.db ./venv/bin/python scripts/run_scrape.py >> ...
 ```
 
+## X wait-time alerts
+
+The alert runner defaults to a safe dry run. It evaluates 45-, 60-, and
+90-minute thresholds with a six-hour per-terminal cooldown:
+
+```bash
+./venv/bin/python scripts/run_tweet_alerts.py --dry-run
+./venv/bin/python scripts/run_tweet_alerts.py --dry-run --airport JFK
+./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7
+./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7 --airport JFK
+```
+
+Dry runs and backtests evaluate all supported airports. Live posting only
+includes airports with `tweet_alerts.enabled` set to `true` in
+`data/airports.json`.
+
+Live posting requires these OAuth 1.0a credentials:
+
+```bash
+X_CONSUMER_KEY=...
+X_CONSUMER_SECRET=...
+X_ACCESS_TOKEN=...
+X_ACCESS_TOKEN_SECRET=...
+```
+
+Store credentials outside the repository. To run alerts after each successful
+scrape, load the credentials from an owner-readable environment file rather
+than placing their values directly in crontab, then use:
+
+```cron
+*/15 * * * * cd /path/to/tsa && (set -a && . /path/to/x-alerts.env && set +a && ./venv/bin/python scripts/run_scrape.py && ./venv/bin/python scripts/run_tweet_alerts.py --live) >> /path/to/tsa/logs/cron.log 2>&1
+```
+
+The live command is the only mode that calls X or writes to `tweet_alerts`.
+Each successfully published post is recorded once per included chart target so
+subsequent runs can enforce cooldowns.
+
 ## Querying the data
 
 ```bash
