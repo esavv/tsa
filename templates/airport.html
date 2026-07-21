@@ -1713,9 +1713,6 @@
       }
       const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
       if (hours === 6 || hours === 12 || hours === 24) {
-        if (dateObj.getHours() === 0 && dateObj.getMinutes() === 0) {
-          return datePart + ' ' + timePart;
-        }
         return timePart;
       }
       return datePart + ' ' + timePart;
