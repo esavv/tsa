@@ -47,6 +47,8 @@ def migrate_wait_times_add_gate(conn: sqlite3.Connection) -> None:
         ALTER TABLE wait_times_new RENAME TO wait_times;
         CREATE INDEX IF NOT EXISTS idx_wait_times_scraped ON wait_times(scraped_at_utc);
         CREATE INDEX IF NOT EXISTS idx_wait_times_airport_terminal ON wait_times(airport, terminal);
+        CREATE INDEX IF NOT EXISTS idx_wait_times_history
+            ON wait_times(airport, terminal, gate, scraped_at_utc);
         """
     )
 
@@ -106,6 +108,8 @@ def migrate_wait_times_nullable_wait_minutes(conn: sqlite3.Connection) -> None:
         ALTER TABLE wait_times_new RENAME TO wait_times;
         CREATE INDEX IF NOT EXISTS idx_wait_times_scraped ON wait_times(scraped_at_utc);
         CREATE INDEX IF NOT EXISTS idx_wait_times_airport_terminal ON wait_times(airport, terminal);
+        CREATE INDEX IF NOT EXISTS idx_wait_times_history
+            ON wait_times(airport, terminal, gate, scraped_at_utc);
         """
     )
 
