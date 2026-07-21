@@ -43,6 +43,23 @@
     .airport-section { margin-bottom: 2rem; }
     .airport-section h2 { margin-bottom: 0.5rem; }
     .chart-container { position: relative; height: 280px; margin: 1rem 0; }
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+      padding: 1rem 0;
+    }
+    .social-links a {
+      display: inline-flex;
+      color: #888;
+    }
+    .social-links a:hover { color: #0066cc; }
+    .social-links svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
   </style>
   {% block head %}{% endblock %}
   <script>
@@ -56,8 +73,17 @@
 </head>
 <body>
   {% block body %}{% endblock %}
-  <footer style="margin-top: 1rem; padding: 1rem 0; text-align: center; color: #888; font-size: 0.85rem;">
-    Feedback? Email <a href="mailto:info@tsa-times.com" style="color: #0066cc;">info@tsa-times.com</a>
+  <footer class="social-links" aria-label="Social links">
+    <a href="https://x.com/tsatimez/" target="_blank" rel="noopener noreferrer" aria-label="Follow TSA Times on X" title="Follow TSA Times on X">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"/>
+      </svg>
+    </a>
+    <a href="mailto:info@tsa-times.com" aria-label="Email TSA Times" title="Email TSA Times">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5-8-5V6l8 5 8-5v2Z"/>
+      </svg>
+    </a>
   </footer>
 </body>
 </html>
