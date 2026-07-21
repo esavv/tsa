@@ -744,7 +744,8 @@
     .chart-area-wrap .range-group {
       margin-bottom: 0;
     }
-    .range-btn {
+    .range-btn,
+    .chart-legend__button {
       border: 1px solid #d0d7e2;
       border-radius: 999px;
       background: #fff;
@@ -845,7 +846,8 @@
       .range-group {
         gap: 0.16rem;
       }
-      .range-btn {
+      .range-btn,
+      .chart-legend__button {
         font-size: 0.78rem;
         padding: 0.19rem 0.46rem;
       }
@@ -863,7 +865,7 @@
       flex-wrap: wrap;
       justify-content: flex-end;
       align-items: center;
-      gap: 0.5rem 1.1rem;
+      gap: 0.35rem;
       margin-top: 0.4rem;
       font-size: 0.8125rem;
       color: #334155;
@@ -879,7 +881,7 @@
         box-sizing: border-box;
         justify-content: flex-end;
         align-content: flex-end;
-        gap: 0.22rem 0.42rem;
+        gap: 0.16rem;
       }
     }
     @media (min-width: 769px) {
@@ -898,22 +900,17 @@
     .chart-legend[hidden] {
       display: none !important;
     }
-    .chart-legend__row {
-      flex: 0 0 auto;
-    }
-    .chart-legend__label {
+    .chart-legend__button {
       display: inline-flex;
       align-items: center;
       gap: 0.35rem 0.45rem;
-      cursor: pointer;
       user-select: none;
       margin: 0;
       font-weight: 400;
+      flex: 0 0 auto;
     }
-    .chart-legend__cb {
-      margin: 0;
-      flex-shrink: 0;
-      accent-color: #334155;
+    .chart-legend__button[aria-pressed="true"] {
+      background: var(--chart-legend-active-bg, #e2e8f0);
     }
     .chart-legend__swatch {
       display: inline-block;
@@ -926,7 +923,7 @@
       line-height: 1.2;
     }
     @media (max-width: 768px) {
-      .chart-legend .chart-legend__label {
+      .chart-legend .chart-legend__button {
         gap: 0.28rem 0.35rem;
       }
     }
@@ -1782,6 +1779,11 @@
       return '#334155';
     }
 
+    function chartLegendTintForDataset(ds) {
+      if (typeof ds.legendTintColor === 'string') return ds.legendTintColor;
+      return 'rgba(51,65,85,0.14)';
+    }
+
     /** Legend-only copy: shorter PreCheck wording than dataset labels used elsewhere. */
     function formatChartHtmlLegendText(rawLabel) {
       return String(rawLabel).replace(/\bTSA PreCheck\b/g, 'PreCheck');
@@ -1807,18 +1809,16 @@
             : 'Dataset ' + i;
         const label = formatChartHtmlLegendText(rawLabel);
         const stroke = chartLegendStrokeForDataset(ds);
-        const row = document.createElement('div');
-        row.className = 'chart-legend__row';
-        const lbl = document.createElement('label');
-        lbl.className = 'chart-legend__label';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.className = 'chart-legend__cb';
-        cb.checked = chartRef.isDatasetVisible(i);
-        cb.dataset.datasetIndex = String(i);
-        cb.addEventListener('change', function () {
-          const di = Number(cb.dataset.datasetIndex);
-          const show = cb.checked;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'chart-legend__button';
+        button.dataset.datasetIndex = String(i);
+        button.style.setProperty('--chart-legend-active-bg', chartLegendTintForDataset(ds));
+        const visible = chartRef.isDatasetVisible(i);
+        button.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        button.addEventListener('click', function () {
+          const di = Number(button.dataset.datasetIndex);
+          const show = button.getAttribute('aria-pressed') !== 'true';
           const dds = chartRef.data.datasets[di];
           if (dds.rangeBandHigh && dds.rangeBandLowIndex != null) {
             chartRef.setDatasetVisibility(di, show);
@@ -1826,6 +1826,7 @@
           } else {
             chartRef.setDatasetVisibility(di, show);
           }
+          button.setAttribute('aria-pressed', show ? 'true' : 'false');
           chartRef.update();
         });
         const swatch = document.createElement('span');
@@ -1835,11 +1836,9 @@
         const text = document.createElement('span');
         text.className = 'chart-legend__text';
         text.textContent = label;
-        lbl.appendChild(swatch);
-        lbl.appendChild(text);
-        lbl.appendChild(cb);
-        row.appendChild(lbl);
-        chartLegendEl.appendChild(row);
+        button.appendChild(swatch);
+        button.appendChild(text);
+        chartLegendEl.appendChild(button);
       }
       if (!anyEntry) {
         chartLegendEl.innerHTML = '';
@@ -1997,6 +1996,7 @@
             rangeBandHigh: true,
             rangeBandLowIndex: lowIdx,
             crosshairDotColor: lineRgb,
+            legendTintColor: chartHexToRgba(paletteHex, 0.14),
             queueTypeKey: next.qt,
             seriesKind: next.kind,
             parsing: false,
@@ -2029,6 +2029,7 @@
           label: def.legend,
           rangeLegendSkip: false,
           crosshairDotColor: lineColor,
+          legendTintColor: chartHexToRgba(paletteHex, 0.14),
           queueTypeKey: def.qt,
           seriesKind: def.kind,
           parsing: false,
