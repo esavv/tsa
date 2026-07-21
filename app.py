@@ -2,6 +2,7 @@
 """Simple webapp: latest wait times + 24h terminal history charts."""
 import html
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -146,6 +147,7 @@ AIRPORT_CODES = frozenset(
 )
 
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
+app.logger.setLevel(logging.INFO)
 
 
 def get_db():
@@ -398,6 +400,7 @@ def api_latest():
 @app.route("/api/history")
 def api_history():
     """History for one airport + terminal (+ optional gate). Returns queues keyed by queue_type."""
+    request_started = time.perf_counter()
     airport = request.args.get("airport")
     terminal = request.args.get("terminal")
     if not airport or not terminal:
@@ -414,15 +417,33 @@ def api_history():
     if hours not in allowed_hours:
         return jsonify(error="hours must be one of 6, 12, 24, 72, 168"), 400
 
+    global_latest_started = time.perf_counter()
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
         "SELECT scraped_at_utc FROM wait_times ORDER BY scraped_at_utc DESC LIMIT 1"
     )
     global_latest_row = cur.fetchone()
+    global_latest_ms = (time.perf_counter() - global_latest_started) * 1000
     if not global_latest_row:
         conn.close()
-        return jsonify(queues={}, latest_scraped_at_utc=None)
+        response = jsonify(queues={}, latest_scraped_at_utc=None)
+        total_ms = (time.perf_counter() - request_started) * 1000
+        response.headers["Server-Timing"] = (
+            f"global_latest;dur={global_latest_ms:.1f}, total;dur={total_ms:.1f}"
+        )
+        app.logger.info(
+            "api_history_duration airport=%s terminal=%r gate=%r hours=%s "
+            "global_latest_ms=%.1f target_latest_ms=0.0 history_query_ms=0.0 "
+            "rows=0 total_ms=%.1f",
+            ap,
+            terminal,
+            gate,
+            hours,
+            global_latest_ms,
+            total_ms,
+        )
+        return response
 
     global_latest_iso = global_latest_row[0]
     gl = global_latest_iso[:-1] + "+00:00" if global_latest_iso.endswith("Z") else global_latest_iso
@@ -430,6 +451,7 @@ def api_history():
     since_dt = global_latest_dt - timedelta(hours=int(hours))
     since = since_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    target_latest_started = time.perf_counter()
     cur.execute(
         """
         SELECT scraped_at_utc
@@ -441,8 +463,10 @@ def api_history():
         (ap, terminal, gate),
     )
     latest_row = cur.fetchone()
+    target_latest_ms = (time.perf_counter() - target_latest_started) * 1000
     latest_scraped_at_utc = latest_row[0] if latest_row else None
 
+    history_query_started = time.perf_counter()
     cur.execute(
         """
         SELECT scraped_at_utc, queue_type, wait_minutes,
@@ -454,6 +478,7 @@ def api_history():
         (ap, terminal, gate, since),
     )
     rows = cur.fetchall()
+    history_query_ms = (time.perf_counter() - history_query_started) * 1000
     conn.close()
 
     queues: dict[str, list[dict]] = {}
@@ -468,10 +493,31 @@ def api_history():
             queues[queue_type] = []
         queues[queue_type].append(point)
 
-    return jsonify(
+    response = jsonify(
         queues=queues,
         latest_scraped_at_utc=latest_scraped_at_utc,
     )
+    total_ms = (time.perf_counter() - request_started) * 1000
+    response.headers["Server-Timing"] = (
+        f"global_latest;dur={global_latest_ms:.1f}, "
+        f"target_latest;dur={target_latest_ms:.1f}, "
+        f"history_query;dur={history_query_ms:.1f}, total;dur={total_ms:.1f}"
+    )
+    app.logger.info(
+        "api_history_duration airport=%s terminal=%r gate=%r hours=%s "
+        "global_latest_ms=%.1f target_latest_ms=%.1f history_query_ms=%.1f "
+        "rows=%d total_ms=%.1f",
+        ap,
+        terminal,
+        gate,
+        hours,
+        global_latest_ms,
+        target_latest_ms,
+        history_query_ms,
+        len(rows),
+        total_ms,
+    )
+    return response
 
 
 if __name__ == "__main__":
