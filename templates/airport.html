@@ -339,6 +339,9 @@
       font-weight: 400;
     }
     .airport-locale-inline-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.35rem;
       font-size: 0.78rem;
       line-height: 1.35;
       margin-top: 0;
@@ -349,9 +352,8 @@
     .airport-last-update-inline {
       display: none;
     }
-    /* Desktop: hide whole row when no city/state (last update stays below tabs). */
     .airport-locale-inline-row--solo {
-      display: none;
+      display: flex;
     }
     #last-scraped-at {
       font-size: 0.78rem;
@@ -440,6 +442,9 @@
         margin-top: 0;
         min-width: 0;
         flex: 1 1 auto;
+      }
+      .airport-locale-separator {
+        display: none;
       }
       .airport-last-update-inline {
         display: block;
@@ -1046,13 +1051,14 @@
         >
           {% if airport_locale_line %}
             <span class="airport-page-heading__locale">{{ airport_locale_line }}</span>
+            <span class="airport-locale-separator" aria-hidden="true">•</span>
           {% endif %}
+          <span id="last-scraped-at"></span>
           <span class="airport-last-update-inline" id="last-scraped-inline"></span>
         </div>
         <div class="tab-row-scroll">
           <div id="tab-row" class="tab-row" role="tablist" aria-label="Terminals"></div>
         </div>
-        <p class="muted" id="last-scraped-at"></p>
         <div class="chart-area-wrap" id="chart-area-wrap">
           <div id="chart-legend" class="chart-legend" role="group" aria-label="Show or hide chart series" hidden></div>
           <div class="chart-ctrl-strip">
