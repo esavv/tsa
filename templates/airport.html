@@ -1679,18 +1679,29 @@
     function shouldShowTick(dateObj, hours) {
       const minute = dateObj.getMinutes();
       const hour = dateObj.getHours();
+      if (minute !== 0) return false;
       if (touchChartUi()) {
-        if (hours === 6) return minute === 0;
-        if (hours === 12) return minute === 0 && hour % 2 === 0;
-        if (hours === 24) return minute === 0 && hour % 3 === 0;
-        if (hours === 72) return minute === 0 && (hour === 0 || hour === 12);
-        if (hours === 168) return minute === 0 && hour === 0;
+        if (hours === 6) return hour % 2 === 0;
+        if (hours === 12) return hour % 4 === 0;
+        if (hours === 24) return hour % 6 === 0;
+        if (hours === 72) return hour === 0;
+        if (hours === 168) {
+          if (hour !== 0) return false;
+          // Use the local calendar date so DST does not shift a 48-hour tick away from midnight.
+          const localDay = Math.floor(Date.UTC(
+            dateObj.getFullYear(),
+            dateObj.getMonth(),
+            dateObj.getDate()
+          ) / 86400000);
+          return localDay % 2 === 0;
+        }
         return false;
       }
-      if (hours === 6) return minute === 0 || minute === 30;
-      if (hours === 12 || hours === 24) return minute === 0;
-      if (hours === 72) return minute === 0 && (hour % 6 === 0);
-      if (hours === 168) return minute === 0 && (hour % 12 === 0);
+      if (hours === 6) return true;
+      if (hours === 12) return hour % 2 === 0;
+      if (hours === 24) return hour % 3 === 0;
+      if (hours === 72) return hour % 12 === 0;
+      if (hours === 168) return hour === 0;
       return false;
     }
 
@@ -2092,8 +2103,8 @@
               },
               ticks: {
                 autoSkip: false,
-                minRotation: 45,
-                maxRotation: 45,
+                minRotation: 0,
+                maxRotation: 0,
                 callback: function (value, index, ticks) {
                   const tick = ticks[index];
                   const ms = tick != null && tick.value != null ? tick.value : value;
