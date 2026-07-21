@@ -420,16 +420,17 @@
     function setOpen(v) {
       open = v;
       input.setAttribute('aria-expanded', v ? 'true' : 'false');
+      var reduceMotion = mqReduceMotion && mqReduceMotion.matches;
+      var instantTransition = reduceMotion || mqSearchMobile.matches;
       if (v && scrim && scrim.hidden) {
         scrim.hidden = false;
-        void scrim.offsetWidth;
+        if (!instantTransition) void scrim.offsetWidth;
       }
       document.body.classList.toggle('airport-search-active', v);
       if (!v && scrim) scrim.hidden = true;
       if (!v) activeIndex = -1;
 
-      var reduceMotion = mqReduceMotion && mqReduceMotion.matches;
-      if (reduceMotion) {
+      if (instantTransition) {
         panel.classList.remove('airport-search-panel--suppress-transition');
         if (v) {
           panel.hidden = false;
