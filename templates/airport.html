@@ -1426,11 +1426,10 @@
               if (Array.isArray(curvePoint)) curvePoint = curvePoint[0];
               if (!curvePoint || !isFinite(curvePoint.y)) continue;
               const curveY = Math.max(chartArea.top, Math.min(chartArea.bottom, curvePoint.y));
-              const fillHeight = chartArea.bottom - curveY;
-              if (fillHeight <= DOTTED_FILL_SPACING) continue;
               let y = Math.ceil((curveY + 1) / DOTTED_FILL_SPACING) * DOTTED_FILL_SPACING;
               for (; y < chartArea.bottom; y += DOTTED_FILL_SPACING) {
-                const strength = (chartArea.bottom - y) / fillHeight;
+                // Every horizontal row has one opacity; the series only clips the dot field.
+                const strength = (chartArea.bottom - y) / chartArea.height;
                 if (strength <= 0) continue;
                 const bin = Math.min(
                   DOTTED_FILL_ALPHA_LEVELS - 1,
