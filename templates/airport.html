@@ -1116,8 +1116,10 @@
       '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626', '#0891b2', '#4f46e5',
       '#db2777', '#0d9488', '#7c3aed',
     ];
-    /** Area under absolute curves: same hue as the line, low alpha. */
-    const ABS_AREA_FILL_ALPHA = 0.1;
+    const DOTTED_FILL_SPACING = 4;
+    const DOTTED_FILL_RADIUS = 0.65;
+    const DOTTED_FILL_MAX_ALPHA = 0.42;
+    const DOTTED_FILL_ALPHA_LEVELS = 8;
 
     function parseChartHexColor(hex) {
       if (!hex || typeof hex !== 'string' || !/^#([0-9a-fA-F]{6})$/.test(hex)) {
@@ -1170,8 +1172,8 @@
     const GAP_BREAK_MS = 45 * 60 * 1000;
 
     /**
-     * Per-segment line (and optional area) styling: hide across time gaps longer than GAP_BREAK_MS.
-     * Used for absolute area fill and range band fill so closed-checkpoint gaps stay empty.
+     * Per-segment styling: hide lines and optional range-band fill across long time gaps.
+     * The dotted absolute fill plugin reads the same transparent segment boundaries.
      */
     function makeGapBreakSegment(lineColor, segmentFill) {
       const out = {
@@ -1391,6 +1393,74 @@
       }
     });
 
+    const dottedFadeFillPlugin = {
+      id: 'dottedFadeFill',
+      beforeDatasetsDraw(chartRef) {
+        const { ctx, chartArea } = chartRef;
+        if (!chartArea) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+        ctx.clip();
+
+        for (let di = 0; di < chartRef.data.datasets.length; di++) {
+          const ds = chartRef.data.datasets[di];
+          if (!ds.dottedFadeFillColor || !chartRef.isDatasetVisible(di)) continue;
+          const line = chartRef.getDatasetMeta(di).dataset;
+          if (!line || !line.points || line.points.length < 2) continue;
+          const { r, g, b } = parseChartHexColor(ds.dottedFadeFillColor);
+          const dotBins = Array.from({ length: DOTTED_FILL_ALPHA_LEVELS }, function () {
+            return [];
+          });
+
+          for (const segment of line.segments || []) {
+            if (segment.style && segment.style.borderColor === 'transparent') continue;
+            const firstPoint = line.points[segment.start];
+            const lastPoint = line.points[segment.end];
+            if (!firstPoint || !lastPoint || firstPoint.skip || lastPoint.skip) continue;
+            const xStart = Math.max(chartArea.left, Math.min(firstPoint.x, lastPoint.x));
+            const xEnd = Math.min(chartArea.right, Math.max(firstPoint.x, lastPoint.x));
+            let x = Math.ceil(xStart / DOTTED_FILL_SPACING) * DOTTED_FILL_SPACING;
+            for (; x <= xEnd; x += DOTTED_FILL_SPACING) {
+              let curvePoint = line.interpolate({ x: x }, 'x');
+              if (Array.isArray(curvePoint)) curvePoint = curvePoint[0];
+              if (!curvePoint || !isFinite(curvePoint.y)) continue;
+              const curveY = Math.max(chartArea.top, Math.min(chartArea.bottom, curvePoint.y));
+              const fillHeight = chartArea.bottom - curveY;
+              if (fillHeight <= DOTTED_FILL_SPACING) continue;
+              let y = Math.ceil((curveY + 1) / DOTTED_FILL_SPACING) * DOTTED_FILL_SPACING;
+              for (; y < chartArea.bottom; y += DOTTED_FILL_SPACING) {
+                const strength = (chartArea.bottom - y) / fillHeight;
+                if (strength <= 0) continue;
+                const bin = Math.min(
+                  DOTTED_FILL_ALPHA_LEVELS - 1,
+                  Math.floor(strength * DOTTED_FILL_ALPHA_LEVELS)
+                );
+                dotBins[bin].push(x, y);
+              }
+            }
+          }
+
+          for (let bin = 0; bin < dotBins.length; bin++) {
+            const dots = dotBins[bin];
+            if (!dots.length) continue;
+            const alpha =
+              DOTTED_FILL_MAX_ALPHA * ((bin + 0.5) / DOTTED_FILL_ALPHA_LEVELS);
+            ctx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+            ctx.beginPath();
+            for (let pi = 0; pi < dots.length; pi += 2) {
+              const x = dots[pi];
+              const y = dots[pi + 1];
+              ctx.moveTo(x + DOTTED_FILL_RADIUS, y);
+              ctx.arc(x, y, DOTTED_FILL_RADIUS, 0, Math.PI * 2);
+            }
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      },
+    };
+
     const readoutCrosshairPlugin = {
       id: 'readoutCrosshair',
       afterDatasetsDraw(chartRef) {
@@ -1435,7 +1505,7 @@
         ctx.restore();
       }
     };
-    Chart.register(readoutCrosshairPlugin);
+    Chart.register(dottedFadeFillPlugin, readoutCrosshairPlugin);
 
     function hideCallout() {
       calloutEl.style.display = 'none';
@@ -2021,15 +2091,13 @@
 
         const lineColor = paletteHex;
         const absAreaFill = def.kind === 'absolute';
-        const fillCol = absAreaFill
-          ? chartHexToRgba(paletteHex, ABS_AREA_FILL_ALPHA)
-          : 'transparent';
-        const seg = makeGapBreakSegment(lineColor, absAreaFill ? fillCol : null);
+        const seg = makeGapBreakSegment(lineColor);
         datasets.push({
           label: def.legend,
           rangeLegendSkip: false,
           crosshairDotColor: lineColor,
           legendTintColor: chartHexToRgba(paletteHex, 0.14),
+          dottedFadeFillColor: absAreaFill ? paletteHex : null,
           queueTypeKey: def.qt,
           seriesKind: def.kind,
           parsing: false,
@@ -2039,10 +2107,10 @@
           }),
           borderColor: lineColor,
           borderWidth: 2,
-          backgroundColor: absAreaFill ? fillCol : 'transparent',
+          backgroundColor: 'transparent',
           pointRadius: 0,
           pointHoverRadius: 5,
-          fill: absAreaFill,
+          fill: false,
           tension: 0.2,
           spanGaps: false,
           segment: seg,
@@ -2083,13 +2151,16 @@
           },
           scales: {
             y: {
-              beginAtZero: true
+              beginAtZero: true,
+              grid: { display: false, drawBorder: false },
+              border: { display: false }
             },
             x: {
               type: 'time',
               min: tMin,
               max: tMax,
               grid: { display: false, drawBorder: false },
+              border: { display: false },
               // Must be on the scale, not under ticks — Chart only calls options.afterBuildTicks.
               afterBuildTicks: function (axis) {
                 const bw = chartBuild.bounds;
