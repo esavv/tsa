@@ -153,6 +153,9 @@
       pointer-events: none;
       transition: opacity 0.2s ease;
     }
+    .airport-search-scrim[hidden] {
+      display: none;
+    }
     body.airport-search-active .airport-search-scrim {
       opacity: 1;
       pointer-events: auto;
@@ -193,6 +196,13 @@
         transition: none;
       }
     }
+    @media (min-width: 769px) {
+      .airport-search-panel {
+        left: auto;
+        right: 0;
+        width: min(calc(100vw - 2rem), 948px);
+      }
+    }
     @media (max-width: 768px) {
       .airport-page-header {
         align-items: center;
@@ -210,6 +220,9 @@
         top: 0;
         right: 0;
         width: 100%;
+      }
+      body.airport-search-active .airport-brand {
+        visibility: hidden;
       }
       body.airport-search-active .airport-search {
         padding-right: 2.55rem;
@@ -1182,7 +1195,7 @@
         <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
       </div>
     </div>
-    <div class="airport-search-scrim" id="airport-search-scrim" aria-hidden="true"></div>
+    <div class="airport-search-scrim" id="airport-search-scrim" aria-hidden="true" hidden></div>
   </main>
   <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
   <script src="{{ url_for('static', filename='queue_wait_line.js') }}"></script>
@@ -2552,6 +2565,7 @@
       var list = document.getElementById('airport-search-results');
       var root = document.getElementById('airport-search-wrap');
       var closeButton = document.getElementById('airport-search-close');
+      var scrim = document.getElementById('airport-search-scrim');
       if (!inp || !panel || !list || !root) return;
       initTsaAirportSearch({
         input: inp,
@@ -2559,6 +2573,7 @@
         list: list,
         root: root,
         closeButton: closeButton,
+        scrim: scrim,
       });
     });
   </script>

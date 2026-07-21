@@ -376,6 +376,7 @@
    * @param {HTMLElement} opts.list
    * @param {HTMLElement} [opts.root]
    * @param {HTMLButtonElement} [opts.closeButton]
+   * @param {HTMLElement} [opts.scrim]
    * @param {number} [opts.maxResults]
    */
   function initTsaAirportSearch(opts) {
@@ -384,6 +385,7 @@
     var list = opts.list;
     var root = opts.root || input.parentElement;
     var closeButton = opts.closeButton || null;
+    var scrim = opts.scrim || null;
     var maxResults = opts.maxResults || DEFAULT_MAX_RESULTS;
 
     var rows = [];
@@ -418,7 +420,12 @@
     function setOpen(v) {
       open = v;
       input.setAttribute('aria-expanded', v ? 'true' : 'false');
+      if (v && scrim && scrim.hidden) {
+        scrim.hidden = false;
+        void scrim.offsetWidth;
+      }
       document.body.classList.toggle('airport-search-active', v);
+      if (!v && scrim) scrim.hidden = true;
       if (!v) activeIndex = -1;
 
       var reduceMotion = mqReduceMotion && mqReduceMotion.matches;
