@@ -374,12 +374,16 @@
    * @param {HTMLInputElement} opts.input
    * @param {HTMLElement} opts.panel
    * @param {HTMLElement} opts.list
+   * @param {HTMLElement} [opts.root]
+   * @param {HTMLButtonElement} [opts.closeButton]
    * @param {number} [opts.maxResults]
    */
   function initTsaAirportSearch(opts) {
     var input = opts.input;
     var panel = opts.panel;
     var list = opts.list;
+    var root = opts.root || input.parentElement;
+    var closeButton = opts.closeButton || null;
     var maxResults = opts.maxResults || DEFAULT_MAX_RESULTS;
 
     var rows = [];
@@ -414,6 +418,7 @@
     function setOpen(v) {
       open = v;
       input.setAttribute('aria-expanded', v ? 'true' : 'false');
+      document.body.classList.toggle('airport-search-active', v);
       if (!v) activeIndex = -1;
 
       var reduceMotion = mqReduceMotion && mqReduceMotion.matches;
@@ -612,11 +617,24 @@
       }
     });
 
+    if (closeButton) {
+      closeButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        input.value = '';
+        matchOrderState.prevSetKey = null;
+        matchOrderState.prevOrder = [];
+        setOpen(false);
+        input.blur();
+      });
+    }
+
     document.addEventListener('click', function (e) {
       if (!open) return;
       var t = e.target;
-      if (panel.contains(t) || input === t || input.contains(t)) return;
+      if (panel.contains(t) || (root && root.contains(t))) return;
       setOpen(false);
+      input.blur();
     });
 
     function searchShortcutIgnoresTarget(el) {

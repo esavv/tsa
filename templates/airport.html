@@ -33,20 +33,42 @@
       width: 100%;
       max-width: 100%;
     }
-    .airport-cluster > h1 {
+    .airport-page-header {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+      min-height: 3.2rem;
+      margin-bottom: 1rem;
+    }
+    .airport-brand {
+      min-width: 0;
+    }
+    .airport-brand > h1 {
+      margin-top: 0;
       margin-bottom: 0.25rem;
       line-height: 1.15;
     }
     .airport-subhead {
       margin-top: 0;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0;
     }
     .airport-search-wrap {
-      margin: 0.75rem 0 1rem;
+      position: relative;
+      flex: 0 0 auto;
+      width: 11.5rem;
+      margin-left: auto;
+      z-index: 1;
+      transition: width 0.24s ease;
+    }
+    body.airport-search-active .airport-search-wrap {
+      width: clamp(20rem, 45vw, 30rem);
+      z-index: 70;
     }
     .airport-search-field {
       position: relative;
-      max-width: min(30rem, 100%);
+      width: 100%;
     }
     .airport-search__icon {
       position: absolute;
@@ -66,75 +88,137 @@
     .airport-search {
       width: 100%;
       max-width: 100%;
-      padding: 0.45rem 0.65rem 0.45rem 2.45rem;
+      padding: 0.45rem 0.75rem 0.45rem 2.45rem;
       /* min 16px: iOS Safari zooms focused inputs when font-size is under 16px */
       font-size: max(16px, 0.95rem);
-      border: 1px solid #ccc;
+      border: 1px solid #cbd5e1;
       border-radius: 9999px;
       background: #f9fafb;
       color: #0f172a;
+      outline: none;
+      transition:
+        border-color 0.16s ease,
+        background-color 0.16s ease,
+        box-shadow 0.16s ease,
+        padding 0.24s ease;
+    }
+    .airport-search-field:hover .airport-search {
+      background: #fff;
+      border-color: #94a3b8;
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+    }
+    .airport-search:focus {
+      background: #fff;
+      border-color: #64748b;
+      box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.18);
     }
     .airport-search::placeholder {
       color: #64748b;
+    }
+    .airport-search::-webkit-search-cancel-button {
+      appearance: none;
+    }
+    .airport-search-close {
+      display: none;
+      position: absolute;
+      right: 0.35rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2rem;
+      height: 2rem;
+      padding: 0.45rem;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #475569;
+      cursor: pointer;
+    }
+    .airport-search-close:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .airport-search-close svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .airport-search-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: rgba(15, 23, 42, 0.42);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    body.airport-search-active .airport-search-scrim {
+      opacity: 1;
+      pointer-events: auto;
     }
     .airport-search-panel {
       position: absolute;
       left: 0;
       right: 0;
-      /* Only applies when the panel is anchored under the field (not chart-overlay). */
-      top: calc(100% + 4px);
-      z-index: 40;
+      top: calc(100% + 0.4rem);
+      z-index: 80;
       background: #fff;
       border: 1px solid #d0d7e2;
       border-radius: 10px;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
-      max-height: min(340px, 55vh);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+      max-height: min(420px, 68vh);
       overflow-y: auto;
+      opacity: 0;
+      transform: translateY(-0.3rem);
+      transition:
+        opacity 0.18s ease,
+        transform 0.18s ease;
+    }
+    .airport-search-panel.airport-search-panel--open {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .airport-search-panel.airport-search-panel--suppress-transition {
+      transition: none !important;
     }
     .airport-below-search {
       position: relative;
     }
-    .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
-      left: 0;
-      right: 0;
-      /* Pull up into the margin below the search field so the dropdown sits closer to the
-         input without changing .airport-search-wrap margins (which set space to the title). */
-      top: -0.5rem;
-      bottom: auto;
-      height: auto;
-      max-height: 100%;
-      margin: 0;
-      border-radius: 10px;
-      z-index: 50;
-      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
-      overflow-y: auto;
-      /* Open-only motion: tune via --airport-search-panel-reveal-* (close is instant in JS). */
-      --airport-search-panel-reveal-duration: 0.18s;
-      --airport-search-panel-reveal-ease: linear;
-      opacity: 0;
-      clip-path: inset(0 0 100% 0);
-      transition: clip-path var(--airport-search-panel-reveal-duration)
-          var(--airport-search-panel-reveal-ease),
-        opacity var(--airport-search-panel-reveal-duration) var(--airport-search-panel-reveal-ease);
-    }
-    .airport-below-search
-      > .airport-search-panel.airport-search-panel--chart-overlay.airport-search-panel--open {
-      opacity: 1;
-      clip-path: inset(0);
-    }
-    .airport-below-search
-      > .airport-search-panel.airport-search-panel--chart-overlay.airport-search-panel--suppress-transition {
-      transition: none !important;
-    }
     @media (prefers-reduced-motion: reduce) {
-      .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
+      .airport-search-wrap,
+      .airport-search,
+      .airport-search-panel,
+      .airport-search-scrim {
         transition: none;
       }
     }
     @media (max-width: 768px) {
-      .airport-below-search > .airport-search-panel.airport-search-panel--chart-overlay {
-        /* Past 100% alone (same as parent height); extend downward, capped to viewport */
-        max-height: min(calc(100% + 1rem), 92vh);
+      .airport-page-header {
+        align-items: center;
+        min-height: 2.35rem;
+        margin-bottom: 0.95rem;
+      }
+      .airport-brand > h1 {
+        white-space: nowrap;
+      }
+      .airport-search-wrap {
+        width: 10.75rem;
+      }
+      body.airport-search-active .airport-search-wrap {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100%;
+      }
+      body.airport-search-active .airport-search {
+        padding-right: 2.55rem;
+      }
+      body.airport-search-active .airport-search-close {
+        display: inline-flex;
+      }
+      .airport-search-panel {
+        max-height: min(560px, calc(100vh - 5.25rem));
       }
     }
     .airport-search-results {
@@ -375,12 +459,9 @@
       .airport-subhead {
         display: none;
       }
-      .airport-cluster > h1 {
+      .airport-brand > h1 {
         font-size: 1.35rem;
-        margin-bottom: 0.12rem;
-      }
-      .airport-search-wrap {
-        margin: 0.3rem 0 0.95rem;
+        margin-bottom: 0;
       }
       .airport-page-heading {
         margin-bottom: 0.15rem;
@@ -1021,27 +1102,44 @@
 {% block body %}
   <main class="airport-layout">
     <div class="airport-cluster">
-      <h1>TSA Wait Times</h1>
-      <p class="muted airport-subhead">Security line wait times at major US airports</p>
-      <div class="airport-search-wrap">
-        <div class="airport-search-field">
-          <span class="airport-search__icon" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <circle cx="11" cy="11" r="7"/>
-              <path d="m21 21-4.3-4.3"/>
-            </svg>
-          </span>
-          <input
-            type="search"
-            class="airport-search"
-            id="airport-search"
-            disabled
-            placeholder="Search airports"
-            aria-label="Search airports"
-            aria-expanded="false"
-          />
+      <header class="airport-page-header">
+        <div class="airport-brand">
+          <h1>TSA Wait Times</h1>
+          <p class="muted airport-subhead">Security line wait times at major US airports</p>
         </div>
-      </div>
+        <div class="airport-search-wrap" id="airport-search-wrap">
+          <div class="airport-search-field">
+            <span class="airport-search__icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="7"/>
+                <path d="m21 21-4.3-4.3"/>
+              </svg>
+            </span>
+            <input
+              type="search"
+              class="airport-search"
+              id="airport-search"
+              disabled
+              placeholder="Search airports"
+              aria-label="Search airports"
+              aria-expanded="false"
+            />
+            <button
+              type="button"
+              class="airport-search-close"
+              id="airport-search-close"
+              aria-label="Close airport search"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18"/>
+              </svg>
+            </button>
+          </div>
+          <div id="airport-search-panel" class="airport-search-panel" hidden>
+            <div id="airport-search-results" class="airport-search-results"></div>
+          </div>
+        </div>
+      </header>
       <div class="airport-below-search">
         <h2 class="airport-page-heading" id="airport-page-title">
           {{ airport }} - {{ airport_display_name }}
@@ -1082,15 +1180,9 @@
           </div>
         </div>
         <p id="chart-bootstrap-msg" class="chart-bootstrap-msg muted" hidden aria-live="polite"></p>
-        <div
-          id="airport-search-panel"
-          class="airport-search-panel airport-search-panel--chart-overlay"
-          hidden
-        >
-          <div id="airport-search-results" class="airport-search-results"></div>
-        </div>
       </div>
     </div>
+    <div class="airport-search-scrim" id="airport-search-scrim" aria-hidden="true"></div>
   </main>
   <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
   <script src="{{ url_for('static', filename='queue_wait_line.js') }}"></script>
@@ -2458,11 +2550,15 @@
       var inp = document.getElementById('airport-search');
       var panel = document.getElementById('airport-search-panel');
       var list = document.getElementById('airport-search-results');
-      if (!inp || !panel || !list) return;
+      var root = document.getElementById('airport-search-wrap');
+      var closeButton = document.getElementById('airport-search-close');
+      if (!inp || !panel || !list || !root) return;
       initTsaAirportSearch({
         input: inp,
         panel: panel,
         list: list,
+        root: root,
+        closeButton: closeButton,
       });
     });
   </script>
