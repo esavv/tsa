@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS wait_times (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wait_times_scraped ON wait_times(scraped_at_utc);
-CREATE INDEX IF NOT EXISTS idx_wait_times_airport_terminal ON wait_times(airport, terminal);
 CREATE INDEX IF NOT EXISTS idx_wait_times_history
 ON wait_times(airport, terminal, gate, scraped_at_utc);
 
