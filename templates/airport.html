@@ -1314,13 +1314,14 @@
     }
 
     /**
-     * X-axis / callout timestamp: comma between date and time (not "at" on iOS),
+     * Chart readout timestamp: comma between date and time (not "at" on iOS),
      * no leading zero on single-digit hour.
      */
     function formatChartAxisLabel(dateObj) {
+      const weekdayPart = dateObj.toLocaleDateString([], { weekday: 'short' }).slice(0, 3);
       const datePart = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
       const timePart = dateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      return datePart + ', ' + timePart;
+      return weekdayPart + ', ' + datePart + ', ' + timePart;
     }
 
     function syncUrl() {
