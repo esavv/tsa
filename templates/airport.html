@@ -2652,7 +2652,13 @@
               beginAtZero: true,
               grid: { display: false, drawBorder: false },
               border: { display: false },
-              ticks: { color: chartThemeColor('--chart-tick-color', '#64748b') }
+              ticks: {
+                color: chartThemeColor('--chart-tick-color', '#64748b'),
+                callback: function (value, index, ticks) {
+                  if (Number(value) === 0) return '';
+                  return Chart.Ticks.formatters.numeric.call(this, value, index, ticks);
+                },
+              }
             },
             x: {
               type: 'time',
