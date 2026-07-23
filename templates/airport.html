@@ -2148,17 +2148,19 @@
       calloutEl.className = 'chart-callout' + (stacked ? ' chart-callout--stacked' : '');
       calloutEl.innerHTML = readoutHtml(label, chartRef, idx);
       calloutEl.style.display = 'block';
-      calloutEl.style.left = x + 'px';
-      requestAnimationFrame(function () {
-        const pad = 6;
-        const parent = calloutEl.parentElement;
-        if (!parent) return;
-        const cw = parent.clientWidth;
-        const w = calloutEl.offsetWidth;
-        const half = w / 2;
-        const clamped = Math.max(pad + half, Math.min(x, cw - pad - half));
-        calloutEl.style.left = clamped + 'px';
-      });
+      const area = chartRef.chartArea;
+      if (!area) {
+        calloutEl.style.left = x + 'px';
+        return;
+      }
+      const half = calloutEl.getBoundingClientRect().width / 2;
+      const minCenter = area.left + half;
+      const maxCenter = area.right - half;
+      const clamped =
+        minCenter <= maxCenter
+          ? Math.max(minCenter, Math.min(x, maxCenter))
+          : (area.left + area.right) / 2;
+      calloutEl.style.left = clamped + 'px';
     }
 
     function setFixedReadout(label, chartRef, idx) {
