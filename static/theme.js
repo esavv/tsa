@@ -5,9 +5,7 @@
     window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
   var viewportQuery =
     window.matchMedia && window.matchMedia('(max-width: 768px)');
-  var shortcutLabel = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-    ? '⌘⇧L'
-    : 'Ctrl+Shift+L';
+  var shortcutLabel = '⌘I';
 
   function validPreference(value) {
     return value === 'light' || value === 'dark' || value === 'system';
@@ -151,10 +149,11 @@
   document.querySelectorAll('[data-theme-picker]').forEach(initPicker);
   document.addEventListener('keydown', function (event) {
     var shortcut =
-      event.shiftKey &&
-      (event.metaKey || event.ctrlKey) &&
+      event.metaKey &&
+      !event.ctrlKey &&
       !event.altKey &&
-      event.code === 'KeyL';
+      !event.shiftKey &&
+      event.code === 'KeyI';
     if (
       event.defaultPrevented ||
       !shortcut ||
