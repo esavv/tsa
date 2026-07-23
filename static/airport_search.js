@@ -661,8 +661,15 @@
       'keydown',
       function (e) {
         if (e.defaultPrevented || e.repeat) return;
-        if (e.code !== 'Slash') return;
-        if (!e.metaKey && !e.altKey) return;
+        var slashShortcut = e.code === 'Slash' && (e.metaKey || e.altKey);
+        var commandKShortcut =
+          !mqSearchMobile.matches &&
+          e.code === 'KeyK' &&
+          e.metaKey &&
+          !e.ctrlKey &&
+          !e.altKey &&
+          !e.shiftKey;
+        if (!slashShortcut && !commandKShortcut) return;
         if (searchShortcutIgnoresTarget(e.target)) return;
         e.preventDefault();
         input.focus();
