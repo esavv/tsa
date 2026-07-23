@@ -200,22 +200,32 @@
       width: 2.25rem;
       height: 2.25rem;
       z-index: 90;
-      overflow: hidden;
+      color: #475569;
+    }
+    .theme-picker::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 2.25rem;
+      height: 2.25rem;
+      box-sizing: border-box;
+      pointer-events: none;
       border: 1px solid #cbd5e1;
       border-radius: 999px;
       background: #f9fafb;
-      color: #475569;
       transition:
         height 0.22s cubic-bezier(0.22, 1, 0.36, 1),
         border-color 0.16s ease,
         background-color 0.16s ease,
         box-shadow 0.22s ease;
     }
-    .theme-picker:hover {
+    .theme-picker:hover::before,
+    .theme-picker:focus-within::before {
       border-color: #94a3b8;
     }
-    .theme-picker.is-open {
-      height: 6.9rem;
+    .theme-picker.is-open::before {
+      height: 6.85rem;
       background: #fff;
       box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
     }
@@ -225,17 +235,16 @@
       align-items: center;
       justify-content: center;
       border: 0;
-      border-radius: 999px;
       background: transparent;
       color: inherit;
       cursor: pointer;
     }
     .theme-picker__trigger {
       position: absolute;
-      inset: 0 auto auto 0;
-      width: 2.125rem;
-      height: 2.125rem;
-      padding: 0.42rem;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0;
       opacity: 1;
       transition: opacity 0.1s ease;
     }
@@ -245,19 +254,18 @@
     }
     .theme-picker__trigger:hover,
     .theme-picker__option:hover,
-    .theme-picker__option.is-selected {
-      background: #e2e8f0;
+    .theme-picker__option.is-selected,
+    .theme-picker__option:focus-visible {
       color: #0f172a;
     }
     .theme-picker__trigger:focus-visible,
     .theme-picker__option:focus-visible {
-      outline: 2px solid #64748b;
-      outline-offset: -2px;
+      outline: none;
     }
-    .theme-picker__trigger span,
-    .theme-picker__trigger svg,
-    .theme-picker__option svg {
-      display: block;
+    .theme-picker__trigger span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 100%;
       height: 100%;
     }
@@ -266,6 +274,9 @@
     }
     .theme-picker__trigger svg,
     .theme-picker__option svg {
+      display: block;
+      width: 1.125rem;
+      height: 1.125rem;
       fill: none;
       stroke: currentColor;
       stroke-width: 1.8;
@@ -275,10 +286,13 @@
     .theme-picker__menu {
       position: absolute;
       inset: 0;
+      width: 100%;
+      height: 6.85rem;
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
-      padding: 0.25rem;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.125rem;
       opacity: 0;
       transform: translateY(-0.35rem) scaleY(0.92);
       transform-origin: top;
@@ -298,7 +312,7 @@
     .theme-picker__option {
       width: 2rem;
       height: 2rem;
-      padding: 0.42rem;
+      padding: 0;
     }
     .airport-search-scrim {
       position: fixed;
@@ -350,6 +364,7 @@
       .airport-search-panel,
       .airport-search-scrim,
       .theme-picker,
+      .theme-picker::before,
       .theme-picker__trigger,
       .theme-picker__menu {
         transition: none;
@@ -1282,11 +1297,17 @@
         text-align: left;
       }
     }
-    html[data-theme="dark"] .airport-search,
-    html[data-theme="dark"] .theme-picker {
+    html[data-theme="dark"] .airport-search {
       background: var(--tsa-surface-soft);
       border-color: var(--tsa-border-strong);
       color: var(--tsa-text-strong);
+    }
+    html[data-theme="dark"] .theme-picker {
+      color: var(--tsa-text-subtle);
+    }
+    html[data-theme="dark"] .theme-picker::before {
+      background: var(--tsa-surface-soft);
+      border-color: var(--tsa-border-strong);
     }
     html[data-theme="dark"] .airport-search-field:hover .airport-search,
     html[data-theme="dark"] .airport-search:focus {
@@ -1303,12 +1324,15 @@
     html[data-theme="dark"] .theme-picker__option {
       color: var(--tsa-text-subtle);
     }
-    html[data-theme="dark"] .airport-search-close:hover,
-    html[data-theme="dark"] .theme-picker__trigger:hover,
-    html[data-theme="dark"] .theme-picker__option:hover,
-    html[data-theme="dark"] .theme-picker__option.is-selected {
+    html[data-theme="dark"] .airport-search-close:hover {
       background: var(--tsa-surface-hover);
       border-color: var(--tsa-border-strong);
+      color: var(--tsa-text-strong);
+    }
+    html[data-theme="dark"] .theme-picker__trigger:hover,
+    html[data-theme="dark"] .theme-picker__option:hover,
+    html[data-theme="dark"] .theme-picker__option.is-selected,
+    html[data-theme="dark"] .theme-picker__option:focus-visible {
       color: var(--tsa-text-strong);
     }
     html[data-theme="dark"] .airport-search-panel {
@@ -1316,7 +1340,7 @@
       border-color: var(--tsa-border);
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     }
-    html[data-theme="dark"] .theme-picker.is-open {
+    html[data-theme="dark"] .theme-picker.is-open::before {
       background: var(--tsa-surface);
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
     }
