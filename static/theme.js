@@ -5,6 +5,9 @@
     window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
   var viewportQuery =
     window.matchMedia && window.matchMedia('(max-width: 768px)');
+  var shortcutLabel = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    ? '⌘⇧L'
+    : 'Ctrl+Shift+L';
 
   function validPreference(value) {
     return value === 'light' || value === 'dark' || value === 'system';
@@ -47,10 +50,11 @@
           ? 'Theme: match device'
           : 'Theme: ' + resolved + ' mode'
       );
-      button.title =
+      var title =
         preference === 'system'
           ? 'Theme: Match device'
           : 'Theme: ' + resolved.charAt(0).toUpperCase() + resolved.slice(1);
+      button.title = title + ' (' + shortcutLabel + ')';
     });
   }
 
@@ -145,6 +149,40 @@
   }
 
   document.querySelectorAll('[data-theme-picker]').forEach(initPicker);
+  document.addEventListener('keydown', function (event) {
+    var shortcut =
+      event.shiftKey &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      event.code === 'KeyL';
+    if (
+      event.defaultPrevented ||
+      !shortcut ||
+      event.repeat ||
+      (viewportQuery && viewportQuery.matches)
+    ) {
+      return;
+    }
+    var active = document.activeElement;
+    if (
+      active &&
+      (active.matches('input, textarea, select') || active.isContentEditable)
+    ) {
+      return;
+    }
+    var picker = document.querySelector('[data-theme-picker]');
+    if (!picker) return;
+    var trigger = picker.querySelector('[data-theme-trigger]');
+    var menu = picker.querySelector('[data-theme-menu]');
+    if (!trigger || !menu) return;
+    event.preventDefault();
+    if (picker.classList.contains('is-open')) {
+      closePicker(picker);
+      trigger.focus();
+    } else {
+      openPicker(picker, trigger, menu);
+    }
+  });
   document.addEventListener('click', function (event) {
     document.querySelectorAll('[data-theme-picker]').forEach(function (picker) {
       if (!picker.contains(event.target)) closePicker(picker);
