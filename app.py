@@ -397,6 +397,132 @@ def api_latest():
     return resp
 
 
+@app.route("/preview")
+def marketing_preview():
+    """Local authoring surface for social preview images."""
+    return render_template("preview.html")
+
+
+@app.route("/api/preview/options")
+def api_preview_options():
+    """Airports and terminal/gate combinations available in the local history DB."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT DISTINCT airport, terminal, gate
+        FROM wait_times
+        WHERE TRIM(terminal) <> ''
+        ORDER BY airport, terminal, gate
+        """
+    )
+    rows = cur.fetchall()
+    cur.execute(
+        "SELECT MIN(scraped_at_utc), MAX(scraped_at_utc) FROM wait_times"
+    )
+    bounds_row = cur.fetchone()
+    conn.close()
+
+    terminals_by_airport: dict[str, list[dict[str, str]]] = {}
+    active_codes = set(active_airport_codes())
+    for airport_code, terminal, gate in rows:
+        if airport_code not in active_codes:
+            continue
+        terminals_by_airport.setdefault(airport_code, []).append(
+            {"terminal": terminal, "gate": gate or ""}
+        )
+
+    airports = []
+    for code in sorted(terminals_by_airport):
+        entry = airport_catalog_entry_for_js(code)
+        terminals = sorted(
+            terminals_by_airport[code],
+            key=lambda row: (
+                _natural_sort_key(row["terminal"]),
+                _natural_sort_key(row["gate"]),
+            ),
+        )
+        airports.append(
+            {
+                "code": code,
+                "display_name": entry.get("display_name") or code,
+                "terminal_tab": entry["terminal_tab"],
+                "wait_times_ui": entry["wait_times_ui"],
+                "terminals": terminals,
+            }
+        )
+
+    return jsonify(
+        airports=airports,
+        earliest_scraped_at_utc=bounds_row[0] if bounds_row else None,
+        latest_scraped_at_utc=bounds_row[1] if bounds_row else None,
+    )
+
+
+def _preview_utc_param(name: str) -> datetime:
+    raw = (request.args.get(name) or "").strip()
+    if not raw:
+        raise ValueError(f"{name} is required")
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an ISO 8601 datetime") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{name} must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+@app.route("/api/preview/history")
+def api_preview_history():
+    """Date-bounded history for the local marketing-image authoring page."""
+    airport = (request.args.get("airport") or "").strip().upper()
+    terminal = request.args.get("terminal") or ""
+    gate = request.args.get("gate") or ""
+    if len(airport) != 3 or not airport.isalpha() or not terminal:
+        return jsonify(error="airport and terminal are required"), 400
+    if airport not in set(active_airport_codes()):
+        abort(404)
+
+    try:
+        start_dt = _preview_utc_param("start")
+        end_dt = _preview_utc_param("end")
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    if start_dt >= end_dt:
+        return jsonify(error="start must be before end"), 400
+
+    start = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT scraped_at_utc, queue_type, wait_minutes,
+               wait_min_minutes, wait_max_minutes
+        FROM wait_times
+        WHERE airport = ? AND terminal = ? AND gate = ?
+          AND scraped_at_utc >= ? AND scraped_at_utc <= ?
+        ORDER BY scraped_at_utc
+        """,
+        (airport, terminal, gate, start, end),
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    queues: dict[str, list[dict]] = {}
+    for scraped_at_utc, queue_type, wait_minutes, wait_min_minutes, wait_max_minutes in rows:
+        queues.setdefault(queue_type, []).append(
+            {
+                "t": scraped_at_utc,
+                "minutes": wait_minutes,
+                "wait_min_minutes": wait_min_minutes,
+                "wait_max_minutes": wait_max_minutes,
+            }
+        )
+    return jsonify(queues=queues, start_utc=start, end_utc=end)
+
+
 @app.route("/api/history")
 def api_history():
     """History for one airport + terminal (+ optional gate). Returns queues keyed by queue_type."""

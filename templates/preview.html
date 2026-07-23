@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marketing image preview</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='preview.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+</head>
+<body>
+  <main class="preview-workspace">
+    <h1>Marketing image preview</h1>
+    <section class="preview-controls" aria-label="Preview controls">
+      <label>
+        Airport
+        <select id="preview-airport"></select>
+      </label>
+      <label>
+        Terminal
+        <select id="preview-terminal"></select>
+      </label>
+      <label>
+        Image size
+        <select id="preview-size">
+          <option value="og">Open Graph · 1200 × 630</option>
+          <option value="x">X header · 1500 × 500</option>
+        </select>
+      </label>
+
+      <div class="range-control" aria-label="Chart time range">
+        <span>Range</span>
+        <div class="range-buttons">
+          <button type="button" class="range-button" data-hours="6">6H</button>
+          <button type="button" class="range-button" data-hours="12">12H</button>
+          <button type="button" class="range-button active" data-hours="24">24H</button>
+          <button type="button" class="range-button" data-hours="72">3D</button>
+          <button type="button" class="range-button" data-hours="168">7D</button>
+        </div>
+      </div>
+
+      <fieldset class="custom-range">
+        <legend>Custom range</legend>
+        <label>
+          Start
+          <input id="preview-start" type="datetime-local">
+        </label>
+        <label>
+          End
+          <input id="preview-end" type="datetime-local">
+        </label>
+        <button type="button" id="preview-apply-range">Apply</button>
+      </fieldset>
+
+      <div class="callout-controls">
+        <span>Callout</span>
+        <div>
+          <button type="button" id="preview-toggle-callout" aria-pressed="false">Show callout</button>
+          <button type="button" id="preview-edit-callout" aria-expanded="false">Edit</button>
+        </div>
+      </div>
+
+      <fieldset class="callout-editor" id="preview-callout-editor" hidden>
+        <legend>Edit callout</legend>
+        <label>
+          Date and time
+          <input id="preview-callout-datetime" type="datetime-local">
+        </label>
+        <label>
+          General (minutes)
+          <input id="preview-callout-general" type="number" min="0" step="1" value="30">
+        </label>
+        <label>
+          PreCheck (minutes)
+          <input id="preview-callout-precheck" type="number" min="0" step="1" value="15">
+        </label>
+      </fieldset>
+    </section>
+
+    <p class="preview-status" id="preview-status" aria-live="polite">Loading local history…</p>
+    <div class="preview-stage-scroll">
+      <div class="preview-stage preview-stage--og" id="preview-stage">
+        <canvas id="preview-chart"></canvas>
+        <div class="preview-callout" id="preview-callout" hidden>
+          <div class="preview-callout__date" id="preview-callout-date"></div>
+          <div class="preview-callout__grid">
+            <span>General</span>
+            <span><span class="wait-time-pill" id="preview-callout-general-value"></span></span>
+            <span>PreCheck</span>
+            <span><span class="wait-time-pill" id="preview-callout-precheck-value"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='terminal_tab_labels.js') }}"></script>
+  <script src="{{ url_for('static', filename='queue_wait_line.js') }}"></script>
+  <script src="{{ url_for('static', filename='preview.js') }}"></script>
+</body>
+</html>
