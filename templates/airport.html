@@ -1382,6 +1382,9 @@
       border-color: var(--tsa-border);
       color: var(--tsa-text);
     }
+    html[data-theme="dark"] .chart-legend__button[aria-pressed="true"] {
+      background: var(--chart-legend-active-bg, var(--tsa-active-bg));
+    }
     html[data-theme="dark"] .tab-btn.active,
     html[data-theme="dark"] .range-btn.active {
       background: var(--tsa-active-bg);
