@@ -423,6 +423,7 @@
   sizeSelect.addEventListener('change', function () {
     stageEl.classList.toggle('preview-stage--og', sizeSelect.value === 'og');
     stageEl.classList.toggle('preview-stage--x', sizeSelect.value === 'x');
+    stageEl.classList.toggle('preview-stage--web', sizeSelect.value === 'web');
     requestAnimationFrame(function () {
       if (chart) chart.resize();
       clampCallout();
