@@ -394,6 +394,13 @@
         left: auto;
         right: 0;
         width: min(calc(100vw - 2rem), 948px);
+        overflow: hidden;
+      }
+      .airport-search-results {
+        max-height: inherit;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border-radius: inherit;
       }
     }
     @media (max-width: 768px) {
