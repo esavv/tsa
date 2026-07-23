@@ -394,6 +394,7 @@
     var metros = {};
     var activeIndex = -1;
     var open = false;
+    var heightBoundaryObserver = null;
     var listId = list.id || 'airport-search-results';
     var matchOrderState = { prevSetKey: null, prevOrder: [] };
 
@@ -421,10 +422,13 @@
     list.setAttribute('role', 'listbox');
 
     function syncPanelMaxHeight() {
-      if (!root || !heightBoundary) return;
-      var panelTopOffset = parseFloat(window.getComputedStyle(panel).top);
-      if (!isFinite(panelTopOffset)) return;
-      var panelTop = root.getBoundingClientRect().top + panelTopOffset;
+      if (!heightBoundary) return;
+      var panelTop = panel.getBoundingClientRect().top;
+      var panelTransform = window.getComputedStyle(panel).transform;
+      if (panelTransform !== 'none' && window.DOMMatrixReadOnly) {
+        panelTop -= new DOMMatrixReadOnly(panelTransform).m42;
+      }
+      if (!isFinite(panelTop)) return;
       var availableHeight = Math.floor(
         heightBoundary.getBoundingClientRect().bottom - panelTop
       );
@@ -434,6 +438,12 @@
     window.addEventListener('resize', function () {
       if (open) syncPanelMaxHeight();
     });
+    if (heightBoundary && window.ResizeObserver) {
+      heightBoundaryObserver = new ResizeObserver(function () {
+        if (open) syncPanelMaxHeight();
+      });
+      heightBoundaryObserver.observe(heightBoundary, { box: 'border-box' });
+    }
 
     function setOpen(v) {
       open = v;
