@@ -10,10 +10,13 @@
   <script>
     (function () {
       var preference = 'system';
-      try {
-        var stored = localStorage.getItem('tsa-theme');
-        if (stored === 'light' || stored === 'dark' || stored === 'system') preference = stored;
-      } catch (_e) {}
+      var mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      if (!mobile) {
+        try {
+          var stored = localStorage.getItem('tsa-theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'system') preference = stored;
+        } catch (_e) {}
+      }
       var deviceDark =
         window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       var resolved = preference === 'system' ? (deviceDark ? 'dark' : 'light') : preference;

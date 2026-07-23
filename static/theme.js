@@ -3,6 +3,8 @@
   var root = document.documentElement;
   var deviceQuery =
     window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  var viewportQuery =
+    window.matchMedia && window.matchMedia('(max-width: 768px)');
 
   function validPreference(value) {
     return value === 'light' || value === 'dark' || value === 'system';
@@ -11,6 +13,15 @@
   function currentPreference() {
     var value = root.dataset.themePreference;
     return validPreference(value) ? value : 'system';
+  }
+
+  function storedPreference() {
+    try {
+      var stored = localStorage.getItem(STORAGE_KEY);
+      return validPreference(stored) ? stored : 'system';
+    } catch (_e) {
+      return 'system';
+    }
   }
 
   function resolveTheme(preference) {
@@ -67,8 +78,23 @@
     var trigger = picker.querySelector('[data-theme-trigger]');
     var menu = picker.querySelector('[data-theme-menu]');
     if (!trigger || !menu) return;
-    menu.hidden = true;
+    picker.classList.remove('is-open');
     trigger.setAttribute('aria-expanded', 'false');
+    clearTimeout(picker._themeCloseTimer);
+    if (menu.hidden) return;
+    picker._themeCloseTimer = setTimeout(function () {
+      if (!picker.classList.contains('is-open')) menu.hidden = true;
+    }, 240);
+  }
+
+  function openPicker(picker, trigger, menu) {
+    clearTimeout(picker._themeCloseTimer);
+    menu.hidden = false;
+    void picker.offsetHeight;
+    picker.classList.add('is-open');
+    trigger.setAttribute('aria-expanded', 'true');
+    var selected = menu.querySelector('[aria-checked="true"]');
+    if (selected) selected.focus();
   }
 
   function initPicker(picker) {
@@ -77,16 +103,12 @@
     if (!trigger || !menu) return;
 
     trigger.addEventListener('click', function () {
-      var willOpen = menu.hidden;
+      var willOpen = !picker.classList.contains('is-open');
       document.querySelectorAll('[data-theme-picker]').forEach(function (other) {
         if (other !== picker) closePicker(other);
       });
-      menu.hidden = !willOpen;
-      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      if (willOpen) {
-        var selected = menu.querySelector('[aria-checked="true"]');
-        if (selected) selected.focus();
-      }
+      if (willOpen) openPicker(picker, trigger, menu);
+      else closePicker(picker);
     });
 
     menu.querySelectorAll('[data-theme-choice]').forEach(function (button) {
@@ -143,6 +165,17 @@
       deviceQuery.addEventListener('change', onDeviceThemeChange);
     } else if (deviceQuery.addListener) {
       deviceQuery.addListener(onDeviceThemeChange);
+    }
+  }
+  if (viewportQuery) {
+    var onThemeViewportChange = function () {
+      applyTheme(viewportQuery.matches ? 'system' : storedPreference(), false);
+      document.querySelectorAll('[data-theme-picker]').forEach(closePicker);
+    };
+    if (viewportQuery.addEventListener) {
+      viewportQuery.addEventListener('change', onThemeViewportChange);
+    } else if (viewportQuery.addListener) {
+      viewportQuery.addListener(onThemeViewportChange);
     }
   }
 
