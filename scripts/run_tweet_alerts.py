@@ -603,7 +603,7 @@ def publish_posts(
         tweet_id = str(response.data["id"])
         alerted_at_utc = utc_iso(datetime.now(timezone.utc))
         record_post(conn, post, tweet_id, alerted_at_utc, is_test=is_test)
-        print(f"Published https://x.com/tsatimez/status/{tweet_id}")
+        print(f"Published https://x.com/tsa_times/status/{tweet_id}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -670,7 +670,7 @@ def main() -> int:
             if existing:
                 print(
                     f"Tweet ID {args.post_id} was already published as "
-                    f"https://x.com/tsatimez/status/{existing['tweet_id']}",
+                    f"https://x.com/tsa_times/status/{existing['tweet_id']}",
                     file=sys.stderr,
                 )
                 return 2
