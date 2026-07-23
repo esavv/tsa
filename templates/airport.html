@@ -2572,6 +2572,7 @@
       var root = document.getElementById('airport-search-wrap');
       var closeButton = document.getElementById('airport-search-close');
       var scrim = document.getElementById('airport-search-scrim');
+      var heightBoundary = document.querySelector('.chart-container');
       if (!inp || !panel || !list || !root) return;
       initTsaAirportSearch({
         input: inp,
@@ -2580,6 +2581,7 @@
         root: root,
         closeButton: closeButton,
         scrim: scrim,
+        heightBoundary: heightBoundary,
       });
     });
   </script>

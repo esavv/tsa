@@ -377,6 +377,7 @@
    * @param {HTMLElement} [opts.root]
    * @param {HTMLButtonElement} [opts.closeButton]
    * @param {HTMLElement} [opts.scrim]
+   * @param {HTMLElement} [opts.heightBoundary]
    * @param {number} [opts.maxResults]
    */
   function initTsaAirportSearch(opts) {
@@ -386,6 +387,7 @@
     var root = opts.root || input.parentElement;
     var closeButton = opts.closeButton || null;
     var scrim = opts.scrim || null;
+    var heightBoundary = opts.heightBoundary || null;
     var maxResults = opts.maxResults || DEFAULT_MAX_RESULTS;
 
     var rows = [];
@@ -400,6 +402,7 @@
       window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
     function onSearchViewportChange() {
       if (!open) return;
+      syncPanelMaxHeight();
       refreshList();
     }
     if (mqSearchMobile.addEventListener) {
@@ -416,6 +419,21 @@
     input.setAttribute('aria-expanded', 'false');
     input.setAttribute('aria-controls', listId);
     list.setAttribute('role', 'listbox');
+
+    function syncPanelMaxHeight() {
+      if (!root || !heightBoundary) return;
+      var panelTopOffset = parseFloat(window.getComputedStyle(panel).top);
+      if (!isFinite(panelTopOffset)) return;
+      var panelTop = root.getBoundingClientRect().top + panelTopOffset;
+      var availableHeight = Math.floor(
+        heightBoundary.getBoundingClientRect().bottom - panelTop
+      );
+      if (availableHeight > 0) panel.style.maxHeight = availableHeight + 'px';
+    }
+
+    window.addEventListener('resize', function () {
+      if (open) syncPanelMaxHeight();
+    });
 
     function setOpen(v) {
       open = v;
@@ -434,6 +452,7 @@
         panel.classList.remove('airport-search-panel--suppress-transition');
         if (v) {
           panel.hidden = false;
+          syncPanelMaxHeight();
           panel.classList.add('airport-search-panel--open');
         } else {
           panel.classList.remove('airport-search-panel--open');
@@ -445,6 +464,7 @@
       if (v) {
         panel.classList.remove('airport-search-panel--suppress-transition');
         panel.hidden = false;
+        syncPanelMaxHeight();
         panel.classList.remove('airport-search-panel--open');
         void panel.offsetWidth;
         requestAnimationFrame(function () {
