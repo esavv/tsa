@@ -14,6 +14,8 @@
   var airportSelect = document.getElementById('preview-airport');
   var terminalSelect = document.getElementById('preview-terminal');
   var sizeSelect = document.getElementById('preview-size');
+  var controlsEl = document.getElementById('preview-controls');
+  var controlsToggleButton = document.getElementById('preview-controls-toggle');
   var startInput = document.getElementById('preview-start');
   var endInput = document.getElementById('preview-end');
   var applyRangeButton = document.getElementById('preview-apply-range');
@@ -30,12 +32,15 @@
   var calloutDatetimeInput = document.getElementById('preview-callout-datetime');
   var calloutGeneralInput = document.getElementById('preview-callout-general');
   var calloutPrecheckInput = document.getElementById('preview-callout-precheck');
+  var calloutSizeInput = document.getElementById('preview-callout-size');
+  var calloutSizeValue = document.getElementById('preview-callout-size-value');
 
   var optionsPayload = null;
   var chart = null;
   var historyAbort = null;
   var selectedHours = 24;
   var customBounds = null;
+  var calloutScale = 1;
 
   function setStatus(message, isError) {
     statusEl.textContent = message;
@@ -337,10 +342,20 @@
     clampCallout();
   }
 
+  function updateCalloutScale() {
+    calloutScale = Number(calloutSizeInput.value) / 100;
+    calloutEl.style.setProperty('--callout-scale', String(calloutScale));
+    calloutSizeValue.value = calloutSizeInput.value + '%';
+    calloutSizeValue.textContent = calloutSizeInput.value + '%';
+    clampCallout();
+  }
+
   function clampCallout() {
     if (calloutEl.hidden) return;
-    var maxLeft = Math.max(0, stageEl.clientWidth - calloutEl.offsetWidth);
-    var maxTop = Math.max(0, stageEl.clientHeight - calloutEl.offsetHeight);
+    var visualWidth = calloutEl.offsetWidth * calloutScale;
+    var visualHeight = calloutEl.offsetHeight * calloutScale;
+    var maxLeft = Math.max(0, stageEl.clientWidth - visualWidth);
+    var maxTop = Math.max(0, stageEl.clientHeight - visualHeight);
     var left = Math.max(0, Math.min(parseFloat(calloutEl.style.left) || 0, maxLeft));
     var top = Math.max(0, Math.min(parseFloat(calloutEl.style.top) || 0, maxTop));
     calloutEl.style.left = left + 'px';
@@ -372,6 +387,14 @@
 
   [calloutDatetimeInput, calloutGeneralInput, calloutPrecheckInput].forEach(function (input) {
     input.addEventListener('input', updateCallout);
+  });
+  calloutSizeInput.addEventListener('input', updateCalloutScale);
+
+  controlsToggleButton.addEventListener('click', function () {
+    var expand = controlsEl.hidden;
+    controlsEl.hidden = !expand;
+    controlsToggleButton.setAttribute('aria-expanded', expand ? 'true' : 'false');
+    controlsToggleButton.textContent = expand ? 'Collapse controls' : 'Expand controls';
   });
 
   calloutEl.addEventListener('pointerdown', function (event) {
@@ -436,6 +459,7 @@
   var roundedNow = new Date(Math.round(Date.now() / STEP_MS) * STEP_MS);
   calloutDatetimeInput.value = localInputValue(roundedNow);
   updateCallout();
+  updateCalloutScale();
 
   fetch('/api/preview/options')
     .then(function (response) {

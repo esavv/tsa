@@ -55,9 +55,22 @@ input {
   padding: 1.25rem;
 }
 
+.preview-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1500px;
+  margin-bottom: 1rem;
+}
+
 .preview-workspace h1 {
-  margin: 0 0 1rem;
+  margin: 0;
   font-size: 1.4rem;
+}
+
+.preview-controls-toggle {
+  flex: 0 0 auto;
 }
 
 .preview-controls {
@@ -72,6 +85,10 @@ input {
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 3px 12px rgba(15, 23, 42, 0.06);
+}
+
+.preview-controls[hidden] {
+  display: none;
 }
 
 .preview-controls label,
@@ -140,6 +157,28 @@ legend {
   display: none;
 }
 
+.callout-size-control > span {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.25rem;
+}
+
+#preview-callout-size {
+  width: 15rem;
+  min-height: 0;
+  padding: 0;
+  accent-color: #1f2937;
+}
+
+#preview-callout-size-value {
+  min-width: 3.4rem;
+  color: #1e293b;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .preview-status {
   min-height: 1.3rem;
   margin: 0 0 0.55rem;
@@ -201,6 +240,8 @@ legend {
   line-height: 1.3;
   cursor: grab;
   touch-action: none;
+  transform: scale(var(--callout-scale, 1));
+  transform-origin: top left;
   user-select: none;
 }
 
@@ -220,9 +261,9 @@ legend {
 
 .preview-callout__grid {
   display: grid;
-  grid-template-columns: max-content auto;
+  grid-template-columns: max-content auto max-content auto;
   align-items: baseline;
-  gap: 0.12rem 0.1rem;
+  column-gap: 0.1rem;
   margin-top: 0.08rem;
   font-size: 0.78rem;
 }
@@ -232,6 +273,10 @@ legend {
   justify-content: flex-end;
   margin-left: 0.1rem;
   font-variant-numeric: tabular-nums;
+}
+
+.preview-callout__grid > span:nth-child(2) {
+  margin-right: 0.5rem;
 }
 
 .wait-time-pill {

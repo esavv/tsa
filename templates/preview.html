@@ -11,8 +11,17 @@
 </head>
 <body>
   <main class="preview-workspace">
-    <h1>Marketing image preview</h1>
-    <section class="preview-controls" aria-label="Preview controls">
+    <div class="preview-heading-row">
+      <h1>Marketing image preview</h1>
+      <button
+        type="button"
+        class="preview-controls-toggle"
+        id="preview-controls-toggle"
+        aria-controls="preview-controls"
+        aria-expanded="true"
+      >Collapse controls</button>
+    </div>
+    <section class="preview-controls" id="preview-controls" aria-label="Preview controls">
       <label>
         Airport
         <select id="preview-airport"></select>
@@ -74,6 +83,20 @@
         <label>
           PreCheck (minutes)
           <input id="preview-callout-precheck" type="number" min="0" step="1" value="15">
+        </label>
+        <label class="callout-size-control">
+          Callout size
+          <span>
+            <input
+              id="preview-callout-size"
+              type="range"
+              min="50"
+              max="250"
+              step="5"
+              value="100"
+            >
+            <output id="preview-callout-size-value" for="preview-callout-size">100%</output>
+          </span>
         </label>
       </fieldset>
     </section>
