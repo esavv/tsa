@@ -110,7 +110,10 @@
       flex: 0 0 auto;
       width: 11.5rem;
       z-index: 1;
-      transition: width 0.24s ease;
+      transform: translateX(0);
+      transition:
+        width 0.24s ease,
+        transform 0.24s ease;
     }
     body.airport-search-active .airport-search-wrap {
       width: clamp(20rem, 45vw, 30rem);
@@ -204,6 +207,12 @@
       height: 2.25rem;
       z-index: 90;
       color: #475569;
+      opacity: 1;
+      transform: scale(1);
+      transform-origin: center;
+      transition:
+        opacity 0.16s ease,
+        transform 0.2s ease;
     }
     .theme-picker::before {
       content: "";
@@ -373,9 +382,17 @@
       }
     }
     @media (min-width: 769px) {
+      body.airport-search-active .airport-search-wrap {
+        transform: translateX(2.75rem);
+      }
+      body.airport-search-active .theme-picker {
+        opacity: 0;
+        transform: scale(0.85);
+        pointer-events: none;
+      }
       .airport-search-panel {
         left: auto;
-        right: -2.75rem;
+        right: 0;
         width: min(calc(100vw - 2rem), 948px);
       }
     }
