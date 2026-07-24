@@ -153,11 +153,17 @@ Preview and backtest commands:
 ./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7
 ./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7 --airport JFK
 ./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 7 --summary
+./venv/bin/python scripts/run_tweet_alerts.py --backtest-days 30 --airport EWR --thresholds 60,90,120 --summary
 ```
 
 Dry runs and backtests evaluate all supported airports. Live posting only
 includes airports with `tweet_alerts.enabled` set to `true` in
 `data/airports.json`.
+
+`--thresholds` accepts exactly three positive, strictly increasing values and
+is limited to backtests; it cannot override live behavior. Backtest totals show
+how many projected tweets fall into each threshold bucket. A grouped airport
+tweet is assigned to the highest threshold crossed by any terminal it contains.
 
 Detailed dry-run and backtest output assigns each generated tweet a stable ID.
 It also identifies whether each post includes a link. Backtest summaries split

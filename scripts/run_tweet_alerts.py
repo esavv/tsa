@@ -44,6 +44,7 @@ class Target:
 class Candidate:
     target: Target
     threshold: int
+    threshold_index: int
     wait_minutes: int
     wait_display: str
     label: str
@@ -155,14 +156,25 @@ def wait_metric_and_display(entry: dict, row: sqlite3.Row) -> tuple[int, str] | 
     return (int(point), f"{point} min") if point is not None else None
 
 
-def crossed_threshold(wait_minutes: int) -> int | None:
-    crossed = [threshold for threshold in THRESHOLDS if wait_minutes >= threshold]
-    return max(crossed) if crossed else None
+def crossed_threshold(
+    wait_minutes: int,
+    thresholds: tuple[int, int, int] = THRESHOLDS,
+) -> tuple[int, int] | None:
+    crossed = [
+        (index, threshold)
+        for index, threshold in enumerate(thresholds)
+        if wait_minutes >= threshold
+    ]
+    if not crossed:
+        return None
+    index, threshold = crossed[-1]
+    return threshold, index
 
 
 def candidates_for_rows(
     rows: list[sqlite3.Row],
     catalog: dict[str, dict],
+    thresholds: tuple[int, int, int] = THRESHOLDS,
 ) -> list[Candidate]:
     best_by_target: dict[Target, tuple[int, str]] = {}
     for row in rows:
@@ -185,13 +197,15 @@ def candidates_for_rows(
 
     candidates = []
     for target, (wait_minutes, wait_display) in best_by_target.items():
-        threshold = crossed_threshold(wait_minutes)
-        if threshold is None:
+        crossed = crossed_threshold(wait_minutes, thresholds)
+        if crossed is None:
             continue
+        threshold, threshold_index = crossed
         candidates.append(
             Candidate(
                 target=target,
                 threshold=threshold,
+                threshold_index=threshold_index,
                 wait_minutes=wait_minutes,
                 wait_display=wait_display,
                 label=terminal_label(
@@ -253,9 +267,9 @@ def make_post(
     lines = [f"{candidate.label}: {candidate.wait_display}" for candidate in ordered]
     if len(lines) == 1:
         candidate = ordered[0]
-        if candidate.is_escalation and candidate.threshold >= 90:
+        if candidate.is_escalation and candidate.threshold_index == 2:
             qualifier = "very long"
-        elif candidate.is_escalation and candidate.threshold >= 60:
+        elif candidate.is_escalation and candidate.threshold_index == 1:
             qualifier = "even longer"
         else:
             qualifier = "elevated"
@@ -398,6 +412,7 @@ def historical_posts(
     airport: str | None,
     start: datetime,
     end: datetime,
+    thresholds: tuple[int, int, int] = THRESHOLDS,
 ) -> list[AlertPost]:
     sql = """
         SELECT DISTINCT scraped_at_utc
@@ -417,7 +432,7 @@ def historical_posts(
         scraped_at_utc = str(timestamp_row[0])
         at = utc_from_iso(scraped_at_utc)
         rows = wait_rows_at(conn, scraped_at_utc, airport)
-        candidates = candidates_for_rows(rows, catalog)
+        candidates = candidates_for_rows(rows, catalog, thresholds)
         eligible = eligible_candidates(candidates, at, state)
         for candidate in eligible:
             state[candidate.target] = (at, candidate.threshold)
@@ -440,12 +455,20 @@ def backtest(
     catalog: dict[str, dict],
     airport: str | None,
     days: int,
+    thresholds: tuple[int, int, int] = THRESHOLDS,
 ) -> list[AlertPost]:
     latest = latest_scrape_at(conn)
     if not latest:
         return []
     end = utc_from_iso(latest)
-    return historical_posts(conn, catalog, airport, end - timedelta(days=days), end)
+    return historical_posts(
+        conn,
+        catalog,
+        airport,
+        end - timedelta(days=days),
+        end,
+        thresholds,
+    )
 
 
 POST_ID_RE = re.compile(r"^\d{8}T\d{6}Z-([A-Z]{3})-[0-9a-f]{12}$")
@@ -507,12 +530,36 @@ def format_cost(cost: Decimal) -> str:
     return f"${cost:.3f}"
 
 
-def print_summary(posts: list[AlertPost], days: int) -> None:
+def post_threshold(post: AlertPost) -> int:
+    """Assign a grouped tweet to its highest threshold bucket."""
+    return max(candidate.threshold for candidate in post.candidates)
+
+
+def print_projection_totals(
+    posts: list[AlertPost],
+    days: int,
+    thresholds: tuple[int, int, int],
+) -> None:
+    print(f"Thresholds: {'/'.join(str(value) for value in thresholds)} min")
     print(f"Projected tweets: {len(posts)} over {days} days")
+    bucket_counts = Counter(post_threshold(post) for post in posts)
+    print("Threshold buckets:")
+    for threshold in thresholds:
+        count = bucket_counts[threshold]
+        noun = "tweet" if count == 1 else "tweets"
+        print(f"  {threshold} min: {count} {noun}")
     link_posts = sum(post.included_link for post in posts)
     print(f"Link posts: {link_posts}")
     print(f"Text-only posts: {len(posts) - link_posts}")
     print(f"Expected API cost: {format_cost(total_cost(posts))}")
+
+
+def print_summary(
+    posts: list[AlertPost],
+    days: int,
+    thresholds: tuple[int, int, int] = THRESHOLDS,
+) -> None:
+    print_projection_totals(posts, days, thresholds)
     counts = Counter(post.airport for post in posts)
     if counts:
         print("\nBy airport:")
@@ -606,6 +653,26 @@ def publish_posts(
         print(f"Published https://x.com/tsa_times/status/{tweet_id}")
 
 
+def parse_thresholds(value: str) -> tuple[int, int, int]:
+    try:
+        parsed = tuple(int(part.strip()) for part in value.split(","))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "thresholds must be three comma-separated integers"
+        ) from exc
+    if len(parsed) != 3:
+        raise argparse.ArgumentTypeError(
+            "thresholds must contain exactly three values"
+        )
+    if any(threshold <= 0 for threshold in parsed):
+        raise argparse.ArgumentTypeError("thresholds must be positive")
+    if not (parsed[0] < parsed[1] < parsed[2]):
+        raise argparse.ArgumentTypeError(
+            "thresholds must be strictly increasing"
+        )
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
@@ -638,6 +705,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="with --backtest-days, show only totals by airport",
     )
+    parser.add_argument(
+        "--thresholds",
+        type=parse_thresholds,
+        metavar="MIN1,MIN2,MIN3",
+        help="backtest-only threshold override (for example, 60,90,120)",
+    )
     return parser.parse_args()
 
 
@@ -653,6 +726,9 @@ def main() -> int:
         return 2
     if args.summary and args.backtest_days is None:
         print("--summary requires --backtest-days", file=sys.stderr)
+        return 2
+    if args.thresholds and args.backtest_days is None:
+        print("--thresholds requires --backtest-days", file=sys.stderr)
         return 2
     if args.post_id and airport:
         print("--airport cannot be combined with --post-id", file=sys.stderr)
@@ -686,13 +762,20 @@ def main() -> int:
                 return 2
             publish_posts(conn, [post], is_test=True)
         elif args.backtest_days is not None:
-            posts = backtest(conn, catalog, airport, args.backtest_days)
+            thresholds = args.thresholds or THRESHOLDS
+            posts = backtest(
+                conn,
+                catalog,
+                airport,
+                args.backtest_days,
+                thresholds,
+            )
             if args.summary:
-                print_summary(posts, args.backtest_days)
+                print_summary(posts, args.backtest_days, thresholds)
             else:
                 print_posts(posts)
-                print(f"\nProjected tweets: {len(posts)} over {args.backtest_days} days")
-                print(f"Expected API cost: {format_cost(total_cost(posts))}")
+                print()
+                print_projection_totals(posts, args.backtest_days, thresholds)
         else:
             posts = preview_latest(conn, catalog, airport, live=args.live)
             if args.live:

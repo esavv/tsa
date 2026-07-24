@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import unittest
@@ -191,6 +192,10 @@ class TweetAlertTests(unittest.TestCase):
             alerts.print_summary([first, later], 7)
 
         self.assertIn("Projected tweets: 2 over 7 days", output.getvalue())
+        self.assertIn("Thresholds: 45/60/90 min", output.getvalue())
+        self.assertIn("45 min: 1 tweet", output.getvalue())
+        self.assertIn("60 min: 1 tweet", output.getvalue())
+        self.assertIn("90 min: 0 tweets", output.getvalue())
         self.assertIn("Link posts: 1", output.getvalue())
         self.assertIn("Text-only posts: 1", output.getvalue())
         self.assertIn("Expected API cost: $0.215", output.getvalue())
@@ -240,6 +245,60 @@ class TweetAlertTests(unittest.TestCase):
             [at_60],
             alerts.eligible_candidates([at_60], now + timedelta(hours=6), state),
         )
+
+    def test_custom_thresholds_assign_levels_and_escalation_copy(self):
+        thresholds = (60, 90, 120)
+        candidates = alerts.candidates_for_rows(
+            [
+                row(terminal="4", wait_minutes=65),
+                row(terminal="5", wait_minutes=95),
+                row(terminal="8", wait_minutes=125),
+            ],
+            self.catalog,
+            thresholds,
+        )
+
+        self.assertEqual(
+            [(60, 0), (90, 1), (120, 2)],
+            [
+                (candidate.threshold, candidate.threshold_index)
+                for candidate in candidates
+            ],
+        )
+
+        now = datetime(2026, 7, 14, 20, tzinfo=timezone.utc)
+        middle = candidates[1]
+        highest = candidates[2]
+        middle_escalation = alerts.eligible_candidates(
+            [middle],
+            now,
+            {middle.target: (now - timedelta(minutes=15), 60)},
+        )
+        highest_escalation = alerts.eligible_candidates(
+            [highest],
+            now,
+            {highest.target: (now - timedelta(minutes=15), 90)},
+        )
+
+        middle_post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            middle_escalation,
+            link_available=False,
+        )[0]
+        highest_post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            highest_escalation,
+            link_available=False,
+        )[0]
+        self.assertIn("wait times are even longer", middle_post.text)
+        self.assertIn("wait times are very long", highest_post.text)
+
+    def test_threshold_override_parser_validates_three_increasing_values(self):
+        self.assertEqual((60, 90, 120), alerts.parse_thresholds("60,90,120"))
+        for invalid in ("60,90", "60,90,90", "60,abc,120", "0,60,90"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    alerts.parse_thresholds(invalid)
 
     def test_escalation_copy_uses_threshold_specific_wording(self):
         now = datetime(2026, 7, 14, 20, tzinfo=timezone.utc)
