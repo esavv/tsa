@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ page_title }}{% endblock %}
+{% block body_class %}{% if marketing_preview_embed %}marketing-preview-embed{% endif %}{% endblock %}
 {% block head %}
   <link rel="canonical" href="{{ canonical_url }}">
   <meta name="description" content="{{ meta_description }}">
@@ -1443,6 +1444,46 @@
     html[data-theme="dark"] .airport-search-row--unavailable .airport-search-name {
       color: var(--tsa-text-subtle);
     }
+    body.marketing-preview-embed {
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+    body.marketing-preview-embed .airport-page-header,
+    body.marketing-preview-embed .airport-page-heading,
+    body.marketing-preview-embed .airport-locale-inline-row,
+    body.marketing-preview-embed .tab-row-scroll,
+    body.marketing-preview-embed .chart-ctrl-strip,
+    body.marketing-preview-embed #chart-legend,
+    body.marketing-preview-embed #chart-bootstrap-msg,
+    body.marketing-preview-embed .airport-search-scrim,
+    body.marketing-preview-embed .chart-callout,
+    body.marketing-preview-embed > footer {
+      display: none !important;
+    }
+    body.marketing-preview-embed main.airport-layout,
+    body.marketing-preview-embed .airport-cluster,
+    body.marketing-preview-embed .airport-below-search,
+    body.marketing-preview-embed .chart-area-wrap,
+    body.marketing-preview-embed #chart-shell,
+    body.marketing-preview-embed .chart-container {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+    }
+    body.marketing-preview-embed .chart-area-wrap,
+    body.marketing-preview-embed #chart-shell {
+      display: block !important;
+    }
+    body.marketing-preview-embed .chart-container {
+      height: 100% !important;
+    }
   </style>
 {% endblock %}
 {% block body %}
@@ -1580,6 +1621,17 @@
     const pageAirportEntry = {{ airport_catalog_entry | tojson }};
     const initialTerminal = {{ initial_terminal | tojson }};
     const initialGate = {{ initial_gate | tojson }};
+    const marketingPreviewEmbed = {{ marketing_preview_embed | tojson }};
+    const marketingPreviewStart = {{ marketing_preview_start | tojson }};
+    const marketingPreviewEnd = {{ marketing_preview_end | tojson }};
+    const marketingPreviewHours = {{ marketing_preview_hours | tojson }};
+    const marketingPreviewBounds = (function () {
+      if (!marketingPreviewEmbed || !marketingPreviewStart || !marketingPreviewEnd) return null;
+      const tMin = Date.parse(marketingPreviewStart);
+      const tMax = Date.parse(marketingPreviewEnd);
+      if (!isFinite(tMin) || !isFinite(tMax) || tMin >= tMax) return null;
+      return { tMin, tMax };
+    })();
 
     let selectedTerminal = '';
     let selectedGate = '';
@@ -1785,6 +1837,7 @@
     }
 
     function syncUrl() {
+      if (marketingPreviewEmbed) return;
       const u = new URL(window.location.origin + '/' + pageAirport);
       if (selectedTerminal) u.searchParams.set('terminal', selectedTerminal);
       const eg = effectiveGateForTab(pageAirportEntry, selectedGate);
@@ -1805,7 +1858,7 @@
     const readingFixedEl = document.getElementById('chart-reading-fixed');
     let chart = null;
     let chartTouchAbort = null;
-    let currentHours = 24;
+    let currentHours = marketingPreviewHours;
     let lastHistoryPayload = null;
     let lastHistoryRequestHours = null;
     let historyFetchAbort = null;
@@ -1822,7 +1875,9 @@
 
     window.addEventListener('tsa-theme-change', function () {
       if (!chart) return;
-      const tickColor = chartThemeColor('--chart-tick-color', '#64748b');
+      const tickColor = marketingPreviewEmbed
+        ? 'transparent'
+        : chartThemeColor('--chart-tick-color', '#64748b');
       chart.options.scales.x.ticks.color = tickColor;
       chart.options.scales.y.ticks.color = tickColor;
       chart.update('none');
@@ -2267,12 +2322,22 @@
 
     /** Chart x-axis domain: [tMin, tMax] with tMax = global latest scrape (from /api/latest). */
     function chartWindowBoundsMs(hours, fallbackTMaxMs) {
+      if (marketingPreviewBounds) return marketingPreviewBounds;
       let tMax = pageGlobalLatestScrapedMs;
       if (tMax == null && fallbackTMaxMs != null) tMax = fallbackTMaxMs;
       if (tMax == null) return null;
       const periodMs = Number(hours) * 3600000;
       const tMin = tMax - periodMs + SCRAPE_STEP_MS;
       return { tMin, tMax };
+    }
+
+    function chartTickHours(hours) {
+      const n = Number(hours);
+      if (n <= 6) return 6;
+      if (n <= 12) return 12;
+      if (n <= 24) return 24;
+      if (n <= 72) return 72;
+      return 168;
     }
 
     function buildChartTickValues(tMin, tMax, hours) {
@@ -2491,7 +2556,14 @@
       }
 
       const hoursNum = Number(hours);
-      const chartBuild = { bounds, hoursNum, mergedRows, mergedTimesMs, queueTypes };
+      const chartBuild = {
+        bounds,
+        hoursNum,
+        tickHours: chartTickHours(hoursNum),
+        mergedRows,
+        mergedTimesMs,
+        queueTypes,
+      };
       const rangeLegendSuffix =
         seriesNorm.includes('absolute') && seriesNorm.includes('range');
       const seriesColorIdx = assignSeriesColorIndices(seriesDefs);
@@ -2572,12 +2644,14 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: marketingPreviewEmbed ? false : undefined,
           interaction: { mode: 'nearest', axis: 'x', intersect: false },
           plugins: {
             legend: { display: false },
             tooltip: { enabled: false }
           },
           onHover: (event, _elements, chartRef) => {
+            if (marketingPreviewEmbed) return;
             if (touchChartUi()) return;
             const area = chartRef.chartArea;
             if (!area || event.x == null) return;
@@ -2600,7 +2674,9 @@
               grid: { display: false, drawBorder: false },
               border: { display: false },
               ticks: {
-                color: chartThemeColor('--chart-tick-color', '#64748b'),
+                color: marketingPreviewEmbed
+                  ? 'transparent'
+                  : chartThemeColor('--chart-tick-color', '#64748b'),
                 callback: function (value, index, ticks) {
                   if (Number(value) === 0) return '';
                   return Chart.Ticks.formatters.numeric.call(this, value, index, ticks);
@@ -2616,7 +2692,7 @@
               // Must be on the scale, not under ticks — Chart only calls options.afterBuildTicks.
               afterBuildTicks: function (axis) {
                 const bw = chartBuild.bounds;
-                const hr = chartBuild.hoursNum;
+                const hr = chartBuild.tickHours;
                 axis.ticks = buildChartTickValues(bw.tMin, bw.tMax, hr).map(function (ms) {
                   return { value: ms };
                 });
@@ -2625,13 +2701,15 @@
                 autoSkip: false,
                 minRotation: 0,
                 maxRotation: 0,
-                color: chartThemeColor('--chart-tick-color', '#64748b'),
+                color: marketingPreviewEmbed
+                  ? 'transparent'
+                  : chartThemeColor('--chart-tick-color', '#64748b'),
                 callback: function (value, index, ticks) {
                   const tick = ticks[index];
                   const ms = tick != null && tick.value != null ? tick.value : value;
                   if (ms == null || ms === '') return '';
                   const dt = new Date(ms);
-                  return formatTick(dt, chartBuild.hoursNum);
+                  return formatTick(dt, chartBuild.tickHours);
                 },
               },
             },
@@ -2710,9 +2788,17 @@
       clearFixedReadout();
       updateRangeButtons(hours);
 
-      let url = '/api/history?airport=' + encodeURIComponent(pageAirport)
-        + '&terminal=' + encodeURIComponent(selectedTerminal)
-        + '&hours=' + encodeURIComponent(hours);
+      let url;
+      if (marketingPreviewBounds) {
+        url = '/api/preview/history?airport=' + encodeURIComponent(pageAirport)
+          + '&terminal=' + encodeURIComponent(selectedTerminal)
+          + '&start=' + encodeURIComponent(new Date(marketingPreviewBounds.tMin).toISOString())
+          + '&end=' + encodeURIComponent(new Date(marketingPreviewBounds.tMax).toISOString());
+      } else {
+        url = '/api/history?airport=' + encodeURIComponent(pageAirport)
+          + '&terminal=' + encodeURIComponent(selectedTerminal)
+          + '&hours=' + encodeURIComponent(hours);
+      }
       if (selectedGate) url += '&gate=' + encodeURIComponent(selectedGate);
 
       fetch(url, { signal: historyFetchAbort.signal })
@@ -2722,6 +2808,15 @@
           lastHistoryPayload = data;
           lastHistoryRequestHours = Number(hours);
           buildChartFromHistory(data, hours);
+          if (marketingPreviewEmbed && window.parent !== window) {
+            const rowCount = Object.values(data.queues || {}).reduce(function (total, rows) {
+              return total + rows.length;
+            }, 0);
+            window.parent.postMessage(
+              { type: 'tsa-preview-chart-ready', rowCount: rowCount },
+              window.location.origin
+            );
+          }
         })
         .catch(e => {
           if (e.name === 'AbortError') return;
@@ -2736,6 +2831,12 @@
             chart = null;
           }
           clearChartHtmlLegend();
+          if (marketingPreviewEmbed && window.parent !== window) {
+            window.parent.postMessage(
+              { type: 'tsa-preview-chart-error', message: e.message },
+              window.location.origin
+            );
+          }
         });
     }
 
@@ -2857,7 +2958,15 @@
       .then(r => r.json())
       .then(data => {
         pageGlobalLatestScrapedMs = data.scraped_at_utc ? Date.parse(data.scraped_at_utc) : null;
-        const rows = (data.airports || {})[pageAirport];
+        let rows = (data.airports || {})[pageAirport];
+        if (marketingPreviewEmbed && initialTerminal) {
+          const previewMatch = (rows || []).some(rowMatchesInitial);
+          if (!previewMatch) {
+            rows = (rows || []).concat([
+              { terminal: initialTerminal, gate: initialGate || '', queues: {} },
+            ]);
+          }
+        }
         const emptyLabel = 'Last update: —';
         if (data.scraped_at_utc) {
           const d = new Date(data.scraped_at_utc);
@@ -2892,7 +3001,7 @@
         selectedTerminal = rows[pick].terminal;
         selectedGate = rows[pick].gate || '';
         syncUrl();
-        renderChart(24);
+        renderChart(marketingPreviewHours);
       })
       .catch(e => {
         bootstrapMsgEl.textContent = 'Error: ' + e.message;

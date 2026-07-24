@@ -70,6 +70,24 @@ class MarketingPreviewTests(unittest.TestCase):
             [{"gate": "", "terminal": "5"}],
         )
 
+    def test_preview_embed_uses_airport_chart_with_preview_bounds(self):
+        response = self.client.get(
+            "/JFK",
+            query_string={
+                "terminal": "5",
+                "marketing_preview": "1",
+                "hours": "72",
+                "start": "2026-07-20T12:00:00Z",
+                "end": "2026-07-23T12:00:00Z",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'class="marketing-preview-embed"', response.data)
+        self.assertIn(b"const marketingPreviewEmbed = true;", response.data)
+        self.assertIn(b"const marketingPreviewHours = 72;", response.data)
+        self.assertIn(b"2026-07-20T12:00:00Z", response.data)
+        self.assertIn(b"2026-07-23T12:00:00Z", response.data)
+
     def test_preview_history_uses_explicit_bounds(self):
         response = self.client.get(
             "/api/preview/history",

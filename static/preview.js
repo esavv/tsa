@@ -2,14 +2,6 @@
   'use strict';
 
   var STEP_MS = 15 * 60 * 1000;
-  var GAP_BREAK_MS = 45 * 60 * 1000;
-  var LINE_COLORS = [
-    '#2563eb', '#16a34a', '#ca8a04', '#9333ea', '#dc2626',
-    '#0891b2', '#4f46e5', '#db2777', '#0d9488', '#7c3aed',
-  ];
-  var QUEUE_ORDER = ['general', 'precheck', 'premier', 'priority', 'clear'];
-  var DOT_SPACING = 4;
-  var DOT_RADIUS = 1;
 
   var airportSelect = document.getElementById('preview-airport');
   var terminalSelect = document.getElementById('preview-terminal');
@@ -21,7 +13,7 @@
   var applyRangeButton = document.getElementById('preview-apply-range');
   var statusEl = document.getElementById('preview-status');
   var stageEl = document.getElementById('preview-stage');
-  var chartCanvas = document.getElementById('preview-chart');
+  var chartFrame = document.getElementById('preview-chart-frame');
   var calloutEl = document.getElementById('preview-callout');
   var calloutDateEl = document.getElementById('preview-callout-date');
   var calloutGeneralEl = document.getElementById('preview-callout-general-value');
@@ -36,8 +28,6 @@
   var calloutSizeValue = document.getElementById('preview-callout-size-value');
 
   var optionsPayload = null;
-  var chart = null;
-  var historyAbort = null;
   var selectedHours = 24;
   var customBounds = null;
   var calloutScale = 1;
@@ -87,240 +77,36 @@
     });
   }
 
-  function currentBounds() {
-    if (customBounds) return customBounds;
-    var latest = optionsPayload && Date.parse(optionsPayload.latest_scraped_at_utc);
-    if (!isFinite(latest)) return null;
-    return {
-      start: new Date(latest - selectedHours * 60 * 60 * 1000),
-      end: new Date(latest),
-    };
-  }
-
-  function sortedQueueTypes(queues) {
-    var keys = Object.keys(queues || {});
-    return keys.sort(function (a, b) {
-      var ai = QUEUE_ORDER.indexOf(a);
-      var bi = QUEUE_ORDER.indexOf(b);
-      if (ai === -1) ai = QUEUE_ORDER.length;
-      if (bi === -1) bi = QUEUE_ORDER.length;
-      return ai === bi ? a.localeCompare(b) : ai - bi;
-    });
-  }
-
-  function normalizedSeriesKinds(airport) {
-    var kinds = (
-      airport &&
-      airport.wait_times_ui &&
-      Array.isArray(airport.wait_times_ui.chart_series)
-    ) ? airport.wait_times_ui.chart_series : ['absolute'];
-    return kinds.length ? kinds : ['absolute'];
-  }
-
-  function pointValue(point, kind) {
-    if (kind === 'absolute') return point.minutes;
-    if (kind === 'min') return point.wait_min_minutes;
-    return point.wait_max_minutes;
-  }
-
-  function makeGapSegment(color) {
-    return {
-      borderColor: function (ctx) {
-        var x0 = ctx.p0.parsed.x;
-        var x1 = ctx.p1.parsed.x;
-        return x0 != null && x1 != null && x1 - x0 > GAP_BREAK_MS
-          ? 'transparent'
-          : color;
-      },
-    };
-  }
-
-  function hexRgb(hex) {
-    var number = parseInt(hex.slice(1), 16);
-    return {
-      r: (number >> 16) & 255,
-      g: (number >> 8) & 255,
-      b: number & 255,
-    };
-  }
-
-  var dottedFadeFillPlugin = {
-    id: 'previewDottedFadeFill',
-    beforeDatasetsDraw: function (chartRef) {
-      var ctx = chartRef.ctx;
-      var area = chartRef.chartArea;
-      if (!area) return;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(area.left, area.top, area.width, area.height);
-      ctx.clip();
-
-      chartRef.data.datasets.forEach(function (dataset, datasetIndex) {
-        if (!dataset.dottedFadeFillColor || !chartRef.isDatasetVisible(datasetIndex)) return;
-        var line = chartRef.getDatasetMeta(datasetIndex).dataset;
-        if (!line || !line.points || line.points.length < 2) return;
-        var rgb = hexRgb(dataset.dottedFadeFillColor);
-        var seriesTop = line.points.reduce(function (top, point) {
-          if (!point || point.skip || !isFinite(point.y)) return top;
-          return Math.min(top, Math.max(area.top, Math.min(area.bottom, point.y)));
-        }, area.bottom);
-        var fadeHeight = area.bottom - seriesTop;
-        if (fadeHeight <= DOT_SPACING) return;
-        var rows = new Map();
-
-        (line.segments || []).forEach(function (segment) {
-          if (segment.style && segment.style.borderColor === 'transparent') return;
-          var first = line.points[segment.start];
-          var last = line.points[segment.end];
-          if (!first || !last || first.skip || last.skip) return;
-          var xStart = Math.max(area.left, Math.min(first.x, last.x));
-          var xEnd = Math.min(area.right, Math.max(first.x, last.x));
-          for (
-            var x = Math.ceil(xStart / DOT_SPACING) * DOT_SPACING;
-            x <= xEnd;
-            x += DOT_SPACING
-          ) {
-            var curvePoint = line.interpolate({ x: x }, 'x');
-            if (Array.isArray(curvePoint)) curvePoint = curvePoint[0];
-            if (!curvePoint || !isFinite(curvePoint.y)) continue;
-            var curveY = Math.max(area.top, Math.min(area.bottom, curvePoint.y));
-            for (
-              var y = Math.ceil((curveY + 1) / DOT_SPACING) * DOT_SPACING;
-              y < area.bottom;
-              y += DOT_SPACING
-            ) {
-              if (!rows.has(y)) rows.set(y, []);
-              rows.get(y).push(x);
-            }
-          }
-        });
-
-        rows.forEach(function (xs, y) {
-          var alpha = Math.max(0, Math.min(1, (area.bottom - y) / fadeHeight));
-          ctx.fillStyle =
-            'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ')';
-          ctx.beginPath();
-          xs.forEach(function (x) {
-            ctx.moveTo(x + DOT_RADIUS, y);
-            ctx.arc(x, y, DOT_RADIUS, 0, Math.PI * 2);
-          });
-          ctx.fill();
-        });
-      });
-      ctx.restore();
-    },
-  };
-
-  Chart.register(dottedFadeFillPlugin);
-
-  function buildDatasets(queues, airport) {
-    var datasets = [];
-    var colorIndex = 0;
-    var kinds = normalizedSeriesKinds(airport);
-    sortedQueueTypes(queues).forEach(function (queueType) {
-      kinds.forEach(function (kind) {
-        var points = (queues[queueType] || []).map(function (point) {
-          var value = pointValue(point, kind);
-          return {
-            x: Date.parse(point.t),
-            y: value == null || !isFinite(Number(value)) ? null : Number(value),
-          };
-        });
-        if (!points.some(function (point) { return point.y != null; })) return;
-        var color = LINE_COLORS[colorIndex % LINE_COLORS.length];
-        colorIndex += 1;
-        datasets.push({
-          data: points,
-          parsing: false,
-          borderColor: color,
-          borderWidth: 2,
-          backgroundColor: 'transparent',
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          fill: false,
-          tension: 0.2,
-          spanGaps: false,
-          segment: makeGapSegment(color),
-          dottedFadeFillColor: kind === 'absolute' || kind === 'range' ? color : null,
-        });
-      });
-    });
-    return datasets;
-  }
-
-  function drawChart(data, bounds) {
-    if (chart) chart.destroy();
-    chart = new Chart(chartCanvas.getContext('2d'), {
-      type: 'line',
-      data: { datasets: buildDatasets(data.queues || {}, selectedAirport()) },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        events: [],
-        layout: { padding: 12 },
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false },
-        },
-        scales: {
-          x: {
-            type: 'time',
-            display: false,
-            min: bounds.start.getTime(),
-            max: bounds.end.getTime(),
-          },
-          y: {
-            display: false,
-            beginAtZero: true,
-          },
-        },
-      },
-    });
+  function customTickHours(bounds) {
+    var hours = (bounds.end.getTime() - bounds.start.getTime()) / 3600000;
+    if (hours <= 6) return 6;
+    if (hours <= 12) return 12;
+    if (hours <= 24) return 24;
+    if (hours <= 72) return 72;
+    return 168;
   }
 
   function renderChart() {
     var airport = selectedAirport();
     var terminal = selectedTerminal();
-    var bounds = currentBounds();
-    if (!airport || !terminal || !bounds) {
+    if (!airport || !terminal) {
       setStatus('No local history options are available.', true);
       return;
     }
-    if (historyAbort) historyAbort.abort();
-    historyAbort = new AbortController();
-    setStatus('Loading chart…', false);
 
     var params = new URLSearchParams({
-      airport: airport.code,
       terminal: terminal.terminal,
-      gate: terminal.gate || '',
-      start: bounds.start.toISOString(),
-      end: bounds.end.toISOString(),
+      marketing_preview: '1',
+      hours: String(customBounds ? customTickHours(customBounds) : selectedHours),
     });
-    fetch('/api/preview/history?' + params.toString(), { signal: historyAbort.signal })
-      .then(function (response) {
-        return response.json().then(function (body) {
-          if (!response.ok || body.error) throw new Error(body.error || 'History request failed');
-          return body;
-        });
-      })
-      .then(function (data) {
-        drawChart(data, bounds);
-        var pointCount = Object.keys(data.queues || {}).reduce(function (total, key) {
-          return total + data.queues[key].length;
-        }, 0);
-        setStatus(
-          pointCount
-            ? pointCount.toLocaleString() + ' history rows rendered.'
-            : 'No history exists in this range.',
-          false
-        );
-      })
-      .catch(function (error) {
-        if (error.name === 'AbortError') return;
-        setStatus('Error: ' + error.message, true);
-      });
+    if (terminal.gate) params.set('gate', terminal.gate);
+    if (customBounds) {
+      params.set('start', customBounds.start.toISOString());
+      params.set('end', customBounds.end.toISOString());
+    }
+
+    setStatus('Loading chart…', false);
+    chartFrame.src = '/' + encodeURIComponent(airport.code) + '?' + params.toString();
   }
 
   function updateCallout() {
@@ -424,10 +210,7 @@
     stageEl.classList.toggle('preview-stage--og', sizeSelect.value === 'og');
     stageEl.classList.toggle('preview-stage--x', sizeSelect.value === 'x');
     stageEl.classList.toggle('preview-stage--web', sizeSelect.value === 'web');
-    requestAnimationFrame(function () {
-      if (chart) chart.resize();
-      clampCallout();
-    });
+    requestAnimationFrame(clampCallout);
   });
 
   document.querySelectorAll('.range-button').forEach(function (button) {
@@ -456,6 +239,21 @@
     renderChart();
   });
   terminalSelect.addEventListener('change', renderChart);
+
+  window.addEventListener('message', function (event) {
+    if (event.origin !== window.location.origin || event.source !== chartFrame.contentWindow) return;
+    var message = event.data || {};
+    if (message.type === 'tsa-preview-chart-ready') {
+      setStatus(
+        message.rowCount
+          ? Number(message.rowCount).toLocaleString() + ' history rows rendered.'
+          : 'No history exists in this range.',
+        false
+      );
+    } else if (message.type === 'tsa-preview-chart-error') {
+      setStatus('Error: ' + (message.message || 'Chart failed to load'), true);
+    }
+  });
 
   var roundedNow = new Date(Math.round(Date.now() / STEP_MS) * STEP_MS);
   calloutDatetimeInput.value = localInputValue(roundedNow);

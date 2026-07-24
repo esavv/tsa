@@ -209,6 +209,24 @@ def airport(code: str):
         abort(404)
     initial_terminal = request.args.get("terminal") or ""
     initial_gate = request.args.get("gate") or ""
+    marketing_preview_embed = request.args.get("marketing_preview") == "1"
+    marketing_preview_start = (
+        request.args.get("start") or ""
+        if marketing_preview_embed
+        else ""
+    )
+    marketing_preview_end = (
+        request.args.get("end") or ""
+        if marketing_preview_embed
+        else ""
+    )
+    requested_preview_hours = request.args.get("hours") or "24"
+    marketing_preview_hours = (
+        int(requested_preview_hours)
+        if marketing_preview_embed
+        and requested_preview_hours in {"6", "12", "24", "72", "168"}
+        else 24
+    )
     airport_display_name = entry.get("display_name") or c
     city = entry.get("city") or ""
     state = entry.get("state") or ""
@@ -234,6 +252,10 @@ def airport(code: str):
         meta_description=meta_description,
         initial_terminal=initial_terminal,
         initial_gate=initial_gate,
+        marketing_preview_embed=marketing_preview_embed,
+        marketing_preview_start=marketing_preview_start,
+        marketing_preview_end=marketing_preview_end,
+        marketing_preview_hours=marketing_preview_hours,
     )
 
 
