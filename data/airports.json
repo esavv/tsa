@@ -89,6 +89,9 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
+      "tweet_alerts": {
+        "enabled": true
+      },
       "status": "active"
     },
     {
@@ -172,6 +175,9 @@
         "chip": "range",
         "chart_series": ["range"]
       },
+      "tweet_alerts": {
+        "enabled": true
+      },
       "status": "active"
     },
     {
@@ -196,6 +202,9 @@
       "wait_times_ui": {
         "chip": "absolute",
         "chart_series": ["absolute"]
+      },
+      "tweet_alerts": {
+        "enabled": true
       },
       "status": "active"
     },
@@ -378,6 +387,9 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
+      "tweet_alerts": {
+        "enabled": true
+      },
       "status": "active"
     },
     {
@@ -404,6 +416,9 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
+      "tweet_alerts": {
+        "enabled": true
+      },
       "status": "active"
     },
     {
@@ -428,6 +443,9 @@
       "wait_times_ui": {
         "chip": "absolute",
         "chart_series": ["absolute"]
+      },
+      "tweet_alerts": {
+        "enabled": true
       },
       "status": "active"
     },
