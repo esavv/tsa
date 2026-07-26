@@ -24,6 +24,7 @@
       "city": "Atlanta",
       "state": "GA",
       "state_name": "Georgia",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "gate_transform": "titlecase_words",
         "without_gate": "{terminal}",
@@ -70,6 +71,7 @@
       "city": "Baltimore",
       "state": "MD",
       "state_name": "Maryland",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Concourse {terminal}",
         "with_gate": "Concourse {terminal}: {gate}"
@@ -101,6 +103,7 @@
       "city": "Charlotte",
       "state": "NC",
       "state_name": "North Carolina",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "ignore_gate": true,
         "without_gate": "{terminal}",
@@ -127,6 +130,7 @@
       "city": "Washington",
       "state": "DC",
       "state_name": "District of Columbia",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: Gates {gate}"
@@ -159,6 +163,7 @@
       "city": "Denver",
       "state": "CO",
       "state_name": "Colorado",
+      "timezone": "America/Denver",
       "terminal_tab": {
         "without_gate": "{terminal} Terminal",
         "with_gate": "Terminal {terminal}: Gates {gate}"
@@ -187,6 +192,7 @@
       "city": "Dallas",
       "state": "TX",
       "state_name": "Texas",
+      "timezone": "America/Chicago",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: Gate {gate}"
@@ -215,6 +221,7 @@
       "city": "Detroit",
       "state": "MI",
       "state_name": "Michigan",
+      "timezone": "America/Detroit",
       "terminal_tab": {
         "without_gate": "{terminal} Terminal",
         "with_gate": "{terminal} Terminal: {gate}"
@@ -241,6 +248,7 @@
       "city": "Newark",
       "state": "NJ",
       "state_name": "New Jersey",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: Gates {gate}"
@@ -290,6 +298,7 @@
       "city": "Houston",
       "state": "TX",
       "state_name": "Texas",
+      "timezone": "America/Chicago",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: {gate}"
@@ -317,6 +326,7 @@
       "city": "New York",
       "state": "NY",
       "state_name": "New York",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: Gates {gate}"
@@ -348,6 +358,7 @@
       "city": "Las Vegas",
       "state": "NV",
       "state_name": "Nevada",
+      "timezone": "America/Los_Angeles",
       "terminal_tab": {
         "without_gate": "{terminal}",
         "with_gate": "{terminal}: {gate}"
@@ -374,6 +385,7 @@
       "city": "Los Angeles",
       "state": "CA",
       "state_name": "California",
+      "timezone": "America/Los_Angeles",
       "terminal_tab": {
         "without_gate": "{terminal}",
         "with_gate": "{terminal}: Gates {gate}"
@@ -403,6 +415,7 @@
       "city": "New York",
       "state": "NY",
       "state_name": "New York",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: Gates {gate}"
@@ -432,6 +445,7 @@
       "city": "Orlando",
       "state": "FL",
       "state_name": "Florida",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "{terminal}",
         "with_gate": "{terminal}: Gates {gate}"
@@ -460,6 +474,7 @@
       "city": "Miami",
       "state": "FL",
       "state_name": "Florida",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Checkpoint {terminal}",
         "with_gate": "Checkpoint {terminal}: Gates {gate}"
@@ -489,6 +504,7 @@
       "city": "Minneapolis",
       "state": "MN",
       "state_name": "Minnesota",
+      "timezone": "America/Chicago",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: {gate}"
@@ -536,6 +552,7 @@
       "city": "Philadelphia",
       "state": "PA",
       "state_name": "Pennsylvania",
+      "timezone": "America/New_York",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal} {gate}"
@@ -561,6 +578,7 @@
       "city": "Phoenix",
       "state": "AZ",
       "state_name": "Arizona",
+      "timezone": "America/Phoenix",
       "terminal_tab": {
         "without_gate": "{terminal}",
         "with_gate": "{terminal}: {gate}"
@@ -587,6 +605,7 @@
       "city": "Seattle",
       "state": "WA",
       "state_name": "Washington",
+      "timezone": "America/Los_Angeles",
       "terminal_tab": {
         "without_gate": "Terminal {terminal}",
         "with_gate": "Terminal {terminal}: Gates {gate}"

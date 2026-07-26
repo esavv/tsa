@@ -138,7 +138,13 @@ Optional: set `TSA_DB_PATH` in crontab if you want the DB elsewhere:
 The alert runner defaults to a safe dry run. It evaluates 45-, 60-, and
 90-minute thresholds with a six-hour per-terminal cooldown. At most one
 production tweet in any rolling seven-day period includes a link; additional
-tweets are text-only until the link cooldown expires.
+tweets are text-only until the link cooldown expires. Links are only included
+from 6:00 a.m. through 9:59 p.m. in the affected airport's local time. Alerts
+outside that window remain text-only and do not consume the weekly link.
+
+Active airport catalog entries define an IANA `timezone` such as
+`America/New_York` or `America/Los_Angeles`; this keeps the link window correct
+across daylight saving changes.
 
 Within the terminal cooldown, crossing 60 minutes changes single-terminal copy
 to “even longer,” and crossing 90 minutes changes it to “very long.” Initial
@@ -183,9 +189,9 @@ assigned to the highest threshold crossed by any terminal it contains.
 
 Detailed dry-run and backtest output assigns each generated tweet a stable ID.
 It also identifies whether each post includes a link. Backtest summaries split
-the forecast into link and text-only posts, calculate expected API cost at
-$0.200 per link post and $0.015 per text-only post, and break out tweet counts
-and costs per airport.
+the forecast into link, outside-window, weekly-limit, and text-only posts,
+calculate expected API cost at $0.200 per link post and $0.015 per text-only
+post, and break out tweet counts and costs per airport.
 To publish one enrolled airport's generated tweet as an explicit API test:
 
 ```bash

@@ -45,6 +45,7 @@ class TweetAlertTests(unittest.TestCase):
                 },
                 "wait_times_ui": {"chip": "absolute"},
                 "tweet_alerts": {"enabled": True},
+                "timezone": "America/New_York",
             },
             "CLT": {
                 "code": "CLT",
@@ -54,6 +55,7 @@ class TweetAlertTests(unittest.TestCase):
                     "with_gate": "{terminal}: {gate}",
                 },
                 "wait_times_ui": {"chip": "absolute"},
+                "timezone": "America/New_York",
             },
         }
 
@@ -151,6 +153,61 @@ class TweetAlertTests(unittest.TestCase):
         self.assertEqual(2, len(posts))
         self.assertEqual(1, sum(post.included_link for post in posts))
 
+    def test_outside_window_airport_does_not_block_later_link(self):
+        candidates = alerts.candidates_for_rows(
+            [
+                row(
+                    airport="CLT",
+                    terminal="Checkpoint 1",
+                    wait_minutes=61,
+                ),
+                row(wait_minutes=57),
+            ],
+            self.catalog,
+        )
+
+        posts = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            candidates,
+            link_available=True,
+            link_eligible_airports={"JFK"},
+        )
+
+        self.assertFalse(posts[0].included_link)
+        self.assertEqual(
+            "outside 6am-10pm local link window",
+            posts[0].link_omission_reason,
+        )
+        self.assertTrue(posts[1].included_link)
+
+    def test_link_window_uses_airport_local_time_and_boundaries(self):
+        entry = self.catalog["JFK"]
+
+        self.assertFalse(
+            alerts.link_window_open(
+                datetime(2026, 7, 14, 9, 59, tzinfo=timezone.utc),
+                entry,
+            )
+        )
+        self.assertTrue(
+            alerts.link_window_open(
+                datetime(2026, 7, 14, 10, 0, tzinfo=timezone.utc),
+                entry,
+            )
+        )
+        self.assertTrue(
+            alerts.link_window_open(
+                datetime(2026, 7, 15, 1, 59, tzinfo=timezone.utc),
+                entry,
+            )
+        )
+        self.assertFalse(
+            alerts.link_window_open(
+                datetime(2026, 7, 15, 2, 0, tzinfo=timezone.utc),
+                entry,
+            )
+        )
+
     def test_generated_post_id_is_stable_and_content_specific(self):
         first = alerts.posts_for_candidates(
             "2026-07-14T20:00:00Z",
@@ -201,6 +258,8 @@ class TweetAlertTests(unittest.TestCase):
         self.assertIn("90 min: 0 tweets", output.getvalue())
         self.assertIn("Link posts: 1", output.getvalue())
         self.assertIn("Text-only posts: 1", output.getvalue())
+        self.assertIn("Outside link window: 0", output.getvalue())
+        self.assertIn("Weekly link limit: 1", output.getvalue())
         self.assertIn("Expected API cost: $0.215", output.getvalue())
         self.assertIn("JFK", output.getvalue())
         self.assertIn("2 tweets", output.getvalue())
@@ -357,6 +416,14 @@ class TweetAlertTests(unittest.TestCase):
                 }
                 with self.assertRaises(ValueError):
                     alerts.airport_thresholds(entry)
+
+    def test_active_airports_require_valid_timezone(self):
+        with self.assertRaises(ValueError):
+            alerts.airport_zoneinfo({"code": "JFK"})
+        with self.assertRaises(ValueError):
+            alerts.airport_zoneinfo(
+                {"code": "JFK", "timezone": "Not/A_Real_Timezone"}
+            )
 
     def test_threshold_override_parser_validates_three_increasing_values(self):
         self.assertEqual((60, 90, 120), alerts.parse_thresholds("60,90,120"))

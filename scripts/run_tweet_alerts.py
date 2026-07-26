@@ -14,6 +14,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -28,6 +29,8 @@ SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://tsa-times.com").rstrip(
 THRESHOLDS = (45, 60, 90)
 COOLDOWN = timedelta(hours=6)
 LINK_COOLDOWN = timedelta(days=7)
+LINK_WINDOW_START_HOUR = 6
+LINK_WINDOW_END_HOUR = 22
 X_URL_LENGTH = 23
 TEXT_POST_COST = Decimal("0.015")
 LINK_POST_COST = Decimal("0.200")
@@ -59,6 +62,7 @@ class AlertPost:
     text: str
     url: str
     included_link: bool
+    link_omission_reason: str | None
 
     @property
     def post_id(self) -> str:
@@ -102,6 +106,8 @@ def load_catalog() -> dict[str, dict]:
     for entry in catalog.values():
         if has_custom_thresholds(entry):
             airport_thresholds(entry)
+        if (entry.get("status") or "active") == "active":
+            airport_zoneinfo(entry)
     return catalog
 
 
@@ -148,6 +154,23 @@ def airport_thresholds(
 def has_custom_thresholds(entry: dict) -> bool:
     config = entry.get("tweet_alerts")
     return isinstance(config, dict) and config.get("thresholds") is not None
+
+
+def airport_zoneinfo(entry: dict) -> ZoneInfo:
+    timezone_name = entry.get("timezone")
+    if not isinstance(timezone_name, str) or not timezone_name:
+        raise ValueError(f"{entry.get('code', 'airport')} must define timezone")
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError(
+            f"{entry.get('code', 'airport')} has invalid timezone {timezone_name!r}"
+        ) from exc
+
+
+def link_window_open(at: datetime, entry: dict) -> bool:
+    local = at.astimezone(airport_zoneinfo(entry))
+    return LINK_WINDOW_START_HOUR <= local.hour < LINK_WINDOW_END_HOUR
 
 
 def terminal_tab_config(entry: dict) -> dict:
@@ -302,6 +325,7 @@ def make_post(
     candidates: list[Candidate],
     *,
     include_link: bool,
+    link_omission_reason: str | None = None,
 ) -> AlertPost:
     ordered = sorted(
         candidates,
@@ -338,6 +362,7 @@ def make_post(
         text=text,
         url=url,
         included_link=include_link,
+        link_omission_reason=link_omission_reason,
     )
 
 
@@ -346,19 +371,35 @@ def posts_for_candidates(
     candidates: list[Candidate],
     *,
     link_available: bool,
+    link_eligible_airports: set[str] | None = None,
 ) -> list[AlertPost]:
     grouped: dict[str, list[Candidate]] = {}
     for candidate in candidates:
         grouped.setdefault(candidate.target.airport, []).append(candidate)
     posts = []
     for airport in sorted(grouped):
-        include_link = link_available and not posts
+        in_link_window = (
+            link_eligible_airports is None or airport in link_eligible_airports
+        )
+        include_link = (
+            link_available
+            and not any(post.included_link for post in posts)
+            and in_link_window
+        )
+        omission_reason = None
+        if not include_link:
+            omission_reason = (
+                "outside 6am-10pm local link window"
+                if not in_link_window
+                else "link used during the prior 7 days"
+            )
         posts.append(
             make_post(
                 scraped_at_utc,
                 airport,
                 grouped[airport],
                 include_link=include_link,
+                link_omission_reason=omission_reason,
             )
         )
     return posts
@@ -443,14 +484,21 @@ def preview_latest(
     at = utc_from_iso(scraped_at_utc)
     eligible = eligible_candidates(candidates, at, actual_alert_state(conn, airport))
     last_link_at = last_production_link_at(conn)
+    posting_at = datetime.now(timezone.utc)
     link_available = (
         last_link_at is None
-        or datetime.now(timezone.utc) - last_link_at >= LINK_COOLDOWN
+        or posting_at - last_link_at >= LINK_COOLDOWN
     )
+    link_eligible_airports = {
+        candidate.target.airport
+        for candidate in eligible
+        if link_window_open(posting_at, catalog[candidate.target.airport])
+    }
     return posts_for_candidates(
         scraped_at_utc,
         eligible,
         link_available=link_available,
+        link_eligible_airports=link_eligible_airports,
     )
 
 
@@ -490,6 +538,11 @@ def historical_posts(
             link_available=(
                 last_link_at is None or at - last_link_at >= LINK_COOLDOWN
             ),
+            link_eligible_airports={
+                candidate.target.airport
+                for candidate in eligible
+                if link_window_open(at, catalog[candidate.target.airport])
+            },
         )
         if any(post.included_link for post in generated):
             last_link_at = at
@@ -561,7 +614,7 @@ def print_posts(posts: list[AlertPost]) -> None:
         print(
             "[link included]"
             if post.included_link
-            else "[text only: link used during the prior 7 days]"
+            else f"[text only: {post.link_omission_reason}]"
         )
         print(f"[{weighted_post_length(post.text, post.url)} weighted characters]")
 
@@ -657,8 +710,17 @@ def print_projection_totals(
         noun = "tweet" if count == 1 else "tweets"
         print(f"  {threshold} min: {count} {noun}")
     link_posts = sum(post.included_link for post in posts)
+    outside_window_posts = sum(
+        post.link_omission_reason == "outside 6am-10pm local link window"
+        for post in posts
+    )
     print(f"Link posts: {link_posts}")
     print(f"Text-only posts: {len(posts) - link_posts}")
+    print(f"  Outside link window: {outside_window_posts}")
+    print(
+        "  Weekly link limit: "
+        f"{len(posts) - link_posts - outside_window_posts}"
+    )
     print(f"Expected API cost: {format_cost(total_cost(posts))}")
 
 
