@@ -94,16 +94,60 @@ def utc_iso(value: datetime) -> str:
 def load_catalog() -> dict[str, dict]:
     with open(CATALOG_PATH, encoding="utf-8") as catalog_file:
         raw = json.load(catalog_file)
-    return {
+    catalog = {
         str(entry.get("code") or "").upper(): entry
         for entry in raw.get("airports", [])
         if entry.get("code")
     }
+    for entry in catalog.values():
+        if has_custom_thresholds(entry):
+            airport_thresholds(entry)
+    return catalog
 
 
 def alerts_enabled(entry: dict) -> bool:
     config = entry.get("tweet_alerts")
     return isinstance(config, dict) and config.get("enabled") is True
+
+
+def validate_thresholds(values: tuple[int, ...] | list[int]) -> tuple[int, int, int]:
+    if len(values) != 3:
+        raise ValueError("thresholds must contain exactly three values")
+    if any(type(value) is not int for value in values):
+        raise ValueError("thresholds must be integers")
+    parsed = (values[0], values[1], values[2])
+    if any(threshold <= 0 for threshold in parsed):
+        raise ValueError("thresholds must be positive")
+    if not (parsed[0] < parsed[1] < parsed[2]):
+        raise ValueError("thresholds must be strictly increasing")
+    return parsed
+
+
+def airport_thresholds(
+    entry: dict,
+    override: tuple[int, int, int] | None = None,
+) -> tuple[int, int, int]:
+    if override is not None:
+        return override
+    config = entry.get("tweet_alerts")
+    raw = config.get("thresholds") if isinstance(config, dict) else None
+    if raw is None:
+        return THRESHOLDS
+    if not isinstance(raw, list):
+        raise ValueError(
+            f"{entry.get('code', 'airport')} tweet_alerts.thresholds must be a list"
+        )
+    try:
+        return validate_thresholds(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"{entry.get('code', 'airport')} tweet_alerts.thresholds: {exc}"
+        ) from exc
+
+
+def has_custom_thresholds(entry: dict) -> bool:
+    config = entry.get("tweet_alerts")
+    return isinstance(config, dict) and config.get("thresholds") is not None
 
 
 def terminal_tab_config(entry: dict) -> dict:
@@ -174,7 +218,7 @@ def crossed_threshold(
 def candidates_for_rows(
     rows: list[sqlite3.Row],
     catalog: dict[str, dict],
-    thresholds: tuple[int, int, int] = THRESHOLDS,
+    threshold_override: tuple[int, int, int] | None = None,
 ) -> list[Candidate]:
     best_by_target: dict[Target, tuple[int, str]] = {}
     for row in rows:
@@ -197,6 +241,10 @@ def candidates_for_rows(
 
     candidates = []
     for target, (wait_minutes, wait_display) in best_by_target.items():
+        thresholds = airport_thresholds(
+            catalog[target.airport],
+            threshold_override,
+        )
         crossed = crossed_threshold(wait_minutes, thresholds)
         if crossed is None:
             continue
@@ -412,7 +460,7 @@ def historical_posts(
     airport: str | None,
     start: datetime,
     end: datetime,
-    thresholds: tuple[int, int, int] = THRESHOLDS,
+    threshold_override: tuple[int, int, int] | None = None,
 ) -> list[AlertPost]:
     sql = """
         SELECT DISTINCT scraped_at_utc
@@ -432,7 +480,7 @@ def historical_posts(
         scraped_at_utc = str(timestamp_row[0])
         at = utc_from_iso(scraped_at_utc)
         rows = wait_rows_at(conn, scraped_at_utc, airport)
-        candidates = candidates_for_rows(rows, catalog, thresholds)
+        candidates = candidates_for_rows(rows, catalog, threshold_override)
         eligible = eligible_candidates(candidates, at, state)
         for candidate in eligible:
             state[candidate.target] = (at, candidate.threshold)
@@ -455,7 +503,7 @@ def backtest(
     catalog: dict[str, dict],
     airport: str | None,
     days: int,
-    thresholds: tuple[int, int, int] = THRESHOLDS,
+    threshold_override: tuple[int, int, int] | None = None,
 ) -> list[AlertPost]:
     latest = latest_scrape_at(conn)
     if not latest:
@@ -467,7 +515,7 @@ def backtest(
         airport,
         end - timedelta(days=days),
         end,
-        thresholds,
+        threshold_override,
     )
 
 
@@ -535,16 +583,76 @@ def post_threshold(post: AlertPost) -> int:
     return max(candidate.threshold for candidate in post.candidates)
 
 
+def threshold_scenario_airports(
+    posts: list[AlertPost],
+    catalog: dict[str, dict],
+    airport: str | None,
+) -> list[str]:
+    if airport:
+        return [airport]
+    codes = {post.airport for post in posts}
+    codes.update(
+        code
+        for code, entry in catalog.items()
+        if has_custom_thresholds(entry)
+    )
+    return sorted(codes)
+
+
 def print_projection_totals(
     posts: list[AlertPost],
     days: int,
-    thresholds: tuple[int, int, int],
+    catalog: dict[str, dict],
+    airport: str | None,
+    threshold_override: tuple[int, int, int] | None,
 ) -> None:
-    print(f"Thresholds: {'/'.join(str(value) for value in thresholds)} min")
+    scenario_airports = threshold_scenario_airports(posts, catalog, airport)
+    if threshold_override:
+        print(
+            "Threshold override: "
+            f"{'/'.join(str(value) for value in threshold_override)} min"
+        )
+        bucket_thresholds = threshold_override
+    elif airport:
+        configured = airport_thresholds(catalog[airport])
+        source = "custom" if has_custom_thresholds(catalog[airport]) else "default"
+        print(
+            f"Thresholds: {'/'.join(str(value) for value in configured)} min "
+            f"({source} for {airport})"
+        )
+        bucket_thresholds = configured
+    else:
+        print(
+            "Default thresholds: "
+            f"{'/'.join(str(value) for value in THRESHOLDS)} min"
+        )
+        custom = [
+            (code, airport_thresholds(catalog[code]))
+            for code in scenario_airports
+            if has_custom_thresholds(catalog[code])
+        ]
+        if custom:
+            print("Custom airport thresholds:")
+            for code, configured in custom:
+                print(
+                    f"  {code}: "
+                    f"{'/'.join(str(value) for value in configured)} min"
+                )
+        bucket_thresholds = tuple(
+            sorted(
+                {
+                    threshold
+                    for code in scenario_airports
+                    for threshold in airport_thresholds(catalog[code])
+                }
+                or set(THRESHOLDS)
+            )
+        )
+
     print(f"Projected tweets: {len(posts)} over {days} days")
     bucket_counts = Counter(post_threshold(post) for post in posts)
     print("Threshold buckets:")
-    for threshold in thresholds:
+    for threshold in bucket_thresholds:
         count = bucket_counts[threshold]
         noun = "tweet" if count == 1 else "tweets"
         print(f"  {threshold} min: {count} {noun}")
@@ -557,18 +665,34 @@ def print_projection_totals(
 def print_summary(
     posts: list[AlertPost],
     days: int,
-    thresholds: tuple[int, int, int] = THRESHOLDS,
+    catalog: dict[str, dict],
+    airport: str | None = None,
+    threshold_override: tuple[int, int, int] | None = None,
 ) -> None:
-    print_projection_totals(posts, days, thresholds)
+    print_projection_totals(
+        posts,
+        days,
+        catalog,
+        airport,
+        threshold_override,
+    )
     counts = Counter(post.airport for post in posts)
     if counts:
         print("\nBy airport:")
         width = max(len(airport) for airport in counts)
         for airport in sorted(counts):
             airport_posts = [post for post in posts if post.airport == airport]
+            custom_suffix = ""
+            if threshold_override is None and has_custom_thresholds(catalog[airport]):
+                configured = airport_thresholds(catalog[airport])
+                custom_suffix = (
+                    "  custom thresholds "
+                    + "/".join(str(value) for value in configured)
+                )
             print(
                 f"  {airport:<{width}}  {counts[airport]:>3} tweets  "
                 f"{format_cost(total_cost(airport_posts)):>7}"
+                f"{custom_suffix}"
             )
 
 
@@ -660,17 +784,10 @@ def parse_thresholds(value: str) -> tuple[int, int, int]:
         raise argparse.ArgumentTypeError(
             "thresholds must be three comma-separated integers"
         ) from exc
-    if len(parsed) != 3:
-        raise argparse.ArgumentTypeError(
-            "thresholds must contain exactly three values"
-        )
-    if any(threshold <= 0 for threshold in parsed):
-        raise argparse.ArgumentTypeError("thresholds must be positive")
-    if not (parsed[0] < parsed[1] < parsed[2]):
-        raise argparse.ArgumentTypeError(
-            "thresholds must be strictly increasing"
-        )
-    return parsed
+    try:
+        return validate_thresholds(parsed)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def parse_args() -> argparse.Namespace:
@@ -762,20 +879,31 @@ def main() -> int:
                 return 2
             publish_posts(conn, [post], is_test=True)
         elif args.backtest_days is not None:
-            thresholds = args.thresholds or THRESHOLDS
             posts = backtest(
                 conn,
                 catalog,
                 airport,
                 args.backtest_days,
-                thresholds,
+                args.thresholds,
             )
             if args.summary:
-                print_summary(posts, args.backtest_days, thresholds)
+                print_summary(
+                    posts,
+                    args.backtest_days,
+                    catalog,
+                    airport,
+                    args.thresholds,
+                )
             else:
                 print_posts(posts)
                 print()
-                print_projection_totals(posts, args.backtest_days, thresholds)
+                print_projection_totals(
+                    posts,
+                    args.backtest_days,
+                    catalog,
+                    airport,
+                    args.thresholds,
+                )
         else:
             posts = preview_latest(conn, catalog, airport, live=args.live)
             if args.live:

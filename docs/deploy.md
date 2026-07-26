@@ -160,10 +160,26 @@ Dry runs and backtests evaluate all supported airports. Live posting only
 includes airports with `tweet_alerts.enabled` set to `true` in
 `data/airports.json`.
 
+To configure custom production thresholds for an airport, add `thresholds` to
+its existing `tweet_alerts` object:
+
+```json
+"tweet_alerts": {
+  "enabled": true,
+  "thresholds": [60, 75, 90]
+}
+```
+
+The list must contain exactly three positive, strictly increasing integers.
+Airports without the field use the global `45, 60, 90` defaults. Alert runs,
+dry runs, and backtests all use catalog thresholds by default.
+
 `--thresholds` accepts exactly three positive, strictly increasing values and
-is limited to backtests; it cannot override live behavior. Backtest totals show
-how many projected tweets fall into each threshold bucket. A grouped airport
-tweet is assigned to the highest threshold crossed by any terminal it contains.
+is limited to backtests; it overrides catalog thresholds for scenario analysis
+but cannot override live behavior. Backtest output identifies custom airport
+thresholds and uses them for volume and cost estimates. Totals show how many
+projected tweets fall into each threshold bucket. A grouped airport tweet is
+assigned to the highest threshold crossed by any terminal it contains.
 
 Detailed dry-run and backtest output assigns each generated tweet a stable ID.
 It also identifies whether each post includes a link. Backtest summaries split

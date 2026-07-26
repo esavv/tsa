@@ -189,10 +189,13 @@ class TweetAlertTests(unittest.TestCase):
         output = StringIO()
 
         with redirect_stdout(output):
-            alerts.print_summary([first, later], 7)
+            alerts.print_summary([first, later], 7, self.catalog, "JFK")
 
         self.assertIn("Projected tweets: 2 over 7 days", output.getvalue())
-        self.assertIn("Thresholds: 45/60/90 min", output.getvalue())
+        self.assertIn(
+            "Thresholds: 45/60/90 min (default for JFK)",
+            output.getvalue(),
+        )
         self.assertIn("45 min: 1 tweet", output.getvalue())
         self.assertIn("60 min: 1 tweet", output.getvalue())
         self.assertIn("90 min: 0 tweets", output.getvalue())
@@ -292,6 +295,68 @@ class TweetAlertTests(unittest.TestCase):
         )[0]
         self.assertIn("wait times are even longer", middle_post.text)
         self.assertIn("wait times are very long", highest_post.text)
+
+    def test_catalog_thresholds_apply_per_airport_and_cli_override_wins(self):
+        catalog = {
+            "JFK": {
+                **self.catalog["JFK"],
+                "tweet_alerts": {
+                    "enabled": True,
+                    "thresholds": [60, 75, 90],
+                },
+            }
+        }
+
+        configured = alerts.candidates_for_rows(
+            [row(wait_minutes=50), row(terminal="8", wait_minutes=65)],
+            catalog,
+        )
+        overridden = alerts.candidates_for_rows(
+            [row(wait_minutes=50)],
+            catalog,
+            (45, 60, 90),
+        )
+
+        self.assertEqual(1, len(configured))
+        self.assertEqual(60, configured[0].threshold)
+        self.assertEqual(45, overridden[0].threshold)
+
+    def test_summary_identifies_custom_airport_thresholds(self):
+        catalog = {
+            "JFK": {
+                **self.catalog["JFK"],
+                "tweet_alerts": {
+                    "enabled": True,
+                    "thresholds": [60, 75, 90],
+                },
+            }
+        }
+        post = alerts.posts_for_candidates(
+            "2026-07-14T20:00:00Z",
+            alerts.candidates_for_rows([row(wait_minutes=78)], catalog),
+            link_available=False,
+        )[0]
+        output = StringIO()
+
+        with redirect_stdout(output):
+            alerts.print_summary([post], 7, catalog, "JFK")
+
+        self.assertIn(
+            "Thresholds: 60/75/90 min (custom for JFK)",
+            output.getvalue(),
+        )
+        self.assertIn("75 min: 1 tweet", output.getvalue())
+        self.assertIn("custom thresholds 60/75/90", output.getvalue())
+
+    def test_catalog_thresholds_must_be_three_increasing_integers(self):
+        for invalid in ([60, 90], [60, 60, 90], [0, 60, 90], [60, "75", 90]):
+            with self.subTest(invalid=invalid):
+                entry = {
+                    "code": "JFK",
+                    "tweet_alerts": {"thresholds": invalid},
+                }
+                with self.assertRaises(ValueError):
+                    alerts.airport_thresholds(entry)
 
     def test_threshold_override_parser_validates_three_increasing_values(self):
         self.assertEqual((60, 90, 120), alerts.parse_thresholds("60,90,120"))
