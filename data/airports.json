@@ -259,6 +259,10 @@
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
+      "tweet_alerts": {
+        "enabled": true,
+        "thresholds": [60, 75, 90]
+      },
       "status": "active"
     },
     {
@@ -471,6 +475,10 @@
       "wait_times_ui": {
         "chip": "range",
         "chart_series": ["range"]
+      },
+      "tweet_alerts": {
+        "enabled": true,
+        "thresholds": [60, 90, 120]
       },
       "status": "active"
     },
