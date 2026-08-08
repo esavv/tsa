@@ -22,6 +22,9 @@ build/
 *.swo
 *~
 
+# JavaScript
+node_modules/
+
 # Project
 .scratch-airports/
 *.db

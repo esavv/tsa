@@ -1,0 +1,35 @@
+{
+  "name": "tsa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Development tooling for tsa-times.com",
+  "scripts": {
+    "deadcode:js": "knip",
+    "format:js": "prettier --write \"static/**/*.js\" eslint.config.mjs package.json",
+    "format:js:check": "prettier --check \"static/**/*.js\" eslint.config.mjs package.json",
+    "lint:js": "eslint static"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/esavv/tsa.git"
+  },
+  "bugs": {
+    "url": "https://github.com/esavv/tsa/issues"
+  },
+  "homepage": "https://github.com/esavv/tsa#readme",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
+    "knip": "^6.32.0",
+    "prettier": "^3.9.6"
+  },
+  "knip": {
+    "entry": [
+      "static/*.js"
+    ],
+    "project": [
+      "static/*.js"
+    ]
+  }
+}

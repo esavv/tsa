@@ -1,0 +1,6 @@
+templates/
+node_modules/
+venv/
+img/
+static/*.png
+package-lock.json
