@@ -4,10 +4,19 @@
   "private": true,
   "description": "Development tooling for tsa-times.com",
   "scripts": {
+    "check": "npm run check:python && npm run check:js",
+    "check:js": "npm run lint:js && npm run format:js:check && npm run deadcode:js",
+    "check:python": "npm run lint:python && npm run format:python:check && npm run deadcode:python && npm run test:python",
+    "deadcode:python": "./venv/bin/vulture",
     "deadcode:js": "knip",
     "format:js": "prettier --write \"static/**/*.js\" eslint.config.mjs package.json",
     "format:js:check": "prettier --check \"static/**/*.js\" eslint.config.mjs package.json",
-    "lint:js": "eslint static"
+    "format:python": "./venv/bin/ruff format app.py scripts tests",
+    "format:python:check": "./venv/bin/ruff format --check app.py scripts tests",
+    "lint:js": "eslint static",
+    "lint:python": "./venv/bin/ruff check app.py scripts tests",
+    "prepare": "husky",
+    "test:python": "./venv/bin/python -m unittest discover -s tests -p 'test_*.py'"
   },
   "repository": {
     "type": "git",
@@ -21,7 +30,9 @@
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "globals": "^17.9.0",
+    "husky": "^9.1.7",
     "knip": "^6.32.0",
+    "lint-staged": "^17.3.0",
     "prettier": "^3.9.6"
   },
   "knip": {
@@ -31,5 +42,16 @@
     "project": [
       "static/*.js"
     ]
+  },
+  "lint-staged": {
+    "*.py": [
+      "./venv/bin/ruff check --fix",
+      "./venv/bin/ruff format"
+    ],
+    "static/**/*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "{eslint.config.mjs,package.json,.prettierrc.json}": "prettier --write"
   }
 }
