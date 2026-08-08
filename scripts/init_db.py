@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Create SQLite DB and wait_times table from schema. Run once (or idempotent)."""
+
 import os
 import sqlite3
 
@@ -12,7 +13,9 @@ DEFAULT_DB_PATH = os.path.join(REPO_ROOT, "tsa.db")
 def migrate_wait_times_add_gate(conn: sqlite3.Connection) -> None:
     """Rebuild wait_times if it exists without a gate column (adds gate + new UNIQUE)."""
     cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'")
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'"
+    )
     if not cur.fetchone():
         return
     cur.execute("PRAGMA table_info(wait_times)")
@@ -55,7 +58,9 @@ def migrate_wait_times_add_gate(conn: sqlite3.Connection) -> None:
 def migrate_wait_times_add_range_columns(conn: sqlite3.Connection) -> None:
     """Add nullable wait_min_minutes / wait_max_minutes when missing (SQLite ALTER ADD COLUMN)."""
     cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'")
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'"
+    )
     if not cur.fetchone():
         return
     cur.execute("PRAGMA table_info(wait_times)")
@@ -69,7 +74,9 @@ def migrate_wait_times_add_range_columns(conn: sqlite3.Connection) -> None:
 def migrate_wait_times_nullable_wait_minutes(conn: sqlite3.Connection) -> None:
     """Rebuild wait_times if wait_minutes is still NOT NULL (SQLite cannot drop NOT NULL in place)."""
     cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'")
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='wait_times'"
+    )
     if not cur.fetchone():
         return
     cur.execute("PRAGMA table_info(wait_times)")
@@ -120,7 +127,9 @@ def migrate_wait_times_drop_redundant_index(conn: sqlite3.Connection) -> None:
 def migrate_tweet_alerts_metadata_columns(conn: sqlite3.Connection) -> None:
     """Add generated-post, test, and link metadata to existing alert tables."""
     cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tweet_alerts'")
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='tweet_alerts'"
+    )
     if not cur.fetchone():
         return
     cur.execute("PRAGMA table_info(tweet_alerts)")

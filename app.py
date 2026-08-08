@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Simple webapp: latest wait times + 24h terminal history charts."""
+
 import html
 import json
 import logging
@@ -8,9 +9,18 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Optional
-from datetime import datetime, timezone, timedelta
-from flask import Flask, Response, abort, jsonify, redirect, render_template, request, url_for
+from datetime import datetime, timedelta, timezone
+
+from flask import (
+    Flask,
+    Response,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("TSA_DB_PATH", os.path.join(APP_DIR, "tsa.db"))
@@ -29,7 +39,7 @@ except (OSError, json.JSONDecodeError):
     AIRPORT_CATALOG = {"metros": {}, "airports": []}
 
 
-def catalog_airport_entry(code: str) -> Optional[dict]:
+def catalog_airport_entry(code: str) -> dict | None:
     for ap in AIRPORT_CATALOG.get("airports", []):
         if ap.get("code") == code:
             return ap
@@ -121,30 +131,13 @@ def airport_catalog_entry_for_js(code: str) -> dict:
         status = "active"
     raw["status"] = status
     tab = dict(raw.get("terminal_tab") or {})
-    merged_tab = _overlay_terminal_display_labels(code, {**_DEFAULT_TERMINAL_TAB, **tab})
+    merged_tab = _overlay_terminal_display_labels(
+        code, {**_DEFAULT_TERMINAL_TAB, **tab}
+    )
     raw["terminal_tab"] = merged_tab
     raw["wait_times_ui"] = _merge_wait_times_ui(raw)
     return raw
 
-# Keep in sync with scripts/scraper.py SCRAPE_AIRPORTS
-AIRPORT_CODES = frozenset(
-    {
-        "LGA",
-        "JFK",
-        "EWR",
-        "LAX",
-        "MIA",
-        "SEA",
-        "DCA",
-        "DFW",
-        "DEN",
-        "CLT",
-        "LAS",
-        "MCO",
-        "PHX",
-        "ATL",
-    }
-)
 
 app = Flask(__name__, template_folder=os.path.join(APP_DIR, "templates"))
 app.logger.setLevel(logging.INFO)
@@ -217,7 +210,9 @@ def airport(code: str):
     location_phrase = f" in {airport_locale_line}" if airport_locale_line else ""
     page_title = f"TSA Wait Times at {c}"
     canonical_url = f"{SITE_BASE_URL}{url_for('airport', code=c)}"
-    social_image_url = f"{SITE_BASE_URL}{url_for('static', filename='social-preview.png')}"
+    social_image_url = (
+        f"{SITE_BASE_URL}{url_for('static', filename='social-preview.png')}"
+    )
     meta_description = (
         f"Live TSA security wait times for {airport_display_name} ({c})"
         f"{location_phrase}, updated throughout the day."
@@ -359,9 +354,7 @@ def _compute_api_latest_payload() -> dict:
             )
         ]
 
-    result = {
-        k: v for k, v in result.items() if not is_hidden_airport(k)
-    }
+    result = {k: v for k, v in result.items() if not is_hidden_airport(k)}
 
     return {"scraped_at_utc": scraped_at_utc, "airports": result}
 
@@ -446,7 +439,11 @@ def api_history():
         return response
 
     global_latest_iso = global_latest_row[0]
-    gl = global_latest_iso[:-1] + "+00:00" if global_latest_iso.endswith("Z") else global_latest_iso
+    gl = (
+        global_latest_iso[:-1] + "+00:00"
+        if global_latest_iso.endswith("Z")
+        else global_latest_iso
+    )
     global_latest_dt = datetime.fromisoformat(gl)
     since_dt = global_latest_dt - timedelta(hours=int(hours))
     since = since_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -482,7 +479,13 @@ def api_history():
     conn.close()
 
     queues: dict[str, list[dict]] = {}
-    for scraped_at_utc, queue_type, wait_minutes, wait_min_minutes, wait_max_minutes in rows:
+    for (
+        scraped_at_utc,
+        queue_type,
+        wait_minutes,
+        wait_min_minutes,
+        wait_max_minutes,
+    ) in rows:
         point = {
             "t": scraped_at_utc,
             "minutes": wait_minutes,

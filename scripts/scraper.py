@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fetch supported airport security wait times and insert them into SQLite."""
+
 import argparse
 import gzip
 import html
@@ -19,7 +20,9 @@ import zlib
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-NYC_API_BASE = "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints"
+NYC_API_BASE = (
+    "https://avi-prod-mpp-webapp-api.azurewebsites.net/api/v1/SecurityWaitTimesPoints"
+)
 NYC_AIRPORTS = {
     "LGA": "https://www.laguardiaairport.com/",
     "JFK": "https://www.jfkairport.com/",
@@ -162,12 +165,20 @@ PHX_HOME_URL = "https://www.skyharbor.com/"
 DEN_FRUITION_TSA_URL = "https://app.flyfruition.com/api/public/tsa"
 DEN_FRUITION_X_API_KEY = "vqw8ruvwqpv02pqu938bh5p028"
 LAS_SECURITY_WAIT_URL = "https://www.harryreidairport.com/security-wait-times"
-MSP_WAIT_TIMES_URL = "https://www.mspairport.com/airport/security-screening/security-wait-times"
+MSP_WAIT_TIMES_URL = (
+    "https://www.mspairport.com/airport/security-screening/security-wait-times"
+)
 DTW_WAIT_TIMES_URL = "https://proxy.metroairport.com/SkyFiiTSAProxy.ashx"
 PHL_WAIT_TIMES_URL = "https://www.phl.org/phllivereach/metrics"
-PHL_CHECKPOINT_PAGE_URL = "https://www.phl.org/flights/security-information/checkpoint-hours"
-PHL_WAIT_API_JS_URL = "https://www.phl.org/modules/custom/phl_wait_api/js/wait-api.js?tec001"
-BWI_WAIT_TIMES_URL = "https://bwiairport.com/wp-content/themes/bwitheme/cache/wait-times.json"
+PHL_CHECKPOINT_PAGE_URL = (
+    "https://www.phl.org/flights/security-information/checkpoint-hours"
+)
+PHL_WAIT_API_JS_URL = (
+    "https://www.phl.org/modules/custom/phl_wait_api/js/wait-api.js?tec001"
+)
+BWI_WAIT_TIMES_URL = (
+    "https://bwiairport.com/wp-content/themes/bwitheme/cache/wait-times.json"
+)
 BWI_HOME_URL = "https://bwiairport.com/"
 ZENSORS_TRPC_BASE = "https://embed.zensors.live/api/embeddable-widget/trpc"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -269,28 +280,6 @@ def normalize_queue_type(value: str) -> str:
     return "general"
 
 
-def parse_wait_minutes(value: str) -> int:
-    lowered = value.lower()
-    if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
-        return 0
-
-    less_than = re.search(r"(?:<|less than|under)\s*(\d+)", lowered)
-    if less_than:
-        return max(int(less_than.group(1)) - 1, 0)
-
-    range_match = re.search(r"(\d+)\s*[-–]\s*(\d+)", lowered)
-    if range_match:
-        start = int(range_match.group(1))
-        end = int(range_match.group(2))
-        return round((start + end) / 2)
-
-    integer_match = re.search(r"(\d+)", lowered)
-    if integer_match:
-        return int(integer_match.group(1))
-
-    return 0
-
-
 def parse_wait_text_to_fields(value: str) -> tuple[int | None, int | None, int | None]:
     """(wait_minutes, wait_min_minutes, wait_max_minutes). Point only for a lone integer; bands never fill point.
 
@@ -322,27 +311,6 @@ def parse_wait_text_to_fields(value: str) -> tuple[int | None, int | None, int |
         return int(integer_match.group(1)), None, None
 
     return None, None, None
-
-
-def parse_den_wait_minutes(value: str) -> int:
-    """Parse DEN FlyFruition `wait_time` strings; numeric ranges use the high end (conservative)."""
-    lowered = value.lower()
-    if any(marker in lowered for marker in ("closed", "opens", "unavailable")):
-        return 0
-
-    less_than = re.search(r"<\s*(\d+)", lowered)
-    if less_than:
-        return max(int(less_than.group(1)) - 1, 0)
-
-    range_match = re.search(r"(\d+)\s*[-–]\s*(\d+)", lowered)
-    if range_match:
-        return int(range_match.group(2))
-
-    integer_match = re.search(r"(\d+)", lowered)
-    if integer_match:
-        return int(integer_match.group(1))
-
-    return 0
 
 
 def parse_den_wait_to_fields(value: str) -> tuple[int | None, int | None, int | None]:
@@ -441,7 +409,9 @@ def fetch_nyc_airport(airport: str) -> list[dict]:
                 "airport": airport,
                 "terminal": point.get("terminal", ""),
                 "gate": normalize_nyc_gate(point.get("gate")),
-                "queue_type": "general" if point.get("queueType") == "Reg" else "precheck",
+                "queue_type": "general"
+                if point.get("queueType") == "Reg"
+                else "precheck",
                 "wait_minutes": wm,
                 "wait_min_minutes": None,
                 "wait_max_minutes": None,
@@ -459,15 +429,23 @@ def fetch_lax_airport() -> list[dict]:
         page,
         flags=re.IGNORECASE | re.DOTALL,
     )
-    source_updated_at = clean_html_text(updated_match.group(1)) if updated_match else None
+    source_updated_at = (
+        clean_html_text(updated_match.group(1)) if updated_match else None
+    )
 
-    body_match = re.search(r"<tbody[^>]*>(.*?)</tbody>", page, flags=re.IGNORECASE | re.DOTALL)
+    body_match = re.search(
+        r"<tbody[^>]*>(.*?)</tbody>", page, flags=re.IGNORECASE | re.DOTALL
+    )
     if not body_match:
         raise ValueError("Could not find LAX wait-times table body")
 
     rows = []
-    for tr_html in re.findall(r"<tr[^>]*>(.*?)</tr>", body_match.group(1), flags=re.IGNORECASE | re.DOTALL):
-        cells = re.findall(r"<td[^>]*>(.*?)</td>", tr_html, flags=re.IGNORECASE | re.DOTALL)
+    for tr_html in re.findall(
+        r"<tr[^>]*>(.*?)</tr>", body_match.group(1), flags=re.IGNORECASE | re.DOTALL
+    ):
+        cells = re.findall(
+            r"<td[^>]*>(.*?)</td>", tr_html, flags=re.IGNORECASE | re.DOTALL
+        )
         if len(cells) < 3:
             continue
         terminal = normalize_terminal(cells[0])
@@ -501,7 +479,9 @@ def extract_mia_api_details() -> tuple[str, str]:
     script_url = urllib.request.urljoin(MIA_WAIT_TIMES_PAGE_URL, script_match.group(1))
     script = fetch_text(script_url)
 
-    url_match = re.search(r'https://waittime\.api\.aero/waittime/v2/current/MIA', script)
+    url_match = re.search(
+        r"https://waittime\.api\.aero/waittime/v2/current/MIA", script
+    )
     key_match = re.search(r'x-apikey":"([a-f0-9]+)"', script, flags=re.IGNORECASE)
     if not url_match or not key_match:
         raise ValueError("Could not extract MIA wait-times API details")
@@ -570,7 +550,9 @@ def fetch_sea_airport() -> list[dict]:
                 "wait_minutes": int(checkpoint.get("WaitTimeMinutes", 0)),
                 "wait_min_minutes": None,
                 "wait_max_minutes": None,
-                "source_updated_at": parse_microsoft_json_date(checkpoint.get("LastUpdated")),
+                "source_updated_at": parse_microsoft_json_date(
+                    checkpoint.get("LastUpdated")
+                ),
                 "point_id": checkpoint.get("CheckpointID"),
             }
         )
@@ -845,7 +827,9 @@ def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
                 "wait_minutes": wait_minutes,
                 "wait_min_minutes": wait_lo,
                 "wait_max_minutes": wait_hi,
-                "source_updated_at": _iso_from_mobi_timestamp(wt.get("lastUpdatedTimestamp")),
+                "source_updated_at": _iso_from_mobi_timestamp(
+                    wt.get("lastUpdatedTimestamp")
+                ),
                 "point_id": point_id,
             }
         )
@@ -884,7 +868,9 @@ def fetch_iah_airport() -> list[dict]:
 
 def _extract_phx_avn_key() -> str:
     page = fetch_text(PHX_HOME_URL)
-    m = re.search(r"api\.phx\.aero/avn-wait-times/raw\?Key=([a-f0-9]+)", page, flags=re.IGNORECASE)
+    m = re.search(
+        r"api\.phx\.aero/avn-wait-times/raw\?Key=([a-f0-9]+)", page, flags=re.IGNORECASE
+    )
     if m:
         return m.group(1)
     return PHX_AVN_KEY_FALLBACK
@@ -1035,7 +1021,9 @@ def fetch_las_airport() -> list[dict]:
         )
         if not isinstance(upd_batch, list) or not upd_batch:
             continue
-        paths = ((upd_batch[0].get("result") or {}).get("data") or {}).get("paths") or {}
+        paths = ((upd_batch[0].get("result") or {}).get("data") or {}).get(
+            "paths"
+        ) or {}
         if not isinstance(paths, dict):
             continue
         for path_key, path in paths.items():
@@ -1059,9 +1047,9 @@ def fetch_las_airport() -> list[dict]:
             try:
                 ms = int(ts)
                 sec = ms // 1000 if ms > 10_000_000_000 else ms
-                source_updated_at = datetime.fromtimestamp(
-                    sec, timezone.utc
-                ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                source_updated_at = datetime.fromtimestamp(sec, timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )
             except (TypeError, ValueError, OSError):
                 source_updated_at = None
             rows.append(
@@ -1163,14 +1151,19 @@ def fetch_atl_airport() -> list[dict]:
     os.close(fd)
     try:
         proc = subprocess.Popen(
-            [sys.executable, os.path.abspath(__file__), "--atl-worker-output", out_path],
+            [
+                sys.executable,
+                os.path.abspath(__file__),
+                "--atl-worker-output",
+                out_path,
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             start_new_session=True,
         )
         try:
             _, stderr = proc.communicate(timeout=ATL_WORKER_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
@@ -1181,17 +1174,17 @@ def fetch_atl_airport() -> list[dict]:
                 pass
             raise RuntimeError(
                 f"ATL worker exceeded {ATL_WORKER_TIMEOUT_S}s wall-clock; killed process group"
-            )
+            ) from exc
 
         if proc.returncode != 0:
             err = (stderr or b"").decode("utf-8", errors="replace").strip()[:1024]
             raise RuntimeError(f"ATL worker exited {proc.returncode}: {err}")
 
         try:
-            with open(out_path, "r", encoding="utf-8") as f:
+            with open(out_path, encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"ATL worker produced no valid output: {exc}")
+            raise RuntimeError(f"ATL worker produced no valid output: {exc}") from exc
     finally:
         try:
             os.unlink(out_path)
@@ -1269,7 +1262,9 @@ def fetch_msp_airport() -> list[dict]:
         page,
         flags=re.IGNORECASE | re.DOTALL,
     )
-    source_updated_at = clean_html_text(updated_match.group(1)) if updated_match else None
+    source_updated_at = (
+        clean_html_text(updated_match.group(1)) if updated_match else None
+    )
 
     card_re = re.compile(
         r'<div class="security-wait-time[^"]*">.*?'
@@ -1368,7 +1363,9 @@ def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, tuple[str, str]]:
         hours[item.group("key")] = (item.group("open"), item.group("close"))
     missing = sorted({meta[3] for meta in PHL_METRIC_MAP.values()} - set(hours))
     if missing:
-        raise ValueError("PHL wait-api.js missing tHours entries: " + ", ".join(missing))
+        raise ValueError(
+            "PHL wait-api.js missing tHours entries: " + ", ".join(missing)
+        )
     return hours
 
 
@@ -1383,7 +1380,9 @@ def _phl_schedule_is_open(hours: dict[str, tuple[str, str]], schedule_key: str) 
 
 
 def fetch_phl_airport() -> list[dict]:
-    wait_api_js = fetch_text(PHL_WAIT_API_JS_URL, headers={"Referer": PHL_CHECKPOINT_PAGE_URL})
+    wait_api_js = fetch_text(
+        PHL_WAIT_API_JS_URL, headers={"Referer": PHL_CHECKPOINT_PAGE_URL}
+    )
     checkpoint_hours = _parse_phl_checkpoint_hours(wait_api_js)
     payload = fetch_json_url(
         PHL_WAIT_TIMES_URL,
@@ -1393,7 +1392,11 @@ def fetch_phl_airport() -> list[dict]:
             "X-Requested-With": "XMLHttpRequest",
         },
     )
-    rows_raw = ((payload.get("content") or {}).get("rows")) if isinstance(payload, dict) else None
+    rows_raw = (
+        ((payload.get("content") or {}).get("rows"))
+        if isinstance(payload, dict)
+        else None
+    )
     if not isinstance(rows_raw, list):
         raise ValueError("PHL metrics endpoint returned unexpected payload")
 
@@ -1640,7 +1643,9 @@ def print_mobi_raw(airport: str) -> None:
         "IAH": (IAH_WAIT_TIMES_URL, IAH_MOBILE_API_KEY, IAH_MOBILE_API_VERSION),
     }
     if code not in endpoints:
-        raise SystemExit("--raw supports DFW, CLT, MCO, and IAH (same Mobi API family).")
+        raise SystemExit(
+            "--raw supports DFW, CLT, MCO, and IAH (same Mobi API family)."
+        )
     url, api_key, api_version = endpoints[code]
     payload = _fetch_mobi_checkpoint_json(url, api_key, api_version)
     print(json.dumps(payload, indent=2))
@@ -1679,7 +1684,17 @@ def preview(airport: str) -> None:
         "source_updated_at",
         "point_id",
     )
-    headers = ("airport", "terminal", "gate", "queue", "wait", "min", "max", "updated", "point_id")
+    headers = (
+        "airport",
+        "terminal",
+        "gate",
+        "queue",
+        "wait",
+        "min",
+        "max",
+        "updated",
+        "point_id",
+    )
 
     def cell(row: dict, key: str) -> str:
         val = row.get(key)
@@ -1692,7 +1707,7 @@ def preview(airport: str) -> None:
     ]
 
     def fmt_line(cells: tuple[str, ...] | list[str]) -> str:
-        return "  ".join(c.ljust(w) for c, w in zip(cells, widths))
+        return "  ".join(c.ljust(w) for c, w in zip(cells, widths, strict=True))
 
     print(fmt_line(list(headers)))
     print(fmt_line(["-" * w for w in widths]))

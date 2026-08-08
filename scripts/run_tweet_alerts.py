@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Preview, backtest, or publish threshold-based TSA wait alerts to X."""
+
 from __future__ import annotations
 
 import argparse
@@ -196,7 +197,9 @@ def terminal_label(entry: dict, terminal: str, gate: str) -> str:
     if config["gate_transform"] == "titlecase_words":
         gate_display = " ".join(word.capitalize() for word in gate_display.split())
     template = config["with_gate"] if gate_display else config["without_gate"]
-    return template.replace("{terminal}", terminal_display).replace("{gate}", gate_display)
+    return template.replace("{terminal}", terminal_display).replace(
+        "{gate}", gate_display
+    )
 
 
 def wait_metric_and_display(entry: dict, row: sqlite3.Row) -> tuple[int, str] | None:
@@ -485,10 +488,7 @@ def preview_latest(
     eligible = eligible_candidates(candidates, at, actual_alert_state(conn, airport))
     last_link_at = last_production_link_at(conn)
     posting_at = datetime.now(timezone.utc)
-    link_available = (
-        last_link_at is None
-        or posting_at - last_link_at >= LINK_COOLDOWN
-    )
+    link_available = last_link_at is None or posting_at - last_link_at >= LINK_COOLDOWN
     link_eligible_airports = {
         candidate.target.airport
         for candidate in eligible
@@ -535,9 +535,7 @@ def historical_posts(
         generated = posts_for_candidates(
             scraped_at_utc,
             eligible,
-            link_available=(
-                last_link_at is None or at - last_link_at >= LINK_COOLDOWN
-            ),
+            link_available=(last_link_at is None or at - last_link_at >= LINK_COOLDOWN),
             link_eligible_airports={
                 candidate.target.airport
                 for candidate in eligible
@@ -645,9 +643,7 @@ def threshold_scenario_airports(
         return [airport]
     codes = {post.airport for post in posts}
     codes.update(
-        code
-        for code, entry in catalog.items()
-        if has_custom_thresholds(entry)
+        code for code, entry in catalog.items() if has_custom_thresholds(entry)
     )
     return sorted(codes)
 
@@ -675,10 +671,7 @@ def print_projection_totals(
         )
         bucket_thresholds = configured
     else:
-        print(
-            "Default thresholds: "
-            f"{'/'.join(str(value) for value in THRESHOLDS)} min"
-        )
+        print(f"Default thresholds: {'/'.join(str(value) for value in THRESHOLDS)} min")
         custom = [
             (code, airport_thresholds(catalog[code]))
             for code in scenario_airports
@@ -687,10 +680,7 @@ def print_projection_totals(
         if custom:
             print("Custom airport thresholds:")
             for code, configured in custom:
-                print(
-                    f"  {code}: "
-                    f"{'/'.join(str(value) for value in configured)} min"
-                )
+                print(f"  {code}: {'/'.join(str(value) for value in configured)} min")
         bucket_thresholds = tuple(
             sorted(
                 {
@@ -717,10 +707,7 @@ def print_projection_totals(
     print(f"Link posts: {link_posts}")
     print(f"Text-only posts: {len(posts) - link_posts}")
     print(f"  Outside link window: {outside_window_posts}")
-    print(
-        "  Weekly link limit: "
-        f"{len(posts) - link_posts - outside_window_posts}"
-    )
+    print(f"  Weekly link limit: {len(posts) - link_posts - outside_window_posts}")
     print(f"Expected API cost: {format_cost(total_cost(posts))}")
 
 
@@ -747,9 +734,8 @@ def print_summary(
             custom_suffix = ""
             if threshold_override is None and has_custom_thresholds(catalog[airport]):
                 configured = airport_thresholds(catalog[airport])
-                custom_suffix = (
-                    "  custom thresholds "
-                    + "/".join(str(value) for value in configured)
+                custom_suffix = "  custom thresholds " + "/".join(
+                    str(value) for value in configured
                 )
             print(
                 f"  {airport:<{width}}  {counts[airport]:>3} tweets  "
@@ -770,7 +756,9 @@ def x_client():
         if not os.environ.get(name)
     ]
     if missing:
-        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+        raise RuntimeError(
+            f"Missing required environment variables: {', '.join(missing)}"
+        )
     try:
         import tweepy
     except ImportError as exc:

@@ -69,7 +69,9 @@ class TweetAlertTests(unittest.TestCase):
         )
 
         self.assertEqual(2, len(candidates))
-        self.assertEqual({"A", "B"}, {candidate.target.gate for candidate in candidates})
+        self.assertEqual(
+            {"A", "B"}, {candidate.target.gate for candidate in candidates}
+        )
         self.assertEqual({45, 60}, {candidate.threshold for candidate in candidates})
 
     def test_collapses_gate_when_webapp_ignores_gate(self):
@@ -421,9 +423,7 @@ class TweetAlertTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             alerts.airport_zoneinfo({"code": "JFK"})
         with self.assertRaises(ValueError):
-            alerts.airport_zoneinfo(
-                {"code": "JFK", "timezone": "Not/A_Real_Timezone"}
-            )
+            alerts.airport_zoneinfo({"code": "JFK", "timezone": "Not/A_Real_Timezone"})
 
     def test_threshold_override_parser_validates_three_increasing_values(self):
         self.assertEqual((60, 90, 120), alerts.parse_thresholds("60,90,120"))
