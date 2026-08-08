@@ -11,6 +11,7 @@ env/
 .env.local
 *.egg-info/
 .eggs/
+.ruff_cache/
 dist/
 build/
 
