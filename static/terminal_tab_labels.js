@@ -52,8 +52,12 @@
     var base = {
       ignore_gate: t.ignore_gate === true,
       gate_transform: t.gate_transform === 'titlecase_words' ? 'titlecase_words' : 'none',
-      without_gate: typeof t.without_gate === 'string' && t.without_gate ? t.without_gate : DEFAULT_TAB.without_gate,
-      with_gate: typeof t.with_gate === 'string' && t.with_gate ? t.with_gate : DEFAULT_TAB.with_gate,
+      without_gate:
+        typeof t.without_gate === 'string' && t.without_gate
+          ? t.without_gate
+          : DEFAULT_TAB.without_gate,
+      with_gate:
+        typeof t.with_gate === 'string' && t.with_gate ? t.with_gate : DEFAULT_TAB.with_gate,
     };
     if (labels) base.terminal_labels = labels;
     return base;
@@ -103,7 +107,6 @@
     return interpolate(cfg.with_gate, t, displayGateForLabel(cfg, gateRaw));
   }
 
-  global.normalizeTerminalTab = normalizeTerminalTab;
   global.effectiveGateForTab = effectiveGateForTab;
   global.terminalTabLabel = terminalTabLabel;
 })(typeof window !== 'undefined' ? window : this);

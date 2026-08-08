@@ -28,11 +28,7 @@
 
   function slotHasWaitSignal(slot) {
     if (!slot || typeof slot !== 'object') return false;
-    return (
-      slot.minutes != null ||
-      slot.wait_min_minutes != null ||
-      slot.wait_max_minutes != null
-    );
+    return slot.minutes != null || slot.wait_min_minutes != null || slot.wait_max_minutes != null;
   }
 
   /**
@@ -86,18 +82,6 @@
     return picked;
   }
 
-  function chipQueueWaitLine(queues, chipMode) {
-    var chip = chipMode || 'absolute';
-    var picked = chipQueueFirstTwoSlots(queues);
-    if (!picked.length) return '';
-    var segments = [];
-    for (var j = 0; j < picked.length; j++) {
-      var disp = formatWaitChipSlot(chip, picked[j].slot);
-      segments.push(chipQueueTypeLabel(picked[j].qt) + ' ' + disp.text);
-    }
-    return segments.join(' · ');
-  }
-
   /** CSS class for wait-time pill (0–14 low, 15–29 mid, 30+ high). */
   function waitTimePillClass(minutes) {
     var m = Number(minutes);
@@ -120,15 +104,10 @@
       var disp = formatWaitChipSlot(chip, slot);
       var valueHtml;
       if (disp.pillMetric == null) {
-        valueHtml =
-          '<span class="airport-search-chip__wait--empty">' + esc(disp.text) + '</span>';
+        valueHtml = '<span class="airport-search-chip__wait--empty">' + esc(disp.text) + '</span>';
       } else {
         valueHtml =
-          '<span class="' +
-          waitTimePillClass(disp.pillMetric) +
-          '">' +
-          esc(disp.text) +
-          '</span>';
+          '<span class="' + waitTimePillClass(disp.pillMetric) + '">' + esc(disp.text) + '</span>';
       }
       return (
         '<span class="airport-search-chip__wait-lbl">' +
@@ -199,26 +178,7 @@
     return rows;
   }
 
-  /** Plain-text summary for title attributes (includes "6m" style). */
-  function airportTabQueueWaitTitle(queues, chipMode) {
-    return airportTabQueueWaitGridRows(queues, chipMode)
-      .map(function (pairs) {
-        return pairs
-          .map(function (s) {
-            return s.label + ' ' + s.text;
-          })
-          .join(' · ');
-      })
-      .join(' | ');
-  }
-
-  global.chipQueueTypeLabel = chipQueueTypeLabel;
-  global.chipQueueFirstTwoSlots = chipQueueFirstTwoSlots;
-  global.chipQueueWaitLine = chipQueueWaitLine;
   global.chipQueueWaitLineHtml = chipQueueWaitLineHtml;
   global.waitTimePillClass = waitTimePillClass;
-  global.slotHasWaitSignal = slotHasWaitSignal;
-  global.formatWaitChipSlot = formatWaitChipSlot;
   global.airportTabQueueWaitGridRows = airportTabQueueWaitGridRows;
-  global.airportTabQueueWaitTitle = airportTabQueueWaitTitle;
 })(typeof window !== 'undefined' ? window : this);

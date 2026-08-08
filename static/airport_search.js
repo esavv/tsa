@@ -27,14 +27,16 @@
     if (latestJson && now - latestFetchedAt < LATEST_TTL_MS) {
       return Promise.resolve(latestJson);
     }
-    return fetch(LATEST_URL).then(function (r) {
-      if (!r.ok) throw new Error('latest fetch failed');
-      return r.json();
-    }).then(function (j) {
-      latestJson = j;
-      latestFetchedAt = Date.now();
-      return j;
-    });
+    return fetch(LATEST_URL)
+      .then(function (r) {
+        if (!r.ok) throw new Error('latest fetch failed');
+        return r.json();
+      })
+      .then(function (j) {
+        latestJson = j;
+        latestFetchedAt = Date.now();
+        return j;
+      });
   }
 
   /** Split for prefix matching (whitespace and common separators between tokens). */
@@ -286,10 +288,9 @@
     for (var i = 0; i < show.length; i++) {
       var row = show[i];
       var label = terminalTabLabel(apEntry, row.terminal, row.gate);
-      var chipMode =
-        (apEntry.wait_times_ui && apEntry.wait_times_ui.chip) || 'absolute';
+      var chipMode = (apEntry.wait_times_ui && apEntry.wait_times_ui.chip) || 'absolute';
       var waitLineHtml = window.chipQueueWaitLineHtml(row.queues, esc, chipMode);
-      var waitsHtml = '';
+      var waitsHtml;
       if (waitLineHtml) {
         waitsHtml = waitLineHtml;
       } else {
@@ -318,12 +319,7 @@
     html += '<span class="airport-search-more-slot">';
     if (more > 0) {
       var moreTitle =
-        more +
-        ' more terminal' +
-        (more === 1 ? '' : 's') +
-        ' — open ' +
-        code +
-        ' for full list';
+        more + ' more terminal' + (more === 1 ? '' : 's') + ' — open ' + code + ' for full list';
       html +=
         '<span class="airport-search-chip-more" title="' +
         esc(moreTitle) +
@@ -394,13 +390,12 @@
     var metros = {};
     var activeIndex = -1;
     var open = false;
-    var heightBoundaryObserver = null;
+    var heightBoundaryObserver;
     var listId = list.id || 'airport-search-results';
     var matchOrderState = { prevSetKey: null, prevOrder: [] };
 
     var mqSearchMobile = window.matchMedia('(max-width: 768px)');
-    var mqReduceMotion =
-      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    var mqReduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
     function onSearchViewportChange() {
       if (!open) return;
       syncPanelMaxHeight();
@@ -429,9 +424,7 @@
         panelTop -= new DOMMatrixReadOnly(panelTransform).m42;
       }
       if (!isFinite(panelTop)) return;
-      var availableHeight = Math.floor(
-        heightBoundary.getBoundingClientRect().bottom - panelTop
-      );
+      var availableHeight = Math.floor(heightBoundary.getBoundingClientRect().bottom - panelTop);
       if (availableHeight > 0) panel.style.maxHeight = availableHeight + 'px';
     }
 
@@ -553,9 +546,7 @@
             '<span class="airport-search-name">' +
             esc(row.display_name) +
             '</span></div>' +
-            (meta
-              ? '<div class="airport-search-row__meta muted">' + esc(meta) + '</div>'
-              : '') +
+            (meta ? '<div class="airport-search-row__meta muted">' + esc(meta) + '</div>' : '') +
             '</div>' +
             searchChipsHtmlForRow(row, latestJson, rows) +
             '</div>';
@@ -705,7 +696,7 @@
         input.focus();
         openPanel();
       },
-      true
+      true,
     );
   }
 

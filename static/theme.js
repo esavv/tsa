@@ -1,10 +1,8 @@
 (function () {
   var STORAGE_KEY = 'tsa-theme';
   var root = document.documentElement;
-  var deviceQuery =
-    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-  var viewportQuery =
-    window.matchMedia && window.matchMedia('(max-width: 768px)');
+  var deviceQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  var viewportQuery = window.matchMedia && window.matchMedia('(max-width: 768px)');
   var shortcutLabel = '⌘I';
 
   function validPreference(value) {
@@ -20,7 +18,7 @@
     try {
       var stored = localStorage.getItem(STORAGE_KEY);
       return validPreference(stored) ? stored : 'system';
-    } catch (_e) {
+    } catch {
       return 'system';
     }
   }
@@ -44,9 +42,7 @@
     document.querySelectorAll('[data-theme-trigger]').forEach(function (button) {
       button.setAttribute(
         'aria-label',
-        preference === 'system'
-          ? 'Theme: match device'
-          : 'Theme: ' + resolved + ' mode'
+        preference === 'system' ? 'Theme: match device' : 'Theme: ' + resolved + ' mode',
       );
       var title =
         preference === 'system'
@@ -65,13 +61,15 @@
     if (persist !== false) {
       try {
         localStorage.setItem(STORAGE_KEY, preference);
-      } catch (_e) {}
+      } catch {
+        /* Storage may be unavailable in privacy-restricted browsing contexts. */
+      }
     }
     syncPicker();
     window.dispatchEvent(
       new CustomEvent('tsa-theme-change', {
         detail: { preference: preference, resolved: resolved },
-      })
+      }),
     );
   }
 
@@ -128,15 +126,10 @@
         trigger.focus();
         return;
       }
-      if (
-        menu.hidden ||
-        (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')
-      ) {
+      if (menu.hidden || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) {
         return;
       }
-      var choices = Array.prototype.slice.call(
-        menu.querySelectorAll('[data-theme-choice]')
-      );
+      var choices = Array.prototype.slice.call(menu.querySelectorAll('[data-theme-choice]'));
       var current = choices.indexOf(document.activeElement);
       var direction = event.key === 'ArrowDown' ? 1 : -1;
       if (current < 0) current = direction > 0 ? -1 : 0;
@@ -149,11 +142,7 @@
   document.querySelectorAll('[data-theme-picker]').forEach(initPicker);
   document.addEventListener('keydown', function (event) {
     var shortcut =
-      event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey &&
-      !event.shiftKey &&
-      event.code === 'KeyI';
+      event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.code === 'KeyI';
     if (
       event.defaultPrevented ||
       !shortcut ||
@@ -163,10 +152,7 @@
       return;
     }
     var active = document.activeElement;
-    if (
-      active &&
-      (active.matches('input, textarea, select') || active.isContentEditable)
-    ) {
+    if (active && (active.matches('input, textarea, select') || active.isContentEditable)) {
       return;
     }
     var picker = document.querySelector('[data-theme-picker]');
@@ -217,10 +203,4 @@
   }
 
   syncPicker();
-  window.tsaTheme = {
-    apply: function (preference) {
-      applyTheme(preference, true);
-    },
-    preference: currentPreference,
-  };
 })();
