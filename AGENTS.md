@@ -1,4 +1,4 @@
-Agent: Do not modify this file unless explicitly requested
+AGENT: DO NOT MODIFY THIS FILE UNLESS EXPLICITLY ASKED
 
 ## Project Context
 - This is a lightweight TSA wait-time tracker for US airports
