@@ -87,6 +87,7 @@ SCRAPE_AIRPORTS = (
     "PHL",
     "BWI",
 )
+MAX_TERMINAL_NAME_LEN = 40
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Encoding": "gzip, deflate",
@@ -1429,6 +1430,16 @@ def _wait_row_has_signal(row: dict) -> bool:
     )
 
 
+def _wait_row_terminal_is_plausible(row: dict) -> bool:
+    """Terminal names are short labels, so prose means we parsed the wrong thing.
+
+    LAX once rendered a backend capacity error into its wait-times table and we
+    stored the whole sentence as a terminal. The longest real name is
+    'International' at 13 characters.
+    """
+    return len(str(row.get("terminal") or "")) <= MAX_TERMINAL_NAME_LEN
+
+
 def fetch_airport(airport: str) -> list[dict]:
     if airport in NYC_AIRPORTS:
         return fetch_nyc_airport(airport)
@@ -1475,6 +1486,8 @@ def store(db_path: str, rows: list[dict], scraped_at_utc: str) -> int:
                 "wait row must set at least one of wait_minutes, wait_min_minutes, "
                 f"wait_max_minutes: {row!r}"
             )
+        if not _wait_row_terminal_is_plausible(row):
+            raise ValueError(f"terminal name is too long to be a real label: {row!r}")
         try:
             cur.execute(
                 """
