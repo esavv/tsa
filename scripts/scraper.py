@@ -15,6 +15,7 @@ import urllib.request
 import zlib
 from datetime import datetime, timezone
 from html.parser import HTMLParser
+from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
 NYC_API_BASE = (
@@ -1271,19 +1272,48 @@ PHL_METRIC_MAP: dict[int, tuple[str, str, str, str]] = {
 }
 
 
-def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, tuple[str, str]]:
-    m = re.search(r"const\s+tHours\s*=\s*\{(?P<body>.*?)\};", js_text, flags=re.DOTALL)
-    if not m:
-        raise ValueError("PHL wait-api.js missing tHours block")
-    hours: dict[str, tuple[str, str]] = {}
-    entry_re = re.compile(
-        r"['\"](?P<key>[^'\"]+)['\"]\s*:\s*\{\s*"
-        r"['\"]open['\"]\s*:\s*['\"](?P<open>\d{2}:\d{2})['\"]\s*,\s*"
-        r"['\"]close['\"]\s*:\s*['\"](?P<close>\d{2}:\d{2})['\"]\s*,?\s*\}",
-        flags=re.DOTALL,
+class PhlSchedule(NamedTuple):
+    open_time: str
+    close_time: str
+    # JavaScript weekday numbers (0=Sunday). None means every day.
+    days: frozenset[int] | None
+
+
+# Entry keys stay quoted, but the properties inside them may or may not be, and
+# the site adds optional properties such as `days`, so match each field on its
+# own rather than pinning the shape of the whole object.
+_PHL_HOURS_BLOCK_RE = re.compile(r"tHours\s*=\s*\{(?P<body>.*?)\};", flags=re.DOTALL)
+_PHL_HOURS_ENTRY_RE = re.compile(
+    r"['\"](?P<key>[^'\"]+)['\"]\s*:\s*\{(?P<body>[^{}]*)\}"
+)
+_PHL_DAYS_RE = re.compile(r"['\"]?days['\"]?\s*:\s*\[(?P<days>[^\]]*)\]")
+
+
+def _phl_entry_time(body: str, field: str) -> str | None:
+    match = re.search(
+        rf"['\"]?{field}['\"]?\s*:\s*['\"](?P<value>\d{{2}}:\d{{2}})['\"]", body
     )
-    for item in entry_re.finditer(m.group("body")):
-        hours[item.group("key")] = (item.group("open"), item.group("close"))
+    return match.group("value") if match else None
+
+
+def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, PhlSchedule]:
+    block = _PHL_HOURS_BLOCK_RE.search(js_text)
+    if not block:
+        raise ValueError("PHL wait-api.js missing tHours block")
+    hours: dict[str, PhlSchedule] = {}
+    for item in _PHL_HOURS_ENTRY_RE.finditer(block.group("body")):
+        body = item.group("body")
+        open_time = _phl_entry_time(body, "open")
+        close_time = _phl_entry_time(body, "close")
+        if not open_time or not close_time:
+            continue
+        days_match = _PHL_DAYS_RE.search(body)
+        days = (
+            frozenset(int(d) for d in re.findall(r"\d+", days_match.group("days")))
+            if days_match
+            else None
+        )
+        hours[item.group("key")] = PhlSchedule(open_time, close_time, days)
     missing = sorted({meta[3] for meta in PHL_METRIC_MAP.values()} - set(hours))
     if missing:
         raise ValueError(
@@ -1292,14 +1322,17 @@ def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, tuple[str, str]]:
     return hours
 
 
-def _phl_schedule_is_open(hours: dict[str, tuple[str, str]], schedule_key: str) -> bool:
-    open_time, close_time = hours[schedule_key]
-    if open_time == close_time:
+def _phl_schedule_is_open(hours: dict[str, PhlSchedule], schedule_key: str) -> bool:
+    schedule = hours[schedule_key]
+    if schedule.open_time == schedule.close_time:
         return False
-    now = datetime.now(ZoneInfo("America/New_York")).strftime("%H:%M")
-    if open_time < close_time:
-        return open_time < now < close_time
-    return now > open_time or now < close_time
+    now_local = datetime.now(ZoneInfo("America/New_York"))
+    if schedule.days is not None and now_local.isoweekday() % 7 not in schedule.days:
+        return False
+    now = now_local.strftime("%H:%M")
+    if schedule.open_time < schedule.close_time:
+        return schedule.open_time < now < schedule.close_time
+    return now > schedule.open_time or now < schedule.close_time
 
 
 def fetch_phl_airport() -> list[dict]:
