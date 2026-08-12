@@ -8,16 +8,13 @@ import json
 import math
 import os
 import re
-import signal
 import sqlite3
-import subprocess
-import sys
-import tempfile
 import time
 import urllib.parse
 import urllib.request
 import zlib
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from zoneinfo import ZoneInfo
 
 NYC_API_BASE = (
@@ -33,120 +30,6 @@ MIA_WAIT_TIMES_PAGE_URL = "https://www.miami-airport.com/tsa-waittimes.asp"
 SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
 DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
 ATL_TIMES_URL = "https://www.atl.com/times/"
-ATL_LEGACY_DOM_SELECTOR = "#nesclasser2 .declasser3 button span"
-ATL_NAVIGATION_MS = 60_000
-ATL_LAYOUT_READY_MS = 60_000
-ATL_LEGACY_FALLBACK_MS = 30_000
-# Wall-clock cap for the out-of-process ATL Playwright worker (sum of in-page
-# timeouts is ~3 min; this is the kill-the-subprocess-group backstop).
-ATL_WORKER_TIMEOUT_S = 240
-ATL_NEW_SCAN_JS = r"""() => {
-    const norm = (el) => (typeof el === "string" ? el : (el.textContent || ""))
-        .replace(/\s+/g, " ")
-        .trim();
-    const apo = (s) => s.replace(/[\u2018\u2019`]/g, "'");
-    const realmFromH1 = (tRaw) => {
-        const t = apo(tRaw).toUpperCase();
-        if (t === "DOMESTIC") return "Domestic";
-        if (t === "INT'L" || t.includes("INT'L")) return "International";
-        if (t.startsWith("INT")) return "International";
-        if (t.includes("INTERNATIONAL")) return "International";
-        return "";
-    };
-    const findWait = (h3) => {
-        const n = (x) => (x.textContent || "").replace(/\s+/g, " ").trim();
-        let el = h3.nextElementSibling;
-        for (let i = 0; i < 12 && el; i++, el = el.nextElementSibling) {
-            if (el.tagName === "H1" || el.tagName === "H2") break;
-            const t = n(el);
-            if (/^\d+$/.test(t)) return t;
-            const btn = el.querySelector("button");
-            if (btn) {
-                const bt = n(btn);
-                if (/^\d+$/.test(bt)) return bt;
-            }
-            for (const ch of el.children) {
-                const ct = n(ch);
-                if (/^\d+$/.test(ct)) return ct;
-            }
-        }
-        const p = h3.parentElement;
-        if (p && p.parentElement) {
-            const row = p.parentElement;
-            for (const cell of row.children) {
-                if (cell.contains(h3)) continue;
-                const t = n(cell);
-                if (/^\d+$/.test(t)) return t;
-                const b = cell.querySelector("button");
-                if (b && /^\d+$/.test(n(b))) return n(b);
-            }
-        }
-        return "";
-    };
-    const root = document.querySelector("main") || document.querySelector("#content")
-        || document.body;
-    let realm = "";
-    let seenTsa = false;
-    const results = [];
-    for (const el of root.querySelectorAll("h1, h2, h3")) {
-        if (el.tagName === "H1") {
-            const t = norm(el);
-            if (t.includes("TSA Security")) {
-                seenTsa = true;
-                realm = "";
-                continue;
-            }
-            if (!seenTsa) continue;
-            const r = realmFromH1(t);
-            if (r) {
-                realm = r;
-                continue;
-            }
-            if (t === "ALERTS" || t.includes("Copyright")) realm = "";
-            continue;
-        }
-        if (!seenTsa || !realm || el.tagName !== "H2") continue;
-        const h2 = el;
-        let h3 = h2.nextElementSibling;
-        while (h3 && h3.tagName !== "H3") {
-            if (h3.tagName === "H1" || h3.tagName === "H2") break;
-            h3 = h3.nextElementSibling;
-        }
-        if (!h3 || h3.tagName !== "H3") continue;
-        const waitText = findWait(h3);
-        if (!waitText) continue;
-        results.push({
-            realm,
-            checkpoint: norm(h2),
-            sub: norm(h3),
-            waitText,
-        });
-    }
-    return results;
-}"""
-ATL_LEGACY_SCAN_JS = r"""() => {
-    const results = [];
-    function scan(section, realm) {
-        if (!section) return;
-        for (const row of section.querySelectorAll(":scope > .row")) {
-            const h2 = row.querySelector("h2");
-            const span = row.querySelector(".declasser3 button span");
-            if (!h2 || !span) continue;
-            const h3 = row.querySelector("h3");
-            results.push({
-                realm,
-                checkpoint: h2.textContent.trim(),
-                sub: h3 ? h3.textContent.trim() : "",
-                waitText: span.textContent.trim(),
-            });
-        }
-    }
-    const root = document.querySelector("#nesclasser2");
-    if (!root) return [];
-    scan(root.querySelector(".col-lg-4.nesclasser2"), "Domestic");
-    scan(root.querySelector(".col-lg-5.nesclasser1"), "International");
-    return results;
-}"""
 DFW_WAIT_TIMES_URL = "https://api.dfwairport.mobi/wait-times/checkpoint/DFW"
 DFW_MOBILE_API_KEY = "87856E0636AA4BF282150FCBE1AD63DE"
 DFW_MOBILE_API_VERSION = "170"
@@ -217,17 +100,61 @@ BROWSER_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
 }
+# Everything a real Chrome tab sends on a top-level navigation, including the
+# client hints and Sec-Fetch metadata. Cloudflare scores the completeness of
+# this set: ATL returns its challenge page to requests that omit it, and serves
+# the real page to requests that include it.
+CHROME_NAV_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,image/apng,*/*;q=0.8"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate",
+    "sec-ch-ua": '"Chromium";v="131", "Not_A Brand";v="24", "Google Chrome";v="131"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+# Residential egress, used only by sources that block this host's datacenter IP.
+PROXY_ENV_VAR = "SCRAPE_PROXY_URL"
+# Bounds a hung socket without failing slow-but-healthy sources: the slowest
+# successful non-ATL fetch on record is DTW at ~31s.
+FETCH_TIMEOUT_S = 60
 SCRAPE_ERROR_MAX_LEN = 2048
 TAG_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
 
 
-def fetch_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
+def _proxy_opener() -> urllib.request.OpenerDirector:
+    proxy_url = os.environ.get(PROXY_ENV_VAR, "").strip()
+    if not proxy_url:
+        raise RuntimeError(
+            f"{PROXY_ENV_VAR} is not set; this source needs residential egress"
+        )
+    handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+    return urllib.request.build_opener(handler)
+
+
+def fetch_bytes(
+    url: str,
+    headers: dict[str, str] | None = None,
+    use_proxy: bool = False,
+) -> bytes:
     merged_headers = dict(DEFAULT_HEADERS)
     if headers:
         merged_headers.update(headers)
     req = urllib.request.Request(url, headers=merged_headers)
-    with urllib.request.urlopen(req) as resp:
+    opener = _proxy_opener().open if use_proxy else urllib.request.urlopen
+    with opener(req, timeout=FETCH_TIMEOUT_S) as resp:
         body = resp.read()
         encoding = (resp.headers.get("Content-Encoding") or "").lower()
         if "gzip" in encoding:
@@ -237,12 +164,22 @@ def fetch_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
         return body
 
 
-def fetch_text(url: str, headers: dict[str, str] | None = None) -> str:
-    return fetch_bytes(url, headers=headers).decode("utf-8", errors="ignore")
+def fetch_text(
+    url: str,
+    headers: dict[str, str] | None = None,
+    use_proxy: bool = False,
+) -> str:
+    return fetch_bytes(url, headers=headers, use_proxy=use_proxy).decode(
+        "utf-8", errors="ignore"
+    )
 
 
-def fetch_json_url(url: str, headers: dict[str, str] | None = None):
-    return json.loads(fetch_text(url, headers=headers))
+def fetch_json_url(
+    url: str,
+    headers: dict[str, str] | None = None,
+    use_proxy: bool = False,
+):
+    return json.loads(fetch_text(url, headers=headers, use_proxy=use_proxy))
 
 
 def clean_html_text(value: str) -> str:
@@ -1097,162 +1034,146 @@ def _atl_scan_items_to_rows(raw: list) -> list[dict]:
     return rows
 
 
-def _atl_playwright_debug_excerpt(page) -> str:
-    """Compact page state for scrape_airport_stats.error when ATL Playwright fails."""
-    try:
-        probe: dict = page.evaluate(
-            r"""() => {
-                const t = (document.body && document.body.innerText) ? document.body.innerText : "";
-                const head = t.slice(0, 400).replace(/\s+/g, " ").trim();
-                const blob = ((document.title || "") + " " + t.slice(0, 300)).toLowerCase();
-                const h1s = [...document.querySelectorAll("h1")]
-                    .slice(0, 8)
-                    .map((h) => (h.innerText || "").replace(/\s+/g, " ").trim())
-                    .filter(Boolean);
-                return {
-                    title: document.title || "",
-                    url: location.href || "",
-                    legacy_dom: !!document.querySelector("#nesclasser2"),
-                    tsa_h1: [...document.querySelectorAll("h1")].some((h) =>
-                        (h.innerText || "").includes("TSA Security")),
-                    cf_guess: /just a moment|checking your browser|cf-browser-verification|cloudflare/i.test(
-                        blob,
-                    ),
-                    h1_join: h1s.join(" | "),
-                    body_head: head,
-                };
-            }"""
-        )
-    except Exception as snap:
-        return f"snapshot_failed={type(snap).__name__}:{snap}"
+class _AtlCheckpointParser(HTMLParser):
+    """Pull checkpoint rows out of ATL's ``#nesclasser2`` wait-times block.
 
-    title = str(probe.get("title") or "")[:100]
-    url_s = str(probe.get("url") or "")[:160]
-    h1j = str(probe.get("h1_join") or "")[:220]
-    body_h = str(probe.get("body_head") or "")[:220]
+    The page nests each realm's checkpoints in its own column, and every row
+    pairs a checkpoint heading with the wait number rendered inside a
+    ``.declasser3`` button. Some headings are commented out in the markup, so
+    this walks real tags rather than matching on raw text.
+    """
+
+    _REALM_MARKERS = (
+        ("nesclasser2", "Domestic"),
+        ("nesclasser1", "International"),
+    )
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.items: list[dict] = []
+        self._depth = 0
+        self._realm = ""
+        self._realm_depth = -1
+        self._wait_depth = -1
+        self._capturing: str | None = None
+        self._buffer: list[str] = []
+        self._pending: dict | None = None
+
+    def _flush_pending(self) -> None:
+        if self._pending and self._pending["waitText"]:
+            self.items.append(self._pending)
+        self._pending = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "div":
+            self._depth += 1
+            classes = set((dict(attrs).get("class") or "").split())
+            if "declasser3" in classes and self._wait_depth < 0:
+                self._wait_depth = self._depth
+            if self._realm_depth < 0:
+                for marker, realm in self._REALM_MARKERS:
+                    if marker in classes and "container-fluid" not in classes:
+                        self._realm = realm
+                        self._realm_depth = self._depth
+                        break
+            return
+        if not self._realm:
+            return
+        if tag in ("h2", "h3") or (tag == "span" and self._wait_depth >= 0):
+            self._capturing = "wait" if tag == "span" else tag
+            self._buffer = []
+
+    def handle_data(self, data: str) -> None:
+        if self._capturing:
+            self._buffer.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._capturing and (
+            tag == self._capturing or (tag == "span" and self._capturing == "wait")
+        ):
+            text = SPACE_RE.sub(" ", "".join(self._buffer)).strip()
+            field = self._capturing
+            self._capturing = None
+            self._buffer = []
+            if field == "h2":
+                self._flush_pending()
+                self._pending = {
+                    "realm": self._realm,
+                    "checkpoint": text,
+                    "sub": "",
+                    "waitText": "",
+                }
+            elif field == "h3" and self._pending and not self._pending["sub"]:
+                self._pending["sub"] = text
+            elif field == "wait" and self._pending and not self._pending["waitText"]:
+                self._pending["waitText"] = text
+        if tag != "div":
+            return
+        if self._depth == self._wait_depth:
+            self._wait_depth = -1
+        if self._depth == self._realm_depth:
+            self._flush_pending()
+            self._realm = ""
+            self._realm_depth = -1
+        self._depth -= 1
+
+    def close(self) -> None:
+        super().close()
+        self._flush_pending()
+
+
+def _atl_page_debug_excerpt(page: str) -> str:
+    """Compact page state for scrape_airport_stats.error when ATL parsing fails."""
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", page, re.IGNORECASE | re.S)
+    title = clean_html_text(title_match.group(1))[:100] if title_match else ""
+    challenged = bool(
+        re.search(
+            r"just a moment|checking your browser|cf-browser-verification", page, re.I
+        )
+    )
     return (
-        f"title={title!r} url={url_s!r} legacy_dom={probe.get('legacy_dom')} "
-        f"tsa_h1={probe.get('tsa_h1')} cf_guess={probe.get('cf_guess')} "
-        f"h1s={h1j!r} body_head={body_h!r}"
+        f"len={len(page)} title={title!r} challenge={challenged} "
+        f"legacy_dom={'nesclasser2' in page}"
     )
 
 
 def fetch_atl_airport() -> list[dict]:
-    """Run the ATL Playwright scrape in a subprocess with a hard wall-clock timeout.
+    """Read ATL's wait times straight from the server-rendered HTML.
 
-    A Chromium hang in ``page.evaluate`` or during cleanup
-    (``context.close`` / ``browser.close``) can wedge the scrape indefinitely
-    and leave orphaned chromium children. Running out-of-process with
-    ``start_new_session=True`` means a timeout kill propagates to the whole
-    process group, so chromium children die with the worker rather than
-    accumulating across cron runs.
+    The page needs no JavaScript, but Cloudflare challenges requests whose
+    headers do not look like a browser navigation. If the direct request is
+    challenged anyway, retry through the residential proxy when one is
+    configured.
     """
-    fd, out_path = tempfile.mkstemp(prefix="atl_worker_", suffix=".json")
-    os.close(fd)
+    page = ""
+    direct_error = ""
     try:
-        proc = subprocess.Popen(
-            [
-                sys.executable,
-                os.path.abspath(__file__),
-                "--atl-worker-output",
-                out_path,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True,
+        page = fetch_text(ATL_TIMES_URL, headers=CHROME_NAV_HEADERS)
+        rows = _atl_scan_items_to_rows(_atl_parse_page(page))
+        if rows:
+            return rows
+        direct_error = "no checkpoint rows; " + _atl_page_debug_excerpt(page)
+    except Exception as exc:
+        direct_error = f"{type(exc).__name__}: {exc}"
+
+    if not os.environ.get(PROXY_ENV_VAR, "").strip():
+        raise RuntimeError(f"ATL direct fetch failed ({direct_error}); no proxy set")
+
+    page = fetch_text(ATL_TIMES_URL, headers=CHROME_NAV_HEADERS, use_proxy=True)
+    rows = _atl_scan_items_to_rows(_atl_parse_page(page))
+    if not rows:
+        raise RuntimeError(
+            f"ATL direct fetch failed ({direct_error}); proxy retry also found "
+            f"no rows: {_atl_page_debug_excerpt(page)}"
         )
-        try:
-            _, stderr = proc.communicate(timeout=ATL_WORKER_TIMEOUT_S)
-        except subprocess.TimeoutExpired as exc:
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            try:
-                proc.communicate(timeout=5)
-            except subprocess.TimeoutExpired:
-                pass
-            raise RuntimeError(
-                f"ATL worker exceeded {ATL_WORKER_TIMEOUT_S}s wall-clock; killed process group"
-            ) from exc
-
-        if proc.returncode != 0:
-            err = (stderr or b"").decode("utf-8", errors="replace").strip()[:1024]
-            raise RuntimeError(f"ATL worker exited {proc.returncode}: {err}")
-
-        try:
-            with open(out_path, encoding="utf-8") as f:
-                return json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"ATL worker produced no valid output: {exc}") from exc
-    finally:
-        try:
-            os.unlink(out_path)
-        except FileNotFoundError:
-            pass
-
-
-def _fetch_atl_airport_impl() -> list[dict]:
-    """Playwright-driven ATL scrape body; runs inside the subprocess worker."""
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 900},
-            locale="en-US",
-        )
-        page = context.new_page()
-        rows: list[dict] = []
-        try:
-            try:
-                page.goto(
-                    ATL_TIMES_URL,
-                    wait_until="domcontentloaded",
-                    timeout=ATL_NAVIGATION_MS,
-                )
-                page.wait_for_function(
-                    """() => {
-                    if (document.querySelector("#nesclasser2")) return true;
-                    return [...document.querySelectorAll("h1")].some((h) =>
-                        (h.innerText || "").includes("TSA Security"));
-                }""",
-                    timeout=ATL_LAYOUT_READY_MS,
-                )
-                page.wait_for_timeout(1500)
-                raw_new = page.evaluate(ATL_NEW_SCAN_JS)
-                rows = _atl_scan_items_to_rows(raw_new)
-                if not rows:
-                    try:
-                        page.wait_for_selector(
-                            ATL_LEGACY_DOM_SELECTOR,
-                            timeout=ATL_LEGACY_FALLBACK_MS,
-                        )
-                    except Exception:
-                        pass
-                    page.wait_for_timeout(500)
-                    raw_legacy = page.evaluate(ATL_LEGACY_SCAN_JS)
-                    rows = _atl_scan_items_to_rows(raw_legacy)
-            except Exception as exc:
-                ctx = _atl_playwright_debug_excerpt(page)
-                raise RuntimeError(f"{exc!s}\nATL_CTX {ctx}") from exc
-            if not rows:
-                ctx = _atl_playwright_debug_excerpt(page)
-                raise RuntimeError(
-                    "ATL page loaded but no checkpoint rows were found\nATL_CTX " + ctx
-                )
-        finally:
-            context.close()
-            browser.close()
-
     return rows
+
+
+def _atl_parse_page(page: str) -> list[dict]:
+    parser = _AtlCheckpointParser()
+    parser.feed(page)
+    parser.close()
+    return parser.items
 
 
 def fetch_msp_airport() -> list[dict]:
@@ -1768,19 +1689,10 @@ if __name__ == "__main__":
         metavar="CODE",
         help="DFW, CLT, MCO, or IAH only: print raw Mobi checkpoint JSON (includes attributes) for inspection; no DB write.",
     )
-    group.add_argument(
-        "--atl-worker-output",
-        metavar="PATH",
-        help=argparse.SUPPRESS,
-    )
     args = parser.parse_args()
     if args.preview:
         preview(args.preview)
     elif args.raw:
         print_mobi_raw(args.raw)
-    elif args.atl_worker_output:
-        rows = _fetch_atl_airport_impl()
-        with open(args.atl_worker_output, "w", encoding="utf-8") as f:
-            json.dump(rows, f)
     else:
         run()

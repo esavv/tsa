@@ -28,14 +28,23 @@ scp -i aws_ec2.pem ubuntu@tsa-times.com:/home/ubuntu/tsa/tsa.db ./tsa.db
    python3 scripts/init_db.py
    ```
 
-2. Install Playwright's Chromium build (needed for **ATL** scraping):
+2. Install Python dependencies:
 
    ```bash
    ./venv/bin/pip install -r requirements.txt
-   ./venv/bin/playwright install chromium
    ```
 
-   On Linux servers you may also need system libraries; see [Playwright system dependencies](https://playwright.dev/docs/intro#system-requirements).
+   The scraper is pure `urllib`; no browser runtime is needed.
+
+   Some airports block this host's datacenter IP address, so they need
+   residential egress. Set `SCRAPE_PROXY_URL` in `.env`:
+
+   ```
+   SCRAPE_PROXY_URL='http://login:password@gw.dataimpulse.com:823'
+   ```
+
+   **ATL** fetches directly and only falls back to the proxy if the direct
+   request is challenged, so in normal operation it uses no proxy bandwidth.
 
 3. Test the scraper once:
 
