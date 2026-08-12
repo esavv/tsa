@@ -473,7 +473,9 @@ def parse_microsoft_json_date(value: str | None) -> str | None:
 
 
 def fetch_sea_airport() -> list[dict]:
-    payload = fetch_json_url(SEA_WAIT_TIMES_URL)
+    # SEA blocks this host's datacenter IP outright, whatever headers we send,
+    # so this source always needs residential egress.
+    payload = fetch_json_url(SEA_WAIT_TIMES_URL, use_proxy=True)
     rows = []
     for checkpoint in payload:
         if not checkpoint.get("IsOpen") or not checkpoint.get("IsDataAvailable"):

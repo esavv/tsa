@@ -43,8 +43,10 @@ scp -i aws_ec2.pem ubuntu@tsa-times.com:/home/ubuntu/tsa/tsa.db ./tsa.db
    SCRAPE_PROXY_URL='http://login:password@gw.dataimpulse.com:823'
    ```
 
-   **ATL** fetches directly and only falls back to the proxy if the direct
-   request is challenged, so in normal operation it uses no proxy bandwidth.
+   **SEA** always uses the proxy, because it refuses this host's datacenter IP
+   whatever headers we send. **ATL** fetches directly and only falls back to the
+   proxy if the direct request is challenged. At a 15-minute cadence the two
+   together use roughly 90 MB per month.
 
 3. Test the scraper once:
 
