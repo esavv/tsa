@@ -9,7 +9,7 @@ AGENT: DO NOT MODIFY THIS FILE UNLESS EXPLICITLY ASKED
 - Analytics handled by PostHog
 - Feedback email info@tsa-times.com configured with ImprovMX, forwarding to my personal email
 - X/Twitter alerts via `@tsa_times`: after each scrape, `scripts/run_tweet_alerts.py` posts when enrolled airports cross wait thresholds (defaults 45/60/90 min; per-airport overrides in `data/airports.json`). Airports opt in with `tweet_alerts.enabled`; supports dry-run/backtest, 6h per-terminal cooldowns, escalation wording, a rolling weekly link budget, and links only during 6am–10pm airport-local time.
-- Tech stack: Python scrapers (mostly `urllib` against public JSON APIs; Playwright + Chromium for ATL's Cloudflare-gated page) writing to a local SQLite DB. Flask + Jinja templates serve the webapp; frontend is vanilla JS with Chart.js for historical charts. Deployed on EC2 behind nginx + certbot; scraper + alert runner run via cron every 15 min. X posts use Tweepy (OAuth 1.0a) with credentials in a local `.env`
+- Tech stack: Python scrapers (`urllib` against public JSON APIs and server-rendered HTML) writing to a local SQLite DB; no browser runtime. Two sources sit behind Cloudflare: ATL needs the full browser header set (`CHROME_NAV_HEADERS`) and falls back to the proxy if challenged, and SEA always needs residential egress via `SCRAPE_PROXY_URL`. Flask + Jinja templates serve the webapp; frontend is vanilla JS with Chart.js for historical charts. Deployed on EC2 behind nginx + certbot; scraper + alert runner run via cron every 15 min. X posts use Tweepy (OAuth 1.0a) with credentials in a local `.env`
 
 ## Develepment & Deployment
 - Local dev runs with a Python venv; production currently runs on EC2 with nginx + certbot (HTTPS) in front of Flask.
