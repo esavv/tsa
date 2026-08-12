@@ -397,16 +397,16 @@
         "la airport",
         "lax airport"
       ],
-      "wait_times_url": "https://www.flylax.com/wait-times",
+      "wait_times_url": null,
       "api_url": null,
       "wait_times_ui": {
         "chip": "absolute",
         "chart_series": ["absolute"]
       },
       "tweet_alerts": {
-        "enabled": true
+        "enabled": false
       },
-      "status": "active"
+      "status": "no_data"
     },
     {
       "code": "LGA",

@@ -26,7 +26,6 @@ NYC_AIRPORTS = {
     "JFK": "https://www.jfkairport.com/",
     "EWR": "https://www.newarkairport.com/",
 }
-LAX_WAIT_TIMES_URL = "https://www.flylax.com/wait-times"
 MIA_WAIT_TIMES_PAGE_URL = "https://www.miami-airport.com/tsa-waittimes.asp"
 SEA_WAIT_TIMES_URL = "https://www.portseattle.org/api/cwt/wait-times"
 DCA_WAIT_TIMES_URL = "https://www.flyreagan.com/security-wait-times"
@@ -72,7 +71,6 @@ SCRAPE_AIRPORTS = (
     "LGA",
     "JFK",
     "EWR",
-    "LAX",
     "MIA",
     "SEA",
     "DCA",
@@ -355,54 +353,6 @@ def fetch_nyc_airport(airport: str) -> list[dict]:
                 "wait_max_minutes": None,
                 "source_updated_at": point.get("updateTime") or None,
                 "point_id": point.get("pointID"),
-            }
-        )
-    return rows
-
-
-def fetch_lax_airport() -> list[dict]:
-    page = fetch_text(LAX_WAIT_TIMES_URL)
-    updated_match = re.search(
-        r"Data Last Updated:</div>\s*<div>(.*?)</div>",
-        page,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    source_updated_at = (
-        clean_html_text(updated_match.group(1)) if updated_match else None
-    )
-
-    body_match = re.search(
-        r"<tbody[^>]*>(.*?)</tbody>", page, flags=re.IGNORECASE | re.DOTALL
-    )
-    if not body_match:
-        raise ValueError("Could not find LAX wait-times table body")
-
-    rows = []
-    for tr_html in re.findall(
-        r"<tr[^>]*>(.*?)</tr>", body_match.group(1), flags=re.IGNORECASE | re.DOTALL
-    ):
-        cells = re.findall(
-            r"<td[^>]*>(.*?)</td>", tr_html, flags=re.IGNORECASE | re.DOTALL
-        )
-        if len(cells) < 3:
-            continue
-        terminal = normalize_terminal(cells[0])
-        lane = clean_html_text(cells[1])
-        wait_text = clean_html_text(cells[2])
-        w, lo, hi = parse_wait_text_to_fields(wait_text)
-        if w is None and lo is None and hi is None:
-            continue
-        rows.append(
-            {
-                "airport": "LAX",
-                "terminal": terminal,
-                "gate": "",
-                "queue_type": normalize_queue_type(lane),
-                "wait_minutes": w,
-                "wait_min_minutes": lo,
-                "wait_max_minutes": hi,
-                "source_updated_at": source_updated_at,
-                "point_id": None,
             }
         )
     return rows
@@ -1482,8 +1432,6 @@ def _wait_row_has_signal(row: dict) -> bool:
 def fetch_airport(airport: str) -> list[dict]:
     if airport in NYC_AIRPORTS:
         return fetch_nyc_airport(airport)
-    if airport == "LAX":
-        return fetch_lax_airport()
     if airport == "MIA":
         return fetch_mia_airport()
     if airport == "SEA":
