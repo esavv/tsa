@@ -1,35 +1,4 @@
-<!-- set-cursor:global:start; generated from ~/Projects/agentsmd/AGENTS.md; do not edit -->
 AGENT: DO NOT MODIFY THIS FILE UNLESS EXPLICITLY ASKED
-
-## Erik's coding setup
-
-Devices:
-- mac-mini: 2024 Mac Mini, Apple M4, 16GB memory, 256GB storage, macOS Tahoe 26.4
-- macbook-air: 2024 Macbook Air, Apple M3, 8GB memory, 256GB storage, macOS Sequoia 15.6.1
-- iphone-15: iPhone 15 Pro Max, 256GB storage, iOS 26.5
-
-The mini is my dev server running headless from my home. Accessed remotely primarily from the macbook, sometimes from my phone. All devices connected via Tailscale.
-
-This device is: mac-mini
-
-## Style rules
-
-- Always use ASD-STE100 Simplified Technical English when you talk to me 
-
-## git conventions
-
-- You must commit local changes immediately, early and often, unless told otherwise. No approval needed. But, never push your changes to remote unless given explicit permission
-- Prepend commit messages with "feat: " for features, "fix: " for bugfixes, "doc: " for readme and other docs changes, "chore" for admin tasks, etc. For major features, use "feat/feature-name: ", and for fixing security gaps use "fix/security: ". For code quality chores, use "chore/format", "chore/lint", "chore/tsc", "chore/knip" etc as appropriate.
-- If asked to build multiple features or fix multiple bugs at once, commit each feature and/or fix separately
-
-## Development conventions
-
-- When drafting commands for me to run, do not concat various commands with `&&` into one long and unreadable command (like `cd` and `git add` and `git commit`) and do not include `cd` commands. Just tell me which dir I should be in, and any other commands should be newline-separated
-- No cheating! No @ts-ignore or @ts-expect-error. No eslint-disable or biome-ignore comments. No type assertions (as, !) unless absolutely necessary. No skipping files or tests when running checks. All TypeScript uses strict mode with no any types.
-
-<!-- set-cursor:global:end -->
-
-<!-- set-cursor:agent-warning -->
 
 ## Project Context
 - This is a lightweight TSA wait-time tracker for US airports
