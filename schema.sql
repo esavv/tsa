@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS wait_times (
     UNIQUE(scraped_at_utc, airport, terminal, queue_type, gate)
 );
 
-CREATE INDEX IF NOT EXISTS idx_wait_times_scraped ON wait_times(scraped_at_utc);
 CREATE INDEX IF NOT EXISTS idx_wait_times_history
 ON wait_times(airport, terminal, gate, scraped_at_utc);
 
@@ -28,8 +27,6 @@ CREATE TABLE IF NOT EXISTS scrape_airport_stats (
     error TEXT,
     UNIQUE(scraped_at_utc, airport)
 );
-
-CREATE INDEX IF NOT EXISTS idx_scrape_airport_stats_scraped ON scrape_airport_stats(scraped_at_utc);
 
 -- Actual X posts, one row per terminal/chart target included in a post.
 -- Grouped airport alerts share the same tweet_id.

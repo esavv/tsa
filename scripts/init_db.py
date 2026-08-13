@@ -119,9 +119,15 @@ def migrate_wait_times_nullable_wait_minutes(conn: sqlite3.Connection) -> None:
     )
 
 
-def migrate_wait_times_drop_redundant_index(conn: sqlite3.Connection) -> None:
-    """Drop the index superseded by the history index's leftmost columns."""
-    conn.execute("DROP INDEX IF EXISTS idx_wait_times_airport_terminal")
+def migrate_drop_redundant_indexes(conn: sqlite3.Connection) -> None:
+    """Drop indexes covered by the leftmost columns of other indexes."""
+    conn.executescript(
+        """
+        DROP INDEX IF EXISTS idx_wait_times_airport_terminal;
+        DROP INDEX IF EXISTS idx_wait_times_scraped;
+        DROP INDEX IF EXISTS idx_scrape_airport_stats_scraped;
+        """
+    )
 
 
 def migrate_tweet_alerts_metadata_columns(conn: sqlite3.Connection) -> None:
@@ -168,7 +174,7 @@ def init_db(db_path: str | None = None) -> str:
     conn.executescript(schema_sql)
     migrate_wait_times_add_range_columns(conn)
     migrate_wait_times_nullable_wait_minutes(conn)
-    migrate_wait_times_drop_redundant_index(conn)
+    migrate_drop_redundant_indexes(conn)
     migrate_tweet_alerts_metadata_columns(conn)
     conn.commit()
     conn.close()
