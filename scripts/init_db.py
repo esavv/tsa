@@ -130,6 +130,49 @@ def migrate_drop_redundant_indexes(conn: sqlite3.Connection) -> None:
     )
 
 
+def migrate_wait_times_without_rowid(conn: sqlite3.Connection) -> None:
+    """Rebuild wait_times around its natural primary key when it still has a rowid."""
+    row = conn.execute(
+        "SELECT wr FROM pragma_table_list WHERE schema = 'main' AND name = 'wait_times'"
+    ).fetchone()
+    if row is None or int(row[0]) == 1:
+        return
+    conn.executescript(
+        """
+        BEGIN IMMEDIATE;
+        DROP TABLE IF EXISTS wait_times_new;
+        CREATE TABLE wait_times_new (
+            scraped_at_utc TEXT NOT NULL,
+            airport TEXT NOT NULL,
+            terminal TEXT NOT NULL,
+            gate TEXT NOT NULL DEFAULT '',
+            queue_type TEXT NOT NULL,
+            wait_minutes INTEGER,
+            wait_min_minutes INTEGER,
+            wait_max_minutes INTEGER,
+            source_updated_at TEXT,
+            point_id INTEGER,
+            PRIMARY KEY(scraped_at_utc, airport, terminal, queue_type, gate)
+        ) WITHOUT ROWID;
+        INSERT INTO wait_times_new (
+            scraped_at_utc, airport, terminal, gate, queue_type,
+            wait_minutes, wait_min_minutes, wait_max_minutes,
+            source_updated_at, point_id
+        )
+        SELECT
+            scraped_at_utc, airport, terminal, gate, queue_type,
+            wait_minutes, wait_min_minutes, wait_max_minutes,
+            source_updated_at, point_id
+        FROM wait_times;
+        DROP TABLE wait_times;
+        ALTER TABLE wait_times_new RENAME TO wait_times;
+        CREATE INDEX idx_wait_times_history
+            ON wait_times(airport, terminal, gate, scraped_at_utc);
+        COMMIT;
+        """
+    )
+
+
 def migrate_tweet_alerts_metadata_columns(conn: sqlite3.Connection) -> None:
     """Add generated-post, test, and link metadata to existing alert tables."""
     cur = conn.cursor()
@@ -175,6 +218,7 @@ def init_db(db_path: str | None = None) -> str:
     migrate_wait_times_add_range_columns(conn)
     migrate_wait_times_nullable_wait_minutes(conn)
     migrate_drop_redundant_indexes(conn)
+    migrate_wait_times_without_rowid(conn)
     migrate_tweet_alerts_metadata_columns(conn)
     conn.commit()
     conn.close()

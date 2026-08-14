@@ -1,6 +1,5 @@
 -- TSA security wait times: one row per checkpoint (terminal × optional gate × queue) per scrape
 CREATE TABLE IF NOT EXISTS wait_times (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
     scraped_at_utc TEXT NOT NULL,
     airport TEXT NOT NULL,
     terminal TEXT NOT NULL,
@@ -11,8 +10,8 @@ CREATE TABLE IF NOT EXISTS wait_times (
     wait_max_minutes INTEGER,
     source_updated_at TEXT,
     point_id INTEGER,
-    UNIQUE(scraped_at_utc, airport, terminal, queue_type, gate)
-);
+    PRIMARY KEY(scraped_at_utc, airport, terminal, queue_type, gate)
+) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS idx_wait_times_history
 ON wait_times(airport, terminal, gate, scraped_at_utc);
