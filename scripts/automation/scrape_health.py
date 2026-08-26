@@ -11,7 +11,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AIRPORTS_PATH = REPO_ROOT / "data" / "airports.json"
-DEFAULT_EC2_KEY = REPO_ROOT / "aws_ec2.pem"
+REPO_EC2_KEY = REPO_ROOT / "aws_ec2.pem"
+PRIMARY_EC2_KEY = Path.home() / "Projects" / "tsa" / "aws_ec2.pem"
+DEFAULT_EC2_KEY = REPO_EC2_KEY if REPO_EC2_KEY.exists() else PRIMARY_EC2_KEY
 DEFAULT_SSH_TARGET = "ubuntu@tsa-times.com"
 DEFAULT_REMOTE_DB = "/home/ubuntu/tsa/tsa.db"
 DEFAULT_THRESHOLD_HOURS = 24

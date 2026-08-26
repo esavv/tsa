@@ -241,3 +241,39 @@ chart target so subsequent production runs can enforce cooldowns.
 ```bash
 sqlite3 tsa.db "SELECT scraped_at_utc, airport, terminal, queue_type, wait_minutes FROM wait_times ORDER BY scraped_at_utc DESC LIMIT 20;"
 ```
+
+## Automated scrape incident monitor
+
+The Mac mini monitor performs a deterministic production database check before
+it invokes OpenCode. Active airports with no successful scrape or stored data
+for 24 hours become incidents. A separate 45-minute threshold detects a stopped
+scraper cron.
+
+The production agent prompt is reviewable at:
+
+```
+scripts/automation/prompts/scrape_incident_live.md
+```
+
+Run only the deterministic check:
+
+```bash
+./venv/bin/python scripts/automation/run_scrape_monitor.py --mode check
+```
+
+Run a read-only agent diagnosis:
+
+```bash
+./venv/bin/python scripts/automation/run_scrape_monitor.py --mode dry-run
+```
+
+The tracked `scripts/automation/com.tsa.scrape-monitor.plist` runs live mode at
+9:00 a.m. and 9:00 p.m. Mac local time. It is a source template and has no
+effect until it is copied to `~/Library/LaunchAgents/` and loaded with
+`launchctl`. Do not load it before the production prompt and deployment
+preconditions have been reviewed.
+
+Live incident state is stored in `~/.local/state/tsa-monitor/`. Agent transcripts
+are stored in `~/Library/Logs/tsa-monitor/`. The monitor never sends Hark
+notifications itself; the invoked agent sends confirmed-incident, deployed-fix,
+or unresolved-incident notifications.

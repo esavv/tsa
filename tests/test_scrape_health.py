@@ -8,8 +8,15 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from scripts.automation.run_scrape_monitor import AGENT_MODEL, build_dry_run_prompt
+from scripts.automation.run_scrape_monitor import (
+    AGENT_MODEL,
+    build_prompt,
+    detect_outcome,
+    incident_key,
+    retry_is_due,
+)
 from scripts.automation.scrape_health import HEALTH_SQL, evaluate_health
+from scripts.automation.validate_deployed_scrape import next_validation_time
 
 NOW = datetime(2026, 8, 26, 14, 0, tzinfo=timezone.utc)
 
@@ -116,12 +123,66 @@ class ScrapeHealthTests(unittest.TestCase):
 
     def test_dry_run_prompt_pins_safety_and_agent_notifications(self) -> None:
         report = self.evaluate([record("ATL")], ["ATL"])
-        prompt = build_dry_run_prompt(report)
+        prompt = build_prompt(report, "dry-run")
         self.assertEqual(AGENT_MODEL, "openai/gpt-5.6-sol")
         self.assertIn("Do not edit files", prompt)
         self.assertIn("Do not notify for a suspected or unconfirmed incident", prompt)
         self.assertIn("dry-run diagnosis with no fix deployed", prompt)
         json.dumps(report)
+
+    def test_live_prompt_requires_safe_deploy_and_scheduled_validation(self) -> None:
+        report = self.evaluate([record("ATL")], ["ATL"])
+        prompt = build_prompt(report, "live")
+        self.assertIn("deploy_production.sh", prompt)
+        self.assertIn("first three minutes", prompt)
+        self.assertIn("Let it sleep", prompt)
+        self.assertIn("MONITOR_RESOLVED", prompt)
+
+    def test_incident_key_ignores_current_runs_when_cron_is_healthy(self) -> None:
+        report = self.evaluate(
+            [
+                record(
+                    "ATL",
+                    success="2026-08-22T06:45:01Z",
+                    data="2026-08-22T06:45:01Z",
+                    ok=0,
+                )
+            ],
+            ["ATL"],
+        )
+        first_key = incident_key(report)
+        report["latest_scraper_run_at"] = "2026-08-26T14:00:00Z"
+        self.assertEqual(first_key, incident_key(report))
+
+    def test_retry_waits_until_state_deadline(self) -> None:
+        state = {
+            "incident_key": "ATL-1234",
+            "next_retry_at": "2026-08-27T14:00:00Z",
+        }
+        self.assertFalse(retry_is_due(state, "ATL-1234", NOW))
+        self.assertTrue(
+            retry_is_due(
+                state,
+                "ATL-1234",
+                datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc),
+            )
+        )
+        self.assertTrue(retry_is_due(state, "JFK-5678", NOW))
+
+    def test_detects_one_agent_outcome(self) -> None:
+        self.assertEqual(detect_outcome("MONITOR_RESOLVED", 0), "resolved")
+        self.assertEqual(detect_outcome("MONITOR_UNRESOLVED", 0), "unresolved")
+        self.assertEqual(detect_outcome("MONITOR_RESOLVED", 1), "failed")
+        self.assertEqual(
+            detect_outcome("MONITOR_RESOLVED MONITOR_UNRESOLVED", 0), "failed"
+        )
+
+    def test_validation_waits_for_next_quarter_hour_plus_four_minutes(self) -> None:
+        deployed_at = datetime(2026, 8, 26, 14, 52, tzinfo=timezone.utc)
+        self.assertEqual(
+            next_validation_time(deployed_at),
+            datetime(2026, 8, 26, 15, 4, tzinfo=timezone.utc),
+        )
 
 
 if __name__ == "__main__":
