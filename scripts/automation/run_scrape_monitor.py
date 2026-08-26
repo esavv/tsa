@@ -46,7 +46,15 @@ def build_prompt(report: dict, mode: str) -> str:
     placeholder = "{{MONITOR_EVIDENCE}}"
     if template.count(placeholder) != 1:
         raise RuntimeError(f"prompt must contain exactly one {placeholder} placeholder")
-    return template.replace(placeholder, json.dumps(report, indent=2))
+    prompt = template.replace(placeholder, json.dumps(report, indent=2))
+    incident_placeholder = "{{INCIDENT_KEY}}"
+    expected_incident_placeholders = 2 if mode == "live" else 0
+    if prompt.count(incident_placeholder) != expected_incident_placeholders:
+        raise RuntimeError(
+            f"prompt must contain {expected_incident_placeholders} "
+            f"{incident_placeholder} placeholders"
+        )
+    return prompt.replace(incident_placeholder, incident_key(report))
 
 
 def incident_key(report: dict) -> str:

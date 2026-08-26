@@ -30,13 +30,13 @@ All Hark notifications are your responsibility. The monitor and deployment scrip
 1. Read `AGENTS.md` and `docs/deploy.md` before making changes.
 2. Confirm the production failure from `scrape_airport_stats`, `wait_times`, logs, and a no-write source preview or request.
 3. Identify the root cause. Do not assume the deterministic monitor's diagnosis is correct.
-4. Fetch `origin/main`. Create an incident branch and an isolated Git worktree from `origin/main` before editing. Do not edit a dirty user worktree.
+4. Fetch `origin/main`. Use the incident branch `agent/scrape-{{INCIDENT_KEY}}` and isolated worktree `$HOME/.local/share/tsa-monitor/worktrees/{{INCIDENT_KEY}}`. Create them from `origin/main` before editing. Do not edit the primary worktree or a dirty user worktree. If this incident worktree already exists from an earlier unresolved attempt, verify that Git identifies it as the matching incident worktree before you reuse it. Never delete or replace an unknown path.
 5. Make the smallest correct source-specific change. Add or update focused fixtures and tests when parser behavior changes.
 6. Run the complete repository check with `npm run check` from the incident worktree.
 7. Run a no-write preview for every affected airport.
 8. Commit the fix using the repository conventions, push the incident branch, create a pull request, and merge it without waiting for human approval. Do not force-push or bypass checks.
 9. Resolve the exact merged `origin/main` commit before deployment.
-10. After the merge, remove only the incident worktree and local incident branch that you created. Do not remove any other worktree or branch.
+10. After a successful merge, remove only this incident worktree and local incident branch. Preserve it after an unresolved attempt so the next retry can inspect and resume the same work. Do not remove any other worktree or branch.
 
 ## Deployment Timing
 

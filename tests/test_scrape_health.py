@@ -131,12 +131,24 @@ class ScrapeHealthTests(unittest.TestCase):
         json.dumps(report)
 
     def test_live_prompt_requires_safe_deploy_and_scheduled_validation(self) -> None:
-        report = self.evaluate([record("ATL")], ["ATL"])
+        report = self.evaluate(
+            [
+                record(
+                    "ATL",
+                    success="2026-08-22T06:45:01Z",
+                    data="2026-08-22T06:45:01Z",
+                    ok=0,
+                )
+            ],
+            ["ATL"],
+        )
         prompt = build_prompt(report, "live")
         self.assertIn("deploy_production.sh", prompt)
         self.assertIn("first three minutes", prompt)
         self.assertIn("Let it sleep", prompt)
         self.assertIn("MONITOR_RESOLVED", prompt)
+        self.assertIn(".local/share/tsa-monitor/worktrees/ATL-", prompt)
+        self.assertNotIn("{{INCIDENT_KEY}}", prompt)
 
     def test_incident_key_ignores_current_runs_when_cron_is_healthy(self) -> None:
         report = self.evaluate(
