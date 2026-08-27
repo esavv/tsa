@@ -65,6 +65,26 @@ SAMPLE = """
 </body></html>
 """
 
+# Trimmed from ATL's current redesign. Closed cards remain in the page but do
+# not publish a numeric wait time.
+REDESIGN_SAMPLE = """
+<html><body>
+<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--live atl-wt-gauge--low"
+     data-checkpoint="main" data-layout="card">
+  <span class="atl-wt-sr-only">Main checkpoint: 10 minute wait, Low, open.</span>
+  <div class="atl-wt-gauge__value">10 Min</div>
+</div>
+<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--closed atl-wt-gauge--closed"
+     data-checkpoint="north" data-layout="card">
+  <div class="atl-wt-gauge__value atl-wt-gauge__value--state">Closed</div>
+</div>
+<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--live atl-wt-gauge--low"
+     data-checkpoint="intl_main" data-layout="card">
+  <div class="atl-wt-gauge__value">3 Min</div>
+</div>
+</body></html>
+"""
+
 CHALLENGE_PAGE = (
     "<html><head><title>Just a moment...</title></head>"
     "<body>Performing security verification</body></html>"
@@ -72,6 +92,13 @@ CHALLENGE_PAGE = (
 
 
 class TestAtlParser(unittest.TestCase):
+    def test_parses_open_redesign_cards_and_skips_closed_cards(self):
+        rows = _atl_scan_items_to_rows(_atl_parse_page(REDESIGN_SAMPLE))
+        self.assertEqual(
+            [(row["terminal"], row["gate"], row["wait_minutes"]) for row in rows],
+            [("Domestic", "Main", 10), ("International", "Main", 3)],
+        )
+
     def test_parses_each_checkpoint_with_its_realm(self):
         items = _atl_parse_page(SAMPLE)
         self.assertEqual(
