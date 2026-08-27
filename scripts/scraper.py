@@ -988,6 +988,70 @@ def _atl_scan_items_to_rows(raw: list) -> list[dict]:
     return rows
 
 
+class _AtlRedesignParser(HTMLParser):
+    """Pull open checkpoint rows from ATL's current wait-time cards."""
+
+    _CHECKPOINTS = {
+        "main": ("Domestic", "Main"),
+        "north": ("Domestic", "North"),
+        "lower_north": ("Domestic", "Lower North"),
+        "south": ("Domestic", "South"),
+        "intl_main": ("International", "Main"),
+    }
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.items: list[dict] = []
+        self._depth = 0
+        self._card_depth = -1
+        self._value_depth = -1
+        self._item: dict | None = None
+        self._buffer: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "div":
+            return
+        self._depth += 1
+        attributes = dict(attrs)
+        classes = set((attributes.get("class") or "").split())
+        checkpoint = attributes.get("data-checkpoint") or ""
+        if (
+            self._card_depth < 0
+            and "atl-security-wait-time" in classes
+            and "atl-security-wait-time--live" in classes
+            and checkpoint in self._CHECKPOINTS
+        ):
+            realm, name = self._CHECKPOINTS[checkpoint]
+            self._card_depth = self._depth
+            self._item = {
+                "realm": realm,
+                "checkpoint": name,
+                "sub": "",
+                "waitText": "",
+            }
+        elif self._card_depth >= 0 and "atl-wt-gauge__value" in classes:
+            self._value_depth = self._depth
+            self._buffer = []
+
+    def handle_data(self, data: str) -> None:
+        if self._value_depth >= 0:
+            self._buffer.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag != "div":
+            return
+        if self._depth == self._value_depth and self._item:
+            self._item["waitText"] = SPACE_RE.sub(" ", "".join(self._buffer)).strip()
+            self._value_depth = -1
+            self._buffer = []
+        if self._depth == self._card_depth:
+            if self._item and self._item["waitText"]:
+                self.items.append(self._item)
+            self._card_depth = -1
+            self._item = None
+        self._depth -= 1
+
+
 class _AtlCheckpointParser(HTMLParser):
     """Pull checkpoint rows out of ATL's ``#nesclasser2`` wait-times block.
 
@@ -1124,6 +1188,12 @@ def fetch_atl_airport() -> list[dict]:
 
 
 def _atl_parse_page(page: str) -> list[dict]:
+    redesign_parser = _AtlRedesignParser()
+    redesign_parser.feed(page)
+    redesign_parser.close()
+    if redesign_parser.items:
+        return redesign_parser.items
+
     parser = _AtlCheckpointParser()
     parser.feed(page)
     parser.close()
