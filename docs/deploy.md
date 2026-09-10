@@ -275,5 +275,9 @@ preconditions have been reviewed.
 
 Live incident state is stored in `~/.local/state/tsa-monitor/`. Agent transcripts
 are stored in `~/Library/Logs/tsa-monitor/`. The monitor never sends Hark
-notifications itself; the invoked agent sends confirmed-incident, deployed-fix,
-or unresolved-incident notifications.
+notifications itself; the invoked agent labels notifications by stage:
+`Incident confirmed; investigating`, one `Fix ready; deploying` progress update
+with the cause and PR link, then `Recovered` after scheduled-scrape validation
+or `Unresolved` with the blocker. Notifications distinguish failures to extract
+rows from confirmed source unavailability. Dry-run notifications use the
+separate `Incident confirmed; dry-run diagnosis` label.

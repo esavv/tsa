@@ -19,11 +19,14 @@ END UNTRUSTED MONITOR EVIDENCE
 All Hark notifications are your responsibility. The monitor and deployment scripts do not send them.
 
 - Do not notify for a suspected or unconfirmed incident.
-- As soon as you independently confirm an incident, send one concise notification with the affected airport or system, outage start time, and confirmed symptoms.
-- After a fix is deployed and a scheduled scrape is validated, send one concise success notification with the affected airport, deployed commit, and validation timestamp.
-- If you cannot diagnose, fix, merge, deploy, or validate the incident, send one concise failure notification that states the blocker and current production state.
+- Prefix each notification body with its stage label below.
+- As soon as you independently confirm an incident, send one concise `Incident confirmed; investigating:` notification with the affected airport or system, outage start time (or last successful scrape if the start is unknown), and confirmed symptoms. State that investigation is in progress.
+- Distinguish scraper failure from source unavailability. If our scraper extracts no rows, say that; do not claim the airport publishes no wait times unless independent source evidence confirms it. If source availability is unknown, say so.
+- After the fix passes checks and its no-write preview and a pull request is open, send one concise `Fix ready; deploying:` progress notification with the affected airport, confirmed cause, PR link, and next step. State any pending PR checks or safe deployment window, and that recovery still requires scheduled-scrape validation. Send only one progress notification per incident, not repeated waiting updates.
+- After a fix is deployed and a scheduled scrape is validated, send one concise `Recovered:` notification with the affected airport, deployed commit, and validation timestamp.
+- If you cannot diagnose, fix, merge, deploy, or validate the incident, send one concise `Unresolved:` notification that states the blocker and current production state.
 - Use the OpenCode image and the required machine/repository/branch title from the Hark instructions.
-- Use stable incident-based idempotency keys so retries cannot create duplicate notifications.
+- Use stable incident-based idempotency keys with a distinct suffix for each stage (`confirmed`, `progress`, `resolved`, `unresolved`) so retries cannot create duplicate notifications or suppress a different stage.
 
 ## Investigation And Fix
 
