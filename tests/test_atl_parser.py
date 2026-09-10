@@ -69,7 +69,7 @@ SAMPLE = """
 # not publish a numeric wait time.
 REDESIGN_SAMPLE = """
 <html><body>
-<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--live atl-wt-gauge--low"
+<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--manual atl-wt-gauge--low"
      data-checkpoint="main" data-layout="card">
   <span class="atl-wt-sr-only">Main checkpoint: 10 minute wait, Low, open.</span>
   <div class="atl-wt-gauge__value">10 Min</div>
@@ -78,7 +78,7 @@ REDESIGN_SAMPLE = """
      data-checkpoint="north" data-layout="card">
   <div class="atl-wt-gauge__value atl-wt-gauge__value--state">Closed</div>
 </div>
-<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--live atl-wt-gauge--low"
+<div class="atl-wt-gauge atl-security-wait-time atl-security-wait-time--manual atl-wt-gauge--low"
      data-checkpoint="intl_main" data-layout="card">
   <div class="atl-wt-gauge__value">3 Min</div>
 </div>
