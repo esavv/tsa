@@ -1018,7 +1018,7 @@ class _AtlRedesignParser(HTMLParser):
         if (
             self._card_depth < 0
             and "atl-security-wait-time" in classes
-            and "atl-security-wait-time--live" in classes
+            and "atl-security-wait-time--closed" not in classes
             and checkpoint in self._CHECKPOINTS
         ):
             realm, name = self._CHECKPOINTS[checkpoint]
