@@ -16,7 +16,7 @@ PRIMARY_EC2_KEY = Path.home() / "Projects" / "tsa" / "aws_ec2.pem"
 DEFAULT_EC2_KEY = REPO_EC2_KEY if REPO_EC2_KEY.exists() else PRIMARY_EC2_KEY
 DEFAULT_SSH_TARGET = "ubuntu@tsa-times.com"
 DEFAULT_REMOTE_DB = "/home/ubuntu/tsa/tsa.db"
-DEFAULT_THRESHOLD_HOURS = 24
+DEFAULT_THRESHOLD_HOURS = 12
 DEFAULT_CRON_STALE_MINUTES = 45
 INCIDENT_EXIT = 2
 

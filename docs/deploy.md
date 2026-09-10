@@ -246,7 +246,7 @@ sqlite3 tsa.db "SELECT scraped_at_utc, airport, terminal, queue_type, wait_minut
 
 The Mac mini monitor performs a deterministic production database check before
 it invokes OpenCode. Active airports with no successful scrape or stored data
-for 24 hours become incidents. A separate 45-minute threshold detects a stopped
+for 12 hours become incidents. A separate 45-minute threshold detects a stopped
 scraper cron.
 
 The production agent prompt is reviewable at:
