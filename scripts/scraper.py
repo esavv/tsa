@@ -10,6 +10,7 @@ import os
 import re
 import sqlite3
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
@@ -37,6 +38,7 @@ CLT_WAIT_TIMES_URL = "https://api.cltairport.mobi/wait-times/checkpoint/CLT"
 CLT_MOBILE_API_KEY = "5ccb418715f9428ca6cb4df1635d4815"
 CLT_MOBILE_API_VERSION = "130"
 MCO_WAIT_TIMES_URL = "https://api.goaa.aero/wait-times/checkpoint/MCO"
+MCO_FALLBACK_WAIT_TIMES_URL = "https://acc.api.goaa.aero/wait-times/checkpoint/MCO"
 MCO_MOBILE_API_KEY = "8eaac7209c824616a8fe58d22268cd59"
 MCO_MOBILE_API_VERSION = "140"
 IAH_WAIT_TIMES_URL = "https://api.houstonairports.mobi/wait-times/checkpoint/IAH"
@@ -510,7 +512,9 @@ def _mobi_optional_minutes_from_seconds(sec: object) -> int | None:
     return max(0, round(v / 60))
 
 
-def _fetch_mobi_checkpoint_json(url: str, api_key: str, api_version: str) -> dict:
+def _fetch_mobi_checkpoint_json(
+    url: str, api_key: str, api_version: str, use_proxy: bool = False
+) -> dict:
     payload = fetch_json_url(
         url,
         headers={
@@ -518,6 +522,7 @@ def _fetch_mobi_checkpoint_json(url: str, api_key: str, api_version: str) -> dic
             "api-version": str(api_version),
             "Accept": "application/json",
         },
+        use_proxy=use_proxy,
     )
     st = payload.get("status") or {}
     code = st.get("code")
@@ -730,9 +735,17 @@ def _parse_mobi_checkpoint_wait_rows(airport: str, payload: dict) -> list[dict]:
 
 
 def fetch_dfw_airport() -> list[dict]:
-    payload = _fetch_mobi_checkpoint_json(
-        DFW_WAIT_TIMES_URL, DFW_MOBILE_API_KEY, DFW_MOBILE_API_VERSION
-    )
+    try:
+        payload = _fetch_mobi_checkpoint_json(
+            DFW_WAIT_TIMES_URL, DFW_MOBILE_API_KEY, DFW_MOBILE_API_VERSION
+        )
+    except urllib.error.URLError:
+        payload = _fetch_mobi_checkpoint_json(
+            DFW_WAIT_TIMES_URL,
+            DFW_MOBILE_API_KEY,
+            DFW_MOBILE_API_VERSION,
+            use_proxy=True,
+        )
     return _parse_mobi_checkpoint_wait_rows("DFW", payload)
 
 
@@ -744,9 +757,16 @@ def fetch_clt_airport() -> list[dict]:
 
 
 def fetch_mco_airport() -> list[dict]:
-    payload = _fetch_mobi_checkpoint_json(
-        MCO_WAIT_TIMES_URL, MCO_MOBILE_API_KEY, MCO_MOBILE_API_VERSION
-    )
+    try:
+        payload = _fetch_mobi_checkpoint_json(
+            MCO_WAIT_TIMES_URL, MCO_MOBILE_API_KEY, MCO_MOBILE_API_VERSION
+        )
+    except urllib.error.URLError:
+        payload = _fetch_mobi_checkpoint_json(
+            MCO_FALLBACK_WAIT_TIMES_URL,
+            MCO_MOBILE_API_KEY,
+            MCO_MOBILE_API_VERSION,
+        )
     return _parse_mobi_checkpoint_wait_rows("MCO", payload)
 
 
