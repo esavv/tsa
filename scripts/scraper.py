@@ -1318,6 +1318,7 @@ class PhlSchedule(NamedTuple):
     close_time: str
     # JavaScript weekday numbers (0=Sunday). None means every day.
     days: frozenset[int] | None
+    day_overrides: dict[int, tuple[str | None, str | None]] | None = None
 
 
 # Entry keys stay quoted, but the properties inside them may or may not be, and
@@ -1325,9 +1326,15 @@ class PhlSchedule(NamedTuple):
 # own rather than pinning the shape of the whole object.
 _PHL_HOURS_BLOCK_RE = re.compile(r"tHours\s*=\s*\{(?P<body>.*?)\};", flags=re.DOTALL)
 _PHL_HOURS_ENTRY_RE = re.compile(
-    r"['\"](?P<key>[^'\"]+)['\"]\s*:\s*\{(?P<body>[^{}]*)\}"
+    r"['\"](?P<key>[^'\"]+)['\"]\s*:\s*\{(?P<body>.*?)\}\s*"
+    r"(?=,\s*['\"][^'\"]+['\"]\s*:|$)",
+    flags=re.DOTALL,
 )
 _PHL_DAYS_RE = re.compile(r"['\"]?days['\"]?\s*:\s*\[(?P<days>[^\]]*)\]")
+_PHL_BY_DAY_RE = re.compile(
+    r"['\"]?byDay['\"]?\s*:\s*\{(?P<body>.*?)\}\s*(?=,|$)", flags=re.DOTALL
+)
+_PHL_DAY_OVERRIDE_RE = re.compile(r"(?P<day>\d+)\s*:\s*\{(?P<body>[^{}]*)\}")
 
 
 def _phl_entry_time(body: str, field: str) -> str | None:
@@ -1354,7 +1361,19 @@ def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, PhlSchedule]:
             if days_match
             else None
         )
-        hours[item.group("key")] = PhlSchedule(open_time, close_time, days)
+        day_overrides = None
+        by_day_match = _PHL_BY_DAY_RE.search(body)
+        if by_day_match:
+            day_overrides = {}
+            for override in _PHL_DAY_OVERRIDE_RE.finditer(by_day_match.group("body")):
+                override_body = override.group("body")
+                day_overrides[int(override.group("day"))] = (
+                    _phl_entry_time(override_body, "open"),
+                    _phl_entry_time(override_body, "close"),
+                )
+        hours[item.group("key")] = PhlSchedule(
+            open_time, close_time, days, day_overrides
+        )
     missing = sorted({meta[3] for meta in PHL_METRIC_MAP.values()} - set(hours))
     if missing:
         raise ValueError(
@@ -1365,15 +1384,22 @@ def _parse_phl_checkpoint_hours(js_text: str) -> dict[str, PhlSchedule]:
 
 def _phl_schedule_is_open(hours: dict[str, PhlSchedule], schedule_key: str) -> bool:
     schedule = hours[schedule_key]
-    if schedule.open_time == schedule.close_time:
-        return False
     now_local = datetime.now(ZoneInfo("America/New_York"))
-    if schedule.days is not None and now_local.isoweekday() % 7 not in schedule.days:
+    weekday = now_local.isoweekday() % 7
+    if schedule.days is not None and weekday not in schedule.days:
+        return False
+    open_time = schedule.open_time
+    close_time = schedule.close_time
+    if schedule.day_overrides and weekday in schedule.day_overrides:
+        override_open, override_close = schedule.day_overrides[weekday]
+        open_time = override_open or open_time
+        close_time = override_close or close_time
+    if open_time == close_time:
         return False
     now = now_local.strftime("%H:%M")
-    if schedule.open_time < schedule.close_time:
-        return schedule.open_time < now < schedule.close_time
-    return now > schedule.open_time or now < schedule.close_time
+    if open_time < close_time:
+        return open_time < now < close_time
+    return now > open_time or now < close_time
 
 
 def fetch_phl_airport() -> list[dict]:
