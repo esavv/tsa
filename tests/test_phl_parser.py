@@ -15,10 +15,10 @@ if SCRIPT_DIR not in sys.path:
 
 from scraper import PhlSchedule, _parse_phl_checkpoint_hours, _phl_schedule_is_open
 
-# Current shape: entry keys quoted, properties bare, plus an optional `days`.
+# Current shape: entry keys quoted, properties bare, plus schedule overrides.
 CURRENT_JS = """
   const tHours = {
-    'tA': { open: '05:00', close: '22:15' },
+    'tA': { open: '05:00', close: '22:15', byDay: { 6: { open: '04:30' } } },
     'tAw1': { open: '15:00', close: '17:30', days: [0, 1, 4, 5] },
     'tAe': { open: '04:15', close: '20:15' },
     'tAepre': { open: '04:15', close: '18:30' },
@@ -55,6 +55,7 @@ class TestPhlCheckpointHours(unittest.TestCase):
         self.assertEqual(hours["tA"].open_time, "05:00")
         self.assertEqual(hours["tA"].close_time, "22:15")
         self.assertIsNone(hours["tA"].days)
+        self.assertEqual(hours["tA"].day_overrides, {6: ("04:30", None)})
 
     def test_still_parses_quoted_property_keys(self):
         hours = _parse_phl_checkpoint_hours(LEGACY_JS)
